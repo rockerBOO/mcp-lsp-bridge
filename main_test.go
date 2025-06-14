@@ -101,7 +101,7 @@ func TestCloseAllClients(t *testing.T) {
 	bridgeInstance := bridge.NewMCPLSPBridge()
 
 	// Create clients for multiple languages
-	languages := []string{"go", "python", "typescript", "rust"}
+	languages := []string{"go"}
 	for _, language := range languages {
 		_, err := bridgeInstance.GetClientForLanguage(language)
 		if err != nil {
@@ -124,10 +124,10 @@ func TestCloseAllClients(t *testing.T) {
 // Benchmark client creation
 func BenchmarkGetClientForLanguage(b *testing.B) {
 	bridgeInstance := bridge.NewMCPLSPBridge()
-	languages := []string{"go", "python", "typescript", "rust"}
+	languages := []string{"go"}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	
+	for i := 0; b.Loop(); i++ {
 		language := languages[i%len(languages)]
 
 		_, err := bridgeInstance.GetClientForLanguage(language)

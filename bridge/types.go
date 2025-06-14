@@ -12,7 +12,6 @@ type MCPLSPBridge struct {
 	server        *server.MCPServer
 	clients       map[string]*lsp.LanguageClient
 	config        *lsp.LSPServerConfig
-	currentClient *lsp.LanguageClient
 }
 
 // SemanticAnalysisResult holds the results of semantic analysis

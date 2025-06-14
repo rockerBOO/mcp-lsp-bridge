@@ -2,8 +2,8 @@ package mcpserver
 
 import (
 	"context"
-	"fmt"
 
+	"rockerboo/mcp-lsp-bridge/logger"
 	"rockerboo/mcp-lsp-bridge/lsp"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -23,30 +23,30 @@ func SetupMCPServer(bridge BridgeInterface) *server.MCPServer {
 	hooks := &server.Hooks{}
 
 	hooks.AddBeforeAny(func(ctx context.Context, id any, method mcp.MCPMethod, message any) {
-		fmt.Printf("beforeAny: %s, %v, %v\n", method, id, message)
+		logger.Debug("beforeAny:", method, id, message)
 	})
 	hooks.AddOnSuccess(func(ctx context.Context, id any, method mcp.MCPMethod, message any, result any) {
-		fmt.Printf("onSuccess: %s, %v, %v, %v\n", method, id, message, result)
+		logger.Info("onSuccess:", method, id, message, result)
 	})
 	hooks.AddOnError(func(ctx context.Context, id any, method mcp.MCPMethod, message any, err error) {
-		fmt.Printf("onError: %s, %v, %v, %v\n", method, id, message, err)
+		logger.Error("onError:", method, id, message, err)
 	})
 	hooks.AddBeforeInitialize(func(ctx context.Context, id any, message *mcp.InitializeRequest) {
-		fmt.Printf("beforeInitialize: %v, %v\n", id, message)
+		logger.Debug("beforeInitialize:", id, message)
 	})
 	hooks.AddOnRequestInitialization(func(ctx context.Context, id any, message any) error {
-		fmt.Printf("AddOnRequestInitialization: %v, %v\n", id, message)
+		logger.Debug("AddOnRequestInitialization:", id, message)
 		// authorization verification and other preprocessing tasks are performed.
 		return nil
 	})
 	hooks.AddAfterInitialize(func(ctx context.Context, id any, message *mcp.InitializeRequest, result *mcp.InitializeResult) {
-		fmt.Printf("afterInitialize: %v, %v, %v\n", id, message, result)
+		logger.Info("afterInitialize:", id, message, result)
 	})
 	hooks.AddAfterCallTool(func(ctx context.Context, id any, message *mcp.CallToolRequest, result *mcp.CallToolResult) {
-		fmt.Printf("afterCallTool: %v, %v, %v\n", id, message, result)
+		logger.Debug("afterCallTool:", id, message, result)
 	})
 	hooks.AddBeforeCallTool(func(ctx context.Context, id any, message *mcp.CallToolRequest) {
-		fmt.Printf("beforeCallTool: %v, %v\n", id, message)
+		logger.Debug("beforeCallTool:", id, message)
 	})
 
 	mcpServer := server.NewMCPServer(
@@ -58,7 +58,7 @@ func SetupMCPServer(bridge BridgeInterface) *server.MCPServer {
 	)
 
 	// Register MCP tools for code analysis
-	registerAnalyzeCodeTool(mcpServer)
+	registerAnalyzeCodeTool(mcpServer, bridge)
 	registerInferLanguageTool(mcpServer, bridge)
 	registerLSPConnectTool(mcpServer, bridge)
 	registerLSPDisconnectTool(mcpServer, bridge)

@@ -9,7 +9,7 @@ import (
 
 func TestNewLanguageClient(t *testing.T) {
 	// Use echo as a simple mock command
-	client, err := NewLanguageClient("echo")
+	client, err := NewLanguageClient("mock-lsp-server")
 	if err != nil {
 		t.Fatalf("Failed to create language client: %v", err)
 	}
@@ -20,18 +20,13 @@ func TestNewLanguageClient(t *testing.T) {
 		t.Fatal("NewLanguageClient returned nil")
 	}
 
-	// Verify initial state
-	if client.status != StatusConnected {
-		t.Errorf("Expected initial status to be Connected, got %v", client.status)
-	}
-
-	if !client.isConnected {
+	if !client.IsConnected() {
 		t.Error("Client should be marked as connected")
 	}
 }
 
 func TestLanguageClientMetrics(t *testing.T) {
-	client, err := NewLanguageClient("echo")
+	client, err := NewLanguageClient("mock-lsp-server")
 	if err != nil {
 		t.Fatalf("Failed to create language client: %v", err)
 	}
@@ -41,8 +36,8 @@ func TestLanguageClientMetrics(t *testing.T) {
 	for range 5 {
 		err := client.SendRequest(
 			"test/method",
-			map[string]interface{}{"key": "value"},
-			&map[string]interface{}{},
+			map[string]any{"key": "value"},
+			&map[string]any{},
 			1*time.Second,
 		)
 		// Ignore errors since we're using echo
@@ -57,12 +52,15 @@ func TestLanguageClientMetrics(t *testing.T) {
 	}
 
 	// Verify other metric properties
-	if metrics["command"] != "echo" {
+	if metrics["command"] != "mock-lsp-server" {
 		t.Errorf("Unexpected command: %v", metrics["command"])
 	}
 
-	if metrics["is_connected"] != true {
-		t.Error("Client should be marked as connected")
+	t.Logf("Metrics: %v", metrics)
+
+	// Since we're sending invalid method requests, the client should be marked as disconnected
+	if metrics["is_connected"] != false {
+		t.Error("Client should be marked as disconnected after failed requests")
 	}
 }
 
@@ -79,7 +77,7 @@ func TestLanguageClientClose(t *testing.T) {
 	}
 
 	// Verify post-close state
-	if client.isConnected {
+	if client.IsConnected() {
 		t.Error("Client should not be connected after Close()")
 	}
 
@@ -102,7 +100,7 @@ func TestSendRequestErrorHandling(t *testing.T) {
 }
 
 func TestClientCapabilitiesAndServerCapabilities(t *testing.T) {
-	client, err := NewLanguageClient("echo")
+	client, err := NewLanguageClient("mock-lsp-server")
 	if err != nil {
 		t.Fatalf("Failed to create language client: %v", err)
 	}
@@ -131,7 +129,7 @@ func TestClientCapabilitiesAndServerCapabilities(t *testing.T) {
 // Benchmark client creation and basic operations
 func BenchmarkLanguageClientCreation(b *testing.B) {
 	for b.Loop() {
-		client, err := NewLanguageClient("echo")
+		client, err := NewLanguageClient("mock-lsp-server")
 		if err != nil {
 			b.Fatalf("Failed to create language client: %v", err)
 		}
@@ -140,7 +138,7 @@ func BenchmarkLanguageClientCreation(b *testing.B) {
 }
 
 func BenchmarkSendRequest(b *testing.B) {
-	client, err := NewLanguageClient("echo")
+	client, err := NewLanguageClient("mock-lsp-server")
 	if err != nil {
 		b.Fatalf("Failed to create language client: %v", err)
 	}
@@ -149,8 +147,8 @@ func BenchmarkSendRequest(b *testing.B) {
 	for b.Loop() {
 		err := client.SendRequest(
 			"test/method",
-			map[string]interface{}{"key": "value"},
-			&map[string]interface{}{},
+			map[string]any{"key": "value"},
+			&map[string]any{},
 			1*time.Second,
 		)
 		// Ignore errors since echo doesn't understand LSP protocol

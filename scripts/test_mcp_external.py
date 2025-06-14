@@ -1,0 +1,414 @@
+#!/usr/bin/env python3
+"""
+MCP External Testing Script
+Tests the MCP-LSP Bridge server by simulating external client interactions
+"""
+
+import json
+import subprocess
+import time
+import os
+import sys
+import signal
+import threading
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+
+class Colors:
+    """ANSI color codes for terminal output"""
+    RED = '\033[0;31m'
+    GREEN = '\033[0;32m'
+    YELLOW = '\033[1;33m'
+    BLUE = '\033[0;34m'
+    NC = '\033[0m'  # No Color
+
+class TestResult:
+    """Represents the result of a test"""
+    def __init__(self, name: str, description: str):
+        self.name = name
+        self.description = description
+        self.success = False
+        self.error = ""
+        self.duration = 0.0
+        self.response = None
+        self.start_time = None
+        self.end_time = None
+
+class MCPTestClient:
+    """External MCP test client"""
+    
+    def __init__(self, project_dir: Path):
+        self.project_dir = project_dir
+        self.scripts_dir = project_dir / "scripts"
+        self.build_output = project_dir / "mcp-lsp-bridge"
+        self.log_file = self.scripts_dir / "mcp_test.log"
+        self.report_file = project_dir / "mcp_test_report.json"
+        
+        self.server_process = None
+        self.request_id = 1
+        self.tests_total = 0
+        self.tests_passed = 0
+        self.tests_failed = 0
+        
+        # Ensure scripts directory exists
+        self.scripts_dir.mkdir(exist_ok=True)
+        
+    def log_message(self, message: str):
+        """Log a message with timestamp"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(self.log_file, "a") as f:
+            f.write(f"{timestamp} - {message}\n")
+    
+    def print_colored(self, message: str, color: str = Colors.NC):
+        """Print a colored message"""
+        print(f"{color}{message}{Colors.NC}")
+    
+    def build_project(self) -> bool:
+        """Build the MCP-LSP Bridge project"""
+        self.print_colored("🔨 Building MCP-LSP Bridge...", Colors.YELLOW)
+        
+        try:
+            result = subprocess.run(
+                ["go", "build", "-o", str(self.build_output), "."],
+                cwd=self.project_dir,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            
+            if result.returncode == 0:
+                self.print_colored("✅ Build successful", Colors.GREEN)
+                self.log_message("Build successful")
+                return True
+            else:
+                self.print_colored("❌ Build failed", Colors.RED)
+                self.print_colored(f"   Error: {result.stderr}", Colors.RED)
+                self.log_message(f"Build failed: {result.stderr}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            self.print_colored("❌ Build timed out", Colors.RED)
+            self.log_message("Build timed out")
+            return False
+        except Exception as e:
+            self.print_colored(f"❌ Build error: {e}", Colors.RED)
+            self.log_message(f"Build error: {e}")
+            return False
+    
+    def start_server(self) -> bool:
+        """Start the MCP server"""
+        self.print_colored("🚀 Starting MCP server...", Colors.YELLOW)
+        
+        try:
+            # Start server process
+            self.server_process = subprocess.Popen(
+                [str(self.build_output)],
+                cwd=self.project_dir,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            # Wait a moment for server to start
+            time.sleep(2)
+            
+            # Check if server is still running
+            if self.server_process.poll() is None:
+                self.print_colored(f"✅ MCP server started (PID: {self.server_process.pid})", Colors.GREEN)
+                self.log_message(f"MCP server started with PID: {self.server_process.pid}")
+                return True
+            else:
+                self.print_colored("❌ MCP server failed to start", Colors.RED)
+                stderr_output = self.server_process.stderr.read() if self.server_process.stderr else ""
+                self.log_message(f"MCP server failed to start: {stderr_output}")
+                return False
+                
+        except Exception as e:
+            self.print_colored(f"❌ Failed to start server: {e}", Colors.RED)
+            self.log_message(f"Failed to start server: {e}")
+            return False
+    
+    def send_request(self, method: str, params: Optional[Dict] = None) -> TestResult:
+        """Send a JSON-RPC request to the MCP server"""
+        if params is None:
+            params = {}
+            
+        request = {
+            "jsonrpc": "2.0",
+            "id": self.request_id,
+            "method": method,
+            "params": params
+        }
+        self.request_id += 1
+        
+        test_result = TestResult(method, f"Method: {method}")
+        test_result.start_time = time.time()
+        
+        try:
+            if not self.server_process or self.server_process.poll() is not None:
+                raise Exception("Server process is not running")
+            
+            # Send request
+            request_json = json.dumps(request) + "\n"
+            self.server_process.stdin.write(request_json)
+            self.server_process.stdin.flush()
+            
+            # Read response with timeout using select or polling
+            import select
+            import sys
+            
+            # Wait for response with timeout
+            ready, _, _ = select.select([self.server_process.stdout], [], [], 10.0)
+            
+            if not ready:
+                raise Exception("Request timed out - no response received")
+            
+            # Read the response line
+            response_line = self.server_process.stdout.readline()
+            if not response_line.strip():
+                raise Exception("Empty response received")
+            
+            response = json.loads(response_line.strip())
+            test_result.response = response
+            
+            # Check for JSON-RPC error
+            if "error" in response:
+                raise Exception(f"Server returned error: {response['error']}")
+            
+            test_result.success = True
+            
+        except Exception as e:
+            test_result.success = False
+            test_result.error = str(e)
+        
+        test_result.end_time = time.time()
+        test_result.duration = test_result.end_time - test_result.start_time
+        
+        return test_result
+    
+    def test_tool_call(self, tool_name: str, arguments: Dict) -> TestResult:
+        """Test calling a specific MCP tool"""
+        params = {
+            "name": tool_name,
+            "arguments": arguments
+        }
+        
+        result = self.send_request("tools/call", params)
+        result.name = f"tool_{tool_name}"
+        result.description = f"Tool: {tool_name}"
+        
+        return result
+    
+    def run_test(self, test_result: TestResult):
+        """Run a single test and update counters"""
+        self.tests_total += 1
+        
+        self.print_colored(f"🔍 Testing: {test_result.description}", Colors.BLUE)
+        self.log_message(f"Starting test: {test_result.name}")
+        
+        if test_result.success:
+            self.print_colored(f"✅ Success: {test_result.description} ({test_result.duration:.3f}s)", Colors.GREEN)
+            self.log_message(f"Test passed: {test_result.name} in {test_result.duration:.3f}s")
+            self.tests_passed += 1
+        else:
+            self.print_colored(f"❌ Failed: {test_result.description} ({test_result.duration:.3f}s)", Colors.RED)
+            self.print_colored(f"   Error: {test_result.error}", Colors.RED)
+            self.log_message(f"Test failed: {test_result.name} in {test_result.duration:.3f}s")
+            self.log_message(f"Error: {test_result.error}")
+            self.tests_failed += 1
+    
+    def run_all_tests(self) -> List[TestResult]:
+        """Run all MCP tests"""
+        self.print_colored("🧪 Running MCP Tool Tests...", Colors.YELLOW)
+        print()
+        
+        results = []
+        
+        # Test 1: Initialize
+        result = self.send_request("initialize", {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {"tools": {}},
+            "clientInfo": {"name": "test-client", "version": "1.0.0"}
+        })
+        result.description = "Initialize MCP Connection"
+        self.run_test(result)
+        results.append(result)
+        
+        # Send initialized notification
+        if result.success:
+            notification = {
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized"
+            }
+            try:
+                notification_json = json.dumps(notification) + "\n"
+                self.server_process.stdin.write(notification_json)
+                self.server_process.stdin.flush()
+            except Exception as e:
+                self.log_message(f"Failed to send initialized notification: {e}")
+        
+        # Test 2: List Tools
+        result = self.send_request("tools/list")
+        result.description = "List Available Tools"
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 3: Infer Language Tool
+        result = self.test_tool_call("infer_language", {"file_path": "/test/example.go"})
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 4: LSP Connect Tool
+        result = self.test_tool_call("lsp_connect", {"language": "go"})
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 5: Analyze Code Tool
+        result = self.test_tool_call("analyze_code", {
+            "uri": "file:///test/example.go",
+            "line": 10,
+            "character": 5
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 6: LSP Disconnect Tool
+        result = self.test_tool_call("lsp_disconnect", {})
+        self.run_test(result)
+        results.append(result)
+        
+        return results
+    
+    def generate_report(self, results: List[TestResult]):
+        """Generate test report"""
+        print()
+        print("=" * 60)
+        self.print_colored("📋 MCP EXTERNAL TEST REPORT", Colors.BLUE)
+        print("=" * 60)
+        
+        print("📊 Summary:")
+        print(f"   Total Tests: {self.tests_total}")
+        self.print_colored(f"   Passed: {self.tests_passed}", Colors.GREEN)
+        self.print_colored(f"   Failed: {self.tests_failed}", Colors.RED)
+        
+        if self.tests_failed == 0:
+            self.print_colored("🎉 All tests passed!", Colors.GREEN)
+        else:
+            self.print_colored(f"⚠️  {self.tests_failed} test(s) failed", Colors.RED)
+        
+        print()
+        print(f"📄 Log file: {self.log_file}")
+        
+        # Generate JSON report
+        report_data = {
+            "timestamp": datetime.now().isoformat(),
+            "summary": {
+                "total": self.tests_total,
+                "passed": self.tests_passed,
+                "failed": self.tests_failed
+            },
+            "tests": [
+                {
+                    "name": result.name,
+                    "description": result.description,
+                    "success": result.success,
+                    "error": result.error,
+                    "duration": result.duration,
+                    "response": result.response
+                }
+                for result in results
+            ],
+            "log_file": str(self.log_file),
+            "project_dir": str(self.project_dir)
+        }
+        
+        with open(self.report_file, "w") as f:
+            json.dump(report_data, f, indent=2)
+        
+        print(f"📄 Report file: {self.report_file}")
+        print()
+    
+    def cleanup(self):
+        """Clean up resources"""
+        if self.server_process:
+            self.print_colored("🧹 Cleaning up MCP server process...", Colors.YELLOW)
+            try:
+                self.server_process.terminate()
+                self.server_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.server_process.kill()
+                self.server_process.wait()
+            except Exception as e:
+                self.log_message(f"Error during cleanup: {e}")
+        
+        # Remove build output
+        if self.build_output.exists():
+            try:
+                self.build_output.unlink()
+            except Exception as e:
+                self.log_message(f"Error removing build output: {e}")
+
+def main():
+    """Main function"""
+    # Determine project directory
+    script_dir = Path(__file__).parent
+    project_dir = script_dir.parent
+    
+    print(f"{Colors.BLUE}🚀 Starting MCP External Testing{Colors.NC}")
+    print("=" * 50)
+    print(f"Project Directory: {project_dir}")
+    print(f"Scripts Directory: {script_dir}")
+    print()
+    
+    client = MCPTestClient(project_dir)
+    
+    # Set up signal handler for cleanup
+    def signal_handler(signum, frame):
+        print(f"\n{Colors.YELLOW}Received signal {signum}, cleaning up...{Colors.NC}")
+        client.cleanup()
+        sys.exit(1)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    try:
+        # Initialize log file
+        with open(client.log_file, "w") as f:
+            f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Starting MCP external testing suite\n")
+        
+        # Build project
+        if not client.build_project():
+            print(f"{Colors.RED}❌ Build failed, exiting{Colors.NC}")
+            return 1
+        
+        # Start MCP server
+        if not client.start_server():
+            print(f"{Colors.RED}❌ Failed to start MCP server, exiting{Colors.NC}")
+            return 1
+        
+        # Run tests
+        results = client.run_all_tests()
+        
+        # Generate report
+        client.generate_report(results)
+        
+        # Determine exit code
+        if client.tests_failed == 0:
+            print(f"{Colors.GREEN}🏁 Testing completed successfully{Colors.NC}")
+            return 0
+        else:
+            print(f"{Colors.RED}🏁 Testing completed with failures{Colors.NC}")
+            return 1
+            
+    except Exception as e:
+        print(f"{Colors.RED}❌ Unexpected error: {e}{Colors.NC}")
+        client.log_message(f"Unexpected error: {e}")
+        return 1
+    
+    finally:
+        client.cleanup()
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -35,7 +35,6 @@ type LanguageClient struct {
 	command            string
 	args               []string
 	processID          int32
-	isConnected        bool
 	lastInitialized    time.Time
 	status             ClientStatus
 	lastError          error
@@ -66,7 +65,9 @@ type LanguageServerConfig struct {
 type LSPServerConfig struct {
 	LanguageServers map[string]LanguageServerConfig `json:"language_servers"`
 	Global          struct {
+		LogPath            string `json:"log_file_path"`
 		LogLevel           string `json:"log_level"`
+		MaxLogFiles        int    `json:"max_log_files"`
 		MaxRestartAttempts int    `json:"max_restart_attempts"`
 		RestartDelayMs     int    `json:"restart_delay_ms"`
 	} `json:"global"`

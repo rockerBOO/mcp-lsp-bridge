@@ -3,10 +3,11 @@ package lsp
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"sync/atomic"
 	"time"
+
+	"rockerboo/mcp-lsp-bridge/logger"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
 	"github.com/sourcegraph/jsonrpc2"
@@ -14,6 +15,9 @@ import (
 
 // NewLanguageClient creates a new Language Server Protocol client
 func NewLanguageClient(command string, args ...string) (*LanguageClient, error) {
+	// Log the LSP server connection attempt
+	logger.Info(fmt.Sprintf("Connecting to LSP server: %s %v", command, args))
+
 	// Create cancellable context for the entire session
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -63,8 +67,8 @@ func NewLanguageClient(command string, args ...string) (*LanguageClient, error) 
 		// Default configuration
 		maxConnectionAttempts: 3,
 		connectionTimeout:     10 * time.Second,
-		idleTimeout:          30 * time.Minute,
-		restartDelay:         1 * time.Second,
+		idleTimeout:           30 * time.Minute,
+		restartDelay:          1 * time.Second,
 
 		status: StatusConnecting,
 	}
@@ -83,9 +87,11 @@ func NewLanguageClient(command string, args ...string) (*LanguageClient, error) 
 	conn := jsonrpc2.NewConn(ctx, stream, handler)
 
 	client.conn = conn
-	client.isConnected = true
 	client.status = StatusConnected
 	client.lastInitialized = time.Now()
+
+	// Log successful LSP server connection
+	logger.Info(fmt.Sprintf("Successfully connected to LSP server: %s %v", command, args))
 
 	// Handle stderr in background
 	go func() {
@@ -96,13 +102,17 @@ func NewLanguageClient(command string, args ...string) (*LanguageClient, error) 
 				break
 			}
 			if n > 0 {
-				fmt.Fprintf(os.Stderr, "[%s SERVER STDERR]: %s", command, buf[:n])
+				logger.Debug(fmt.Sprintf("[%s SERVER STDERR]: %s", command, buf[:n]))
 			}
 		}
 		stderr.Close()
 	}()
 
 	return client, nil
+}
+
+func (ls *LanguageClient) IsConnected() bool {
+	return ls.status == StatusConnected
 }
 
 // Close closes the language client and cleans up resources
@@ -120,21 +130,6 @@ func (lc *LanguageClient) Close() error {
 
 	// Attempt graceful shutdown of language server
 	if lc.cmd != nil && lc.cmd.Process != nil {
-		// Only send shutdown/exit for real LSP servers, not echo
-		if lc.command != "echo" {
-			// Send shutdown notification
-			shutdownErr := lc.Shutdown()
-			if shutdownErr != nil {
-				fmt.Printf("Failed to send shutdown: %v", shutdownErr)
-			}
-
-			// Send exit notification
-			exitErr := lc.Exit()
-			if exitErr != nil {
-				fmt.Printf("Failed to send exit: %v", exitErr)
-			}
-		}
-
 		// Wait for process to exit or kill it
 		done := make(chan error, 1)
 		go func() {
@@ -146,13 +141,12 @@ func (lc *LanguageClient) Close() error {
 			// Process exited gracefully
 		case <-time.After(2 * time.Second):
 			// Force kill if it doesn't exit
-			lc.cmd.Process.Kill()
+			_ = lc.cmd.Process.Kill()
 			<-done // Wait for it to actually exit
 		}
 	}
 
 	// Reset connection state
-	lc.isConnected = false
 	lc.status = StatusUninitialized
 	lc.lastError = nil
 
@@ -183,7 +177,7 @@ func (lc *LanguageClient) SendRequest(method string, params any, result any, tim
 	atomic.AddInt64(&lc.totalRequests, 1)
 
 	// Ensure connection is still valid
-	if !lc.isConnected || lc.status != StatusConnected {
+	if !lc.IsConnected() {
 		return fmt.Errorf("language server not connected")
 	}
 
@@ -199,7 +193,7 @@ func (lc *LanguageClient) SendRequest(method string, params any, result any, tim
 		lc.status = StatusError
 
 		// Log the error
-		fmt.Printf("LSP Request Error: method=%s, error=%v", method, err)
+		logger.Error(fmt.Sprintf("LSP Request Error: method=%s, error=%v", method, err))
 	} else {
 		// Increment successful requests
 		atomic.AddInt64(&lc.successfulRequests, 1)
@@ -215,6 +209,10 @@ func (lc *LanguageClient) SendRequestNoTimeout(method string, params any, result
 
 // SendNotification sends a notification
 func (lc *LanguageClient) SendNotification(method string, params any) error {
+	if len(method) == 0 {
+		return fmt.Errorf("Empty notification method.")
+	}
+
 	return lc.conn.Notify(lc.ctx, method, params)
 }
 
@@ -224,20 +222,20 @@ func (lc *LanguageClient) Context() context.Context {
 }
 
 // GetMetrics returns the current metrics for the language client
-func (lc *LanguageClient) GetMetrics() map[string]interface{} {
+func (lc *LanguageClient) GetMetrics() map[string]any {
 	lc.mu.RLock()
 	defer lc.mu.RUnlock()
 
-	return map[string]interface{}{
-		"command":               lc.command,
-		"status":               lc.status,
-		"total_requests":       atomic.LoadInt64(&lc.totalRequests),
-		"successful_requests":  atomic.LoadInt64(&lc.successfulRequests),
-		"failed_requests":      atomic.LoadInt64(&lc.failedRequests),
-		"last_initialized":     lc.lastInitialized,
-		"last_error_time":      lc.lastErrorTime,
-		"last_error":           lc.lastError,
-		"is_connected":         lc.isConnected,
-		"process_id":           lc.processID,
+	return map[string]any{
+		"command":             lc.command,
+		"status":              lc.status,
+		"total_requests":      atomic.LoadInt64(&lc.totalRequests),
+		"successful_requests": atomic.LoadInt64(&lc.successfulRequests),
+		"failed_requests":     atomic.LoadInt64(&lc.failedRequests),
+		"last_initialized":    lc.lastInitialized,
+		"last_error_time":     lc.lastErrorTime,
+		"last_error":          lc.lastError,
+		"is_connected":        lc.IsConnected(),
+		"process_id":          lc.processID,
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"rockerboo/mcp-lsp-bridge/logger"
 	"github.com/sourcegraph/jsonrpc2"
 )
 
@@ -14,40 +15,38 @@ type ClientHandler struct {
 }
 
 func (h *ClientHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
-	fmt.Printf("Received from server - Method: %s, ID: %v\n", req.Method, req.ID)
-
 	switch req.Method {
 	case "textDocument/publishDiagnostics":
 		// Handle diagnostics
 		var params any
 		if err := json.Unmarshal(*req.Params, &params); err == nil {
-			fmt.Printf("Diagnostics: %+v\n", params)
+			logger.Debug(fmt.Sprintf("Diagnostics: %+v\n", params))
 		}
 
 	case "window/showMessage":
 		// Handle show message
 		var params any
 		if err := json.Unmarshal(*req.Params, &params); err == nil {
-			fmt.Printf("Server message: %+v\n", params)
+			logger.Debug(fmt.Sprintf("Server message: %+v\n", params))
 		}
 
 	case "window/logMessage":
 		// Handle log message
 		var params any
 		if err := json.Unmarshal(*req.Params, &params); err == nil {
-			fmt.Printf("Server log: %+v\n", params)
+			logger.Debug(fmt.Sprintf("Server log: %+v\n", params))
 		}
 
 	case "client/registerCapability":
 		// Handle capability registration - reply with success
 		if err := conn.Reply(ctx, req.ID, map[string]any{}); err != nil {
-			fmt.Printf("Failed to reply to registerCapability: %v\n", err)
+			logger.Debug(fmt.Sprintf("Failed to reply to registerCapability: %v\n", err))
 		}
 
 	case "workspace/configuration":
 		// Handle configuration request - reply with empty config
 		if err := conn.Reply(ctx, req.ID, []any{}); err != nil {
-			fmt.Printf("Failed to reply to configuration: %v\n", err)
+			logger.Debug(fmt.Sprintf("Failed to reply to configuration: %v\n", err))
 		}
 
 	default:
@@ -58,7 +57,7 @@ func (h *ClientHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *js
 			Message: "Method not found",
 		}
 		if replyErr := conn.ReplyWithError(ctx, req.ID, err); replyErr != nil {
-			fmt.Printf("Failed to reply with error: %v\n", replyErr)
+			logger.Debug(fmt.Sprintf("Failed to reply with error: %v\n", replyErr))
 		}
 	}
 }

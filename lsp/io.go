@@ -2,7 +2,7 @@ package lsp
 
 import "io"
 
-// stdioReadWriteCloser combines stdin and stdout into a ReadWriteCloser
+// stdioReadWriteCloser implements io.ReadWriteCloser
 type stdioReadWriteCloser struct {
 	stdin  io.WriteCloser
 	stdout io.ReadCloser
