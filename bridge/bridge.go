@@ -109,7 +109,6 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 			continue
 		}
 
-
 		// Set server capabilities
 		lc.SetServerCapabilities(result.Capabilities)
 

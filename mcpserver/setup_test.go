@@ -38,7 +38,7 @@ func TestMCPServerSetup(t *testing.T) {
 
 		// Use reflection to check server metadata
 		v := reflect.ValueOf(mcpServer).Elem()
-		
+
 		// Check name
 		nameField := v.FieldByName("name")
 		if !nameField.IsValid() {
@@ -62,7 +62,7 @@ func TestMCPServerSetup(t *testing.T) {
 		// List of expected registration method names
 		expectedRegistrationMethods := []string{
 			"registerAnalyzeCodeTool",
-			"registerInferLanguageTool", 
+			"registerInferLanguageTool",
 			"registerLSPConnectTool",
 			"registerLSPDisconnectTool",
 		}

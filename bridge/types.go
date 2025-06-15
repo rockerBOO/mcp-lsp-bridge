@@ -9,9 +9,9 @@ import (
 
 // MCPLSPBridge combines MCP server capabilities with multiple LSP clients
 type MCPLSPBridge struct {
-	server        *server.MCPServer
-	clients       map[string]*lsp.LanguageClient
-	config        *lsp.LSPServerConfig
+	server  *server.MCPServer
+	clients map[string]*lsp.LanguageClient
+	config  *lsp.LSPServerConfig
 }
 
 // SemanticAnalysisResult holds the results of semantic analysis

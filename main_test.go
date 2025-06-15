@@ -126,7 +126,6 @@ func BenchmarkGetClientForLanguage(b *testing.B) {
 	bridgeInstance := bridge.NewMCPLSPBridge()
 	languages := []string{"go"}
 
-	
 	for i := 0; b.Loop(); i++ {
 		language := languages[i%len(languages)]
 

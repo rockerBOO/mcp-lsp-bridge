@@ -32,12 +32,12 @@ type LanguageClient struct {
 	serverCapabilities protocol.ServerCapabilities
 
 	// Connection management
-	command            string
-	args               []string
-	processID          int32
-	lastInitialized    time.Time
-	status             ClientStatus
-	lastError          error
+	command         string
+	args            []string
+	processID       int32
+	lastInitialized time.Time
+	status          ClientStatus
+	lastError       error
 
 	// Metrics
 	totalRequests      int64
@@ -48,8 +48,8 @@ type LanguageClient struct {
 	// Configuration
 	maxConnectionAttempts int
 	connectionTimeout     time.Duration
-	idleTimeout          time.Duration
-	restartDelay         time.Duration
+	idleTimeout           time.Duration
+	restartDelay          time.Duration
 }
 
 // LanguageServerConfig defines the configuration for a specific language server

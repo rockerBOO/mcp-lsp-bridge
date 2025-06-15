@@ -46,8 +46,3 @@ logger.InitLogger(logConfig)
 - `logger.Debug()`: Log debug messages (only when log level is "debug")
 - `logger.Error()`: Log error messages
 
-## Running Tests
-
-```bash
-go test ./logger
-```

@@ -13,7 +13,7 @@ type TestMockBridge struct {
 	mockInferLanguage        func(string) (string, error)
 	mockGetClientForLanguage func(string) (any, error)
 	mockGetConfig            func() *lsp.LSPServerConfig
-	mockCloseAllClients     func()
+	mockCloseAllClients      func()
 }
 
 func (m *TestMockBridge) GetClientForLanguageInterface(language string) (any, error) {
@@ -49,7 +49,7 @@ func (m *TestMockBridge) GetConfig() *lsp.LSPServerConfig {
 
 func TestMCPServerToolsSetup(t *testing.T) {
 	testCases := []struct {
-		name            string
+		name             string
 		toolRegistration func(*server.MCPServer, *TestMockBridge)
 	}{
 		{

@@ -80,7 +80,7 @@ func registerAnalyzeCodeTool(mcpServer *server.MCPServer, bridge BridgeInterface
 		}
 
 		// Log analysis details
-		logger.Info("analyze_code: Successfully analyzed code", 
+		logger.Info("analyze_code: Successfully analyzed code",
 			fmt.Sprintf("URI: %s, Line: %d, Character: %d", uri, line, character),
 		)
 
@@ -92,7 +92,7 @@ func registerAnalyzeCodeTool(mcpServer *server.MCPServer, bridge BridgeInterface
 			if completionValue.Kind() == reflect.Ptr {
 				completionValue = completionValue.Elem()
 			}
-			
+
 			// Try to get the items or suggestions
 			itemsField := completionValue.FieldByName("Items")
 			if itemsField.IsValid() {
@@ -102,12 +102,12 @@ func registerAnalyzeCodeTool(mcpServer *server.MCPServer, bridge BridgeInterface
 
 		// Prepare result summary
 		summary := fmt.Sprintf(
-			"Analysis Results:\n" +
-			"Hover: %v\n" +
-			"Completion Suggestions: %d\n" +
-			"Signature Help: %v\n" +
-			"Diagnostics: %d\n" +
-			"Code Actions: %d",
+			"Analysis Results:\n"+
+				"Hover: %v\n"+
+				"Completion Suggestions: %d\n"+
+				"Signature Help: %v\n"+
+				"Diagnostics: %d\n"+
+				"Code Actions: %d",
 			result.Hover != nil,
 			completionCount,
 			result.SignatureHelp != nil,
@@ -135,13 +135,13 @@ func registerInferLanguageTool(mcpServer *server.MCPServer, bridge BridgeInterfa
 		language, err := bridge.InferLanguage(filePath)
 		if err != nil {
 			ext := filepath.Ext(filePath)
-			logger.Error("infer_language: Language inference failed", 
+			logger.Error("infer_language: Language inference failed",
 				fmt.Sprintf("Extension: %s", ext),
 			)
 			return mcp.NewToolResultError(fmt.Sprintf("No language found for extension %s", ext)), nil
 		}
 
-		logger.Info("infer_language: Successfully inferred language", 
+		logger.Info("infer_language: Successfully inferred language",
 			fmt.Sprintf("File: %s, Language: %s", filePath, language),
 		)
 
@@ -169,7 +169,7 @@ func registerLSPConnectTool(mcpServer *server.MCPServer, bridge BridgeInterface)
 		}
 
 		if _, exists := config.LanguageServers[language]; !exists {
-			logger.Error("lsp_connect: No language server configured", 
+			logger.Error("lsp_connect: No language server configured",
 				fmt.Sprintf("Language: %s", language),
 			)
 			return mcp.NewToolResultError(fmt.Sprintf("No language server configured for %s", language)), nil
@@ -178,13 +178,13 @@ func registerLSPConnectTool(mcpServer *server.MCPServer, bridge BridgeInterface)
 		// Attempt to get or create the LSP client
 		_, err = bridge.GetClientForLanguageInterface(language)
 		if err != nil {
-			logger.Error("lsp_connect: Failed to set up LSP client", 
+			logger.Error("lsp_connect: Failed to set up LSP client",
 				fmt.Sprintf("Language: %s, Error: %v", language, err),
 			)
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to set up LSP client: %v", err)), nil
 		}
 
-		logger.Info("lsp_connect: Successfully connected to LSP", 
+		logger.Info("lsp_connect: Successfully connected to LSP",
 			fmt.Sprintf("Language: %s", language),
 		)
 

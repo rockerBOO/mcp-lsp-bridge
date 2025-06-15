@@ -16,12 +16,12 @@ import (
 
 // MCPTestClient represents an external MCP client for testing
 type MCPTestClient struct {
-	cmd           *exec.Cmd
-	stdin         io.WriteCloser
-	stdout        io.ReadCloser
-	stderr        io.ReadCloser
-	requestID     int
-	capabilities  *mcp.ServerCapabilities
+	cmd          *exec.Cmd
+	stdin        io.WriteCloser
+	stdout       io.ReadCloser
+	stderr       io.ReadCloser
+	requestID    int
+	capabilities *mcp.ServerCapabilities
 }
 
 // TestResult represents the result of a test
@@ -45,7 +45,7 @@ func NewMCPTestClient() (*MCPTestClient, error) {
 	// Start the MCP server process
 	cmd := exec.Command("../mcp-lsp-bridge")
 	cmd.Dir = "."
-	
+
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stdin pipe: %v", err)
@@ -179,7 +179,7 @@ func (c *MCPTestClient) initialize() error {
 // testToolCall tests calling a specific MCP tool
 func (c *MCPTestClient) testToolCall(toolName string, arguments map[string]interface{}) (*TestResult, error) {
 	start := time.Now()
-	
+
 	params := map[string]interface{}{
 		"name":      toolName,
 		"arguments": arguments,
@@ -207,7 +207,7 @@ func (c *MCPTestClient) testToolCall(toolName string, arguments map[string]inter
 // testListTools tests listing available tools
 func (c *MCPTestClient) testListTools() (*TestResult, error) {
 	start := time.Now()
-	
+
 	response, err := c.sendRequest("tools/list", map[string]interface{}{})
 	duration := time.Since(start)
 
@@ -308,7 +308,7 @@ func generateReport(results []*TestResult) {
 
 	for _, result := range results {
 		totalDuration += result.Duration
-		
+
 		status := "✅ PASS"
 		if !result.Success {
 			status = "❌ FAIL"
@@ -324,9 +324,9 @@ func generateReport(results []*TestResult) {
 	}
 
 	fmt.Println(strings.Repeat("-", 60))
-	fmt.Printf("📊 Summary: %d passed, %d failed (Total: %v)\n", 
+	fmt.Printf("📊 Summary: %d passed, %d failed (Total: %v)\n",
 		successful, failed, totalDuration)
-	
+
 	if failed == 0 {
 		fmt.Println("🎉 All tests passed!")
 	} else {
@@ -342,7 +342,7 @@ func saveDetailedReport(results []*TestResult) {
 	reportData := map[string]interface{}{
 		"timestamp": time.Now().Format(time.RFC3339),
 		"summary": map[string]interface{}{
-			"total":      len(results),
+			"total": len(results),
 			"successful": func() int {
 				count := 0
 				for _, r := range results {
@@ -366,7 +366,7 @@ func saveDetailedReport(results []*TestResult) {
 	}
 
 	reportJSON, _ := json.MarshalIndent(reportData, "", "  ")
-	
+
 	reportFile := filepath.Join("..", "mcp_test_report.json")
 	if err := os.WriteFile(reportFile, reportJSON, 0644); err != nil {
 		fmt.Printf("⚠️  Failed to save detailed report: %v\n", err)
@@ -396,12 +396,12 @@ func main() {
 	defer client.Close()
 
 	fmt.Println("🔗 MCP Client connected successfully")
-	
+
 	// Run all tests
 	results := client.runAllTests()
-	
+
 	// Generate report
 	generateReport(results)
-	
+
 	fmt.Println("\n🏁 Testing completed")
 }

@@ -40,39 +40,39 @@ func TestLogLevels(t *testing.T) {
 
 	// Test different log levels
 	testCases := []struct {
-		name        string
-		logLevel    string
-		logFunc     func(...interface{})
-		logMessage  string
-		shouldLog   bool
+		name       string
+		logLevel   string
+		logFunc    func(...interface{})
+		logMessage string
+		shouldLog  bool
 	}{
 		{
-			name:        "Info Log at Info Level",
-			logLevel:    "info",
-			logFunc:     Info,
-			logMessage:  "Test info message",
-			shouldLog:   true,
+			name:       "Info Log at Info Level",
+			logLevel:   "info",
+			logFunc:    Info,
+			logMessage: "Test info message",
+			shouldLog:  true,
 		},
 		{
-			name:        "Debug Log at Info Level",
-			logLevel:    "info",
-			logFunc:     Debug,
-			logMessage:  "Test debug message",
-			shouldLog:   false,
+			name:       "Debug Log at Info Level",
+			logLevel:   "info",
+			logFunc:    Debug,
+			logMessage: "Test debug message",
+			shouldLog:  false,
 		},
 		{
-			name:        "Debug Log at Debug Level",
-			logLevel:    "debug",
-			logFunc:     Debug,
-			logMessage:  "Test debug message",
-			shouldLog:   true,
+			name:       "Debug Log at Debug Level",
+			logLevel:   "debug",
+			logFunc:    Debug,
+			logMessage: "Test debug message",
+			shouldLog:  true,
 		},
 		{
-			name:        "Error Log Always Logs",
-			logLevel:    "info",
-			logFunc:     Error,
-			logMessage:  "Test error message",
-			shouldLog:   true,
+			name:       "Error Log Always Logs",
+			logLevel:   "info",
+			logFunc:    Error,
+			logMessage: "Test error message",
+			shouldLog:  true,
 		},
 	}
 
@@ -123,24 +123,24 @@ func TestLogRotation(t *testing.T) {
 
 	// Test log rotation
 	testCases := []struct {
-		name           string
-		maxLogFiles    int
-		expectedFiles  int
+		name          string
+		maxLogFiles   int
+		expectedFiles int
 	}{
 		{
-			name:           "Rotate with 3 max log files",
-			maxLogFiles:    3,
-			expectedFiles:  3,
+			name:          "Rotate with 3 max log files",
+			maxLogFiles:   3,
+			expectedFiles: 3,
 		},
 		{
-			name:           "Rotate with 5 max log files",
-			maxLogFiles:    5,
-			expectedFiles:  5,
+			name:          "Rotate with 5 max log files",
+			maxLogFiles:   5,
+			expectedFiles: 5,
 		},
 		{
-			name:           "No rotation with 0 max log files",
-			maxLogFiles:    0,
-			expectedFiles:  1,
+			name:          "No rotation with 0 max log files",
+			maxLogFiles:   0,
+			expectedFiles: 1,
 		},
 	}
 
@@ -208,24 +208,24 @@ func TestEmptyLogPath(t *testing.T) {
 	baseLogDir := t.TempDir()
 
 	testCases := []struct {
-		name           string
-		inputLogPath   string
-		expectDefault  bool
+		name          string
+		inputLogPath  string
+		expectDefault bool
 	}{
 		{
-			name:           "Empty Path",
-			inputLogPath:   "",
-			expectDefault:  true,
+			name:          "Empty Path",
+			inputLogPath:  "",
+			expectDefault: true,
 		},
 		{
-			name:           "Relative Path",
-			inputLogPath:   "bridge.log",
-			expectDefault:  false,
+			name:          "Relative Path",
+			inputLogPath:  "bridge.log",
+			expectDefault: false,
 		},
 		{
-			name:           "Absolute Path",
-			inputLogPath:   filepath.Join(baseLogDir, "bridge.log"),
-			expectDefault:  false,
+			name:          "Absolute Path",
+			inputLogPath:  filepath.Join(baseLogDir, "bridge.log"),
+			expectDefault: false,
 		},
 	}
 

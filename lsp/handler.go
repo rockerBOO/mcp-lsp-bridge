@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"rockerboo/mcp-lsp-bridge/logger"
 	"github.com/sourcegraph/jsonrpc2"
+	"rockerboo/mcp-lsp-bridge/logger"
 )
 
 // ClientHandler handles incoming messages from the language server
