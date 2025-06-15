@@ -152,12 +152,46 @@ def test_mcp_tools():
         else:
             print("❌ lsp_connect timeout")
         
-        # Test 3: lsp_disconnect
-        print("\n🔍 Testing lsp_disconnect tool...")
+        # Test 3: detect_project_languages
+        print("\n🔍 Testing detect_project_languages tool...")
         tests_total += 1
         tool_request = {
             "jsonrpc": "2.0",
             "id": 4,
+            "method": "tools/call",
+            "params": {
+                "name": "detect_project_languages",
+                "arguments": {
+                    "project_path": str(project_dir),
+                    "mode": "primary"
+                }
+            }
+        }
+        
+        request_json = json.dumps(tool_request) + "\n"
+        process.stdin.write(request_json)
+        process.stdin.flush()
+        
+        ready, _, _ = select.select([process.stdout], [], [], 5.0)
+        if ready:
+            response_line = process.stdout.readline()
+            if response_line.strip():
+                response = json.loads(response_line.strip())
+                if "result" in response and response["result"]["content"]:
+                    content = response["result"]["content"][0]["text"]
+                    print(f"✅ detect_project_languages: {content}")
+                    tests_passed += 1
+                else:
+                    print(f"❌ detect_project_languages failed: {response}")
+        else:
+            print("❌ detect_project_languages timeout")
+        
+        # Test 4: lsp_disconnect
+        print("\n🔍 Testing lsp_disconnect tool...")
+        tests_total += 1
+        tool_request = {
+            "jsonrpc": "2.0",
+            "id": 5,
             "method": "tools/call",
             "params": {
                 "name": "lsp_disconnect",

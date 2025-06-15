@@ -16,6 +16,8 @@ type BridgeInterface interface {
 	InferLanguage(filePath string) (string, error)
 	CloseAllClients()
 	GetConfig() *lsp.LSPServerConfig
+	DetectProjectLanguages(projectPath string) ([]string, error)
+	DetectPrimaryProjectLanguage(projectPath string) (string, error)
 }
 
 // SetupMCPServer configures the MCP server with AI-powered tools
@@ -62,6 +64,8 @@ func SetupMCPServer(bridge BridgeInterface) *server.MCPServer {
 	registerInferLanguageTool(mcpServer, bridge)
 	registerLSPConnectTool(mcpServer, bridge)
 	registerLSPDisconnectTool(mcpServer, bridge)
+	registerProjectAnalysisTool(mcpServer, bridge)
+	registerProjectLanguageDetectionTool(mcpServer, bridge)
 
 	return mcpServer
 }

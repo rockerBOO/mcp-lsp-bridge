@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strings"
 
 	"rockerboo/mcp-lsp-bridge/logger"
 	"rockerboo/mcp-lsp-bridge/lsp"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
 // registerAnalyzeCodeTool registers the analyze_code tool
@@ -119,6 +121,88 @@ func registerAnalyzeCodeTool(mcpServer *server.MCPServer, bridge BridgeInterface
 	})
 }
 
+func registerProjectAnalysisTool(mcpServer *server.MCPServer, bridge BridgeInterface) {
+	mcpServer.AddTool(mcp.NewTool("project_analysis",
+		mcp.WithDescription("Analyze project structure, find references, and search across files"),
+		mcp.WithString("workspace_uri", mcp.Description("URI to the workspace/project root")),
+		mcp.WithString("query", mcp.Description("Symbol or text to search for")),
+		mcp.WithString("analysis_type", mcp.Description("Type of analysis: 'references', 'definitions', 'workspace_symbols', or 'text_search'")),
+	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		workspaceUri, err := request.RequireString("workspace_uri")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		query, err := request.RequireString("query")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		analysisType, err := request.RequireString("analysis_type")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		// Use the project language detection method instead of single file inference
+		languages, err := bridge.DetectProjectLanguages(workspaceUri)
+
+		if err != nil {
+			return mcp.NewToolResultError("Failed to detect project languages"), nil
+		}
+
+		// Use the first detected language
+		if len(languages) == 0 {
+			return mcp.NewToolResultError("No languages detected in project"), nil
+		}
+
+		// Get a client for the first detected language
+		client, err := bridge.GetClientForLanguageInterface(languages[0])
+		if err != nil {
+			return mcp.NewToolResultError("No LSP clients available for detected languages"), nil
+		}
+
+		lspClient, ok := client.(*lsp.LanguageClient)
+		if !ok {
+			return mcp.NewToolResultError("Invalid LSP client type"), nil
+		}
+
+		var response strings.Builder
+		response.WriteString(fmt.Sprintf("Project Analysis: %s\n", analysisType))
+		response.WriteString(fmt.Sprintf("Query: %s\n", query))
+		response.WriteString(fmt.Sprintf("Workspace: %s\n", workspaceUri))
+		response.WriteString(fmt.Sprintf("Detected Languages: %v\n\n", languages))
+
+		switch analysisType {
+		case "workspace_symbols":
+			symbols, err := lspClient.WorkspaceSymbols(query)
+			if err != nil {
+				return mcp.NewToolResultError("Failed to get workspace symbols"), nil
+			}
+
+			formatWorkspaceSymbols := func(symbols []protocol.SymbolInformation) string {
+				var result strings.Builder
+				for i, symbol := range symbols {
+					result.WriteString(fmt.Sprintf("%d. %v\n", i+1, symbol))
+				}
+				return result.String()
+			}
+
+			response.WriteString("=== WORKSPACE SYMBOLS ===\n")
+			response.WriteString(formatWorkspaceSymbols(symbols))
+
+		case "references":
+			// This would require a specific position, so we'd need to find the symbol first
+			response.WriteString("=== REFERENCES ===\n")
+			response.WriteString("Note: Reference search requires specific file position. Use workspace_symbols first to locate the symbol.\n")
+
+		default:
+			return mcp.NewToolResultError(fmt.Sprintf("Unknown analysis type: %s", analysisType)), nil
+		}
+
+		return mcp.NewToolResultText(response.String()), nil
+	})
+}
+
 // registerInferLanguageTool registers the infer_language tool
 func registerInferLanguageTool(mcpServer *server.MCPServer, bridge BridgeInterface) {
 	mcpServer.AddTool(mcp.NewTool("infer_language",
@@ -132,9 +216,15 @@ func registerInferLanguageTool(mcpServer *server.MCPServer, bridge BridgeInterfa
 		}
 
 		// Infer language from file extension
-		language, err := bridge.InferLanguage(filePath)
-		if err != nil {
-			ext := filepath.Ext(filePath)
+		config := bridge.GetConfig()
+		if config == nil {
+			logger.Error("infer_language: No configuration available")
+			return mcp.NewToolResultError("No LSP configuration found"), nil
+		}
+
+		ext := filepath.Ext(filePath)
+		language, found := config.ExtensionLanguageMap[ext]
+		if !found {
 			logger.Error("infer_language: Language inference failed",
 				fmt.Sprintf("Extension: %s", ext),
 			)
@@ -203,5 +293,74 @@ func registerLSPDisconnectTool(mcpServer *server.MCPServer, bridge BridgeInterfa
 		logger.Info("lsp_disconnect: Disconnected all language server clients")
 
 		return mcp.NewToolResultText("All language server clients disconnected"), nil
+	})
+}
+
+// registerProjectLanguageDetectionTool registers the detect_project_languages tool
+func registerProjectLanguageDetectionTool(mcpServer *server.MCPServer, bridge BridgeInterface) {
+	mcpServer.AddTool(mcp.NewTool("detect_project_languages",
+		mcp.WithDescription("Detect all programming languages used in a project by examining root markers and file extensions"),
+		mcp.WithString("project_path", mcp.Description("Path to the project directory to analyze")),
+		mcp.WithString("mode", mcp.Description("Detection mode: 'all' for all languages, 'primary' for primary language only (default: 'all')")),
+	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		projectPath, err := request.RequireString("project_path")
+		if err != nil {
+			logger.Error("detect_project_languages: Project path parsing failed", err)
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		mode, err := request.RequireString("mode")
+		if err != nil {
+			// Default to "all" if mode is not specified
+			mode = "all"
+		}
+
+		logger.Info("detect_project_languages: Starting language detection",
+			fmt.Sprintf("Path: %s, Mode: %s", projectPath, mode),
+		)
+
+		switch mode {
+		case "primary":
+			primaryLanguage, err := bridge.DetectPrimaryProjectLanguage(projectPath)
+			if err != nil {
+				logger.Error("detect_project_languages: Primary language detection failed", err)
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to detect primary language: %v", err)), nil
+			}
+
+			logger.Info("detect_project_languages: Primary language detected",
+				fmt.Sprintf("Language: %s", primaryLanguage),
+			)
+
+			return mcp.NewToolResultText(fmt.Sprintf("Primary language: %s", primaryLanguage)), nil
+
+		case "all":
+			fallthrough
+		default:
+			languages, err := bridge.DetectProjectLanguages(projectPath)
+			if err != nil {
+				logger.Error("detect_project_languages: Language detection failed", err)
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to detect languages: %v", err)), nil
+			}
+
+			if len(languages) == 0 {
+				return mcp.NewToolResultText("No programming languages detected in project"), nil
+			}
+
+			logger.Info("detect_project_languages: Languages detected",
+				fmt.Sprintf("Count: %d, Languages: %v", len(languages), languages),
+			)
+
+			// Format the result
+			result := "Detected languages (in priority order):\n"
+			for i, lang := range languages {
+				priority := "Primary"
+				if i > 0 {
+					priority = "Secondary"
+				}
+				result += fmt.Sprintf("%d. %s (%s)\n", i+1, lang, priority)
+			}
+
+			return mcp.NewToolResultText(result), nil
+		}
 	})
 }

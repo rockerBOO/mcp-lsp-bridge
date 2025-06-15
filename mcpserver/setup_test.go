@@ -21,7 +21,19 @@ func (m *MockBridge) InferLanguage(filePath string) (string, error) {
 func (m *MockBridge) CloseAllClients() {}
 
 func (m *MockBridge) GetConfig() *lsp.LSPServerConfig {
-	return &lsp.LSPServerConfig{}
+	return &lsp.LSPServerConfig{
+		LanguageServers: map[string]lsp.LanguageServerConfig{
+			"go": {Command: "gopls"},
+		},
+	}
+}
+
+func (m *MockBridge) DetectProjectLanguages(projectPath string) ([]string, error) {
+	return []string{"go"}, nil
+}
+
+func (m *MockBridge) DetectPrimaryProjectLanguage(projectPath string) (string, error) {
+	return "go", nil
 }
 
 func TestMCPServerSetup(t *testing.T) {
@@ -65,6 +77,7 @@ func TestMCPServerSetup(t *testing.T) {
 			"registerInferLanguageTool",
 			"registerLSPConnectTool",
 			"registerLSPDisconnectTool",
+			"registerProjectLanguageDetectionTool",
 		}
 
 		// Verify each registration method

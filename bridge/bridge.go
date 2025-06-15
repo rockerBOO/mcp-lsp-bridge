@@ -200,3 +200,19 @@ func (b *MCPLSPBridge) SetServer(mcpServer *server.MCPServer) {
 func (b *MCPLSPBridge) GetClientForLanguageInterface(language string) (any, error) {
 	return b.GetClientForLanguage(language)
 }
+
+// DetectProjectLanguages detects all languages used in a project directory
+func (b *MCPLSPBridge) DetectProjectLanguages(projectPath string) ([]string, error) {
+	if b.config == nil {
+		return nil, fmt.Errorf("no LSP configuration available")
+	}
+	return b.config.DetectProjectLanguages(projectPath)
+}
+
+// DetectPrimaryProjectLanguage detects the primary language of a project
+func (b *MCPLSPBridge) DetectPrimaryProjectLanguage(projectPath string) (string, error) {
+	if b.config == nil {
+		return "", fmt.Errorf("no LSP configuration available")
+	}
+	return b.config.DetectPrimaryProjectLanguage(projectPath)
+}

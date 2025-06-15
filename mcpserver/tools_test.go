@@ -42,9 +42,28 @@ func (m *TestMockBridge) GetConfig() *lsp.LSPServerConfig {
 	}
 	return &lsp.LSPServerConfig{
 		LanguageServers: map[string]lsp.LanguageServerConfig{
-			"go": {Command: "gopls"},
+			"go": {
+				Command: "gopls",
+				Filetypes: []string{".go"},
+			},
+			"python": {
+				Command: "pyright",
+				Filetypes: []string{".py"},
+			},
+		},
+		ExtensionLanguageMap: map[string]string{
+			".go": "go",
+				".py": "python",
 		},
 	}
+}
+
+func (m *TestMockBridge) DetectProjectLanguages(projectPath string) ([]string, error) {
+	return []string{"go"}, nil
+}
+
+func (m *TestMockBridge) DetectPrimaryProjectLanguage(projectPath string) (string, error) {
+	return "go", nil
 }
 
 func TestMCPServerToolsSetup(t *testing.T) {
@@ -74,6 +93,12 @@ func TestMCPServerToolsSetup(t *testing.T) {
 			name: "LSP Disconnect Tool",
 			toolRegistration: func(mcpServer *server.MCPServer, mockBridge *TestMockBridge) {
 				registerLSPDisconnectTool(mcpServer, mockBridge)
+			},
+		},
+		{
+			name: "Detect Project Languages Tool",
+			toolRegistration: func(mcpServer *server.MCPServer, mockBridge *TestMockBridge) {
+				registerProjectLanguageDetectionTool(mcpServer, mockBridge)
 			},
 		},
 	}

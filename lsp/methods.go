@@ -81,3 +81,14 @@ func (lc *LanguageClient) DidClose(uri string) error {
 	}
 	return lc.SendNotification("textDocument/didClose", params)
 }
+
+func (lc *LanguageClient) WorkspaceSymbols(query string) ([]protocol.SymbolInformation, error) {
+	var result []protocol.SymbolInformation
+	err := lc.SendRequest("workspace/symbol", protocol.WorkspaceSymbolParams{
+		Query: query,
+	}, &result, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
