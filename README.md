@@ -129,6 +129,41 @@ The logger can be configured through the `lsp_config.json` file under the `globa
   - `error`: Logs only error messages
 - `max_log_files`: Maximum number of log files to keep before rotation. Default is 5.
 
+## Docker
+
+Docker implementation is available but no LSP servers are installed. Ideally you'd make your own extended container which includes the LSP servers you want to support.
+
+```bash
+docker pull docker.io/rockerboo/mcp-lsp-bridge
+docker run -it --rm rockerboo/mcp-lsp-bridge:latest
+```
+
+```Dockerfile
+# Use the official rockerboo/mcp-lsp-bridge image as a base
+FROM rockerboo/mcp-lsp-bridge:latest
+
+# Install additional LSP servers
+RUN apt-get update && apt-get install -y \
+    npm \
+    && npm install -g @typescript-language-server typescript-language-server \
+    && npm install -g diagnostic-languageserver
+
+# Optional: Add more LSP servers as needed
+# RUN npm install -g <another-lsp-server>
+
+# Create the config directory
+RUN mkdir -p /home/user/.config/mcp-lsp-bridge
+
+# Copy your LSP configuration file to the docker container
+COPY lsp_config.json /home/user/.config/mcp-lsp-bridge/lsp_config.json
+
+# Set the user
+USER user
+
+# Set the command to run when the container starts
+CMD ["mcp-lsp-bridge"]
+```
+
 ### Programmatic Configuration
 
 You can also configure logging programmatically:
