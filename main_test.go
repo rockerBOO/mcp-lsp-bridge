@@ -2,11 +2,37 @@ package main
 
 import (
 	"rockerboo/mcp-lsp-bridge/bridge"
+	"rockerboo/mcp-lsp-bridge/lsp"
 	"testing"
 )
 
+// createTestConfig creates a minimal test configuration
+func createTestConfig() *lsp.LSPServerConfig {
+	config, err := lsp.LoadLSPConfig("lsp_config.json")
+	if err != nil {
+		// Fallback to a minimal config if file doesn't exist
+		return &lsp.LSPServerConfig{
+			LanguageServers: map[string]lsp.LanguageServerConfig{
+				"go": {
+					Command:   "gopls",
+					Args:      []string{},
+					Languages: []string{"go"},
+					Filetypes: []string{".go"},
+				},
+			},
+			ExtensionLanguageMap: map[string]string{
+				".go": "go",
+			},
+			LanguageExtensionMap: map[string][]string{
+				"go": {".go"},
+			},
+		}
+	}
+	return config
+}
+
 func TestNewMCPLSPBridge(t *testing.T) {
-	bridgeInstance := bridge.NewMCPLSPBridge()
+	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig())
 
 	if bridgeInstance == nil {
 		t.Fatal("NewMCPLSPBridge returned nil")
@@ -23,7 +49,7 @@ func TestNewMCPLSPBridge(t *testing.T) {
 }
 
 func TestInferLanguage(t *testing.T) {
-	bridgeInstance := bridge.NewMCPLSPBridge()
+	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig())
 
 	testCases := []struct {
 		filePath   string
@@ -61,7 +87,7 @@ func TestInferLanguage(t *testing.T) {
 }
 
 func TestGetClientForLanguage(t *testing.T) {
-	bridgeInstance := bridge.NewMCPLSPBridge()
+	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig())
 
 	testCases := []struct {
 		language string
@@ -98,7 +124,7 @@ func TestGetClientForLanguage(t *testing.T) {
 }
 
 func TestCloseAllClients(t *testing.T) {
-	bridgeInstance := bridge.NewMCPLSPBridge()
+	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig())
 
 	// Create clients for multiple languages
 	languages := []string{"go"}
@@ -123,7 +149,7 @@ func TestCloseAllClients(t *testing.T) {
 
 // Benchmark client creation
 func BenchmarkGetClientForLanguage(b *testing.B) {
-	bridgeInstance := bridge.NewMCPLSPBridge()
+	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig())
 	languages := []string{"go"}
 
 	for i := 0; b.Loop(); i++ {

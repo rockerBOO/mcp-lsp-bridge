@@ -13,21 +13,12 @@ import (
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
-// NewMCPLSPBridge creates a new bridge instance with optional configuration
-func NewMCPLSPBridge() *MCPLSPBridge {
+// NewMCPLSPBridge creates a new bridge instance with provided configuration
+func NewMCPLSPBridge(config *lsp.LSPServerConfig) *MCPLSPBridge {
 	bridge := &MCPLSPBridge{
 		clients: make(map[string]*lsp.LanguageClient),
+		config:  config,
 	}
-
-	// Try to load configuration
-	confPath := "lsp_config.json"
-	config, err := lsp.LoadLSPConfig(confPath)
-	if err != nil {
-		logger.Error(fmt.Sprintf("Could not load configuration from %s: %v", confPath, err))
-		os.Exit(1)
-	}
-
-	bridge.config = config
 	return bridge
 }
 
