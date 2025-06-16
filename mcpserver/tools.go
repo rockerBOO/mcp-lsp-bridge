@@ -143,26 +143,41 @@ func registerProjectAnalysisTool(mcpServer *server.MCPServer, bridge BridgeInter
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
+		// Convert URI to local file path
+		projectPath := strings.TrimPrefix(workspaceUri, "file://")
+
 		// Use the project language detection method instead of single file inference
-		languages, err := bridge.DetectProjectLanguages(workspaceUri)
+		languages, err := bridge.DetectProjectLanguages(projectPath)
 
 		if err != nil {
-			return mcp.NewToolResultError("Failed to detect project languages"), nil
+			logger.Error("Project language detection failed", fmt.Sprintf("Workspace URI: %s, Error: %v", workspaceUri, err))
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to detect project languages: %v", err)), nil
 		}
 
 		// Use the first detected language
 		if len(languages) == 0 {
+			logger.Warn("No programming languages detected in project", fmt.Sprintf("Workspace URI: %s", workspaceUri))
 			return mcp.NewToolResultError("No languages detected in project"), nil
 		}
 
-		// Get a client for the first detected language
-		client, err := bridge.GetClientForLanguageInterface(languages[0])
-		if err != nil {
+		// Try to get clients for multiple languages with fallback
+		clients, err := bridge.GetMultiLanguageClients(languages)
+		if err != nil || len(clients) == 0 {
 			return mcp.NewToolResultError("No LSP clients available for detected languages"), nil
 		}
 
-		lspClient, ok := client.(*lsp.LanguageClient)
-		if !ok {
+		// Use the first available client
+		var lspClient *lsp.LanguageClient
+		var activeLanguage string
+		for lang, client := range clients {
+			if typedClient, ok := client.(*lsp.LanguageClient); ok {
+				lspClient = typedClient
+				activeLanguage = lang
+				break
+			}
+		}
+
+		if lspClient == nil {
 			return mcp.NewToolResultError("Invalid LSP client type"), nil
 		}
 
@@ -170,7 +185,8 @@ func registerProjectAnalysisTool(mcpServer *server.MCPServer, bridge BridgeInter
 		response.WriteString(fmt.Sprintf("Project Analysis: %s\n", analysisType))
 		response.WriteString(fmt.Sprintf("Query: %s\n", query))
 		response.WriteString(fmt.Sprintf("Workspace: %s\n", workspaceUri))
-		response.WriteString(fmt.Sprintf("Detected Languages: %v\n\n", languages))
+		response.WriteString(fmt.Sprintf("Detected Languages: %v\n", languages))
+		response.WriteString(fmt.Sprintf("Active Language: %s\n\n", activeLanguage))
 
 		switch analysisType {
 		case "workspace_symbols":
@@ -191,9 +207,81 @@ func registerProjectAnalysisTool(mcpServer *server.MCPServer, bridge BridgeInter
 			response.WriteString(formatWorkspaceSymbols(symbols))
 
 		case "references":
-			// This would require a specific position, so we'd need to find the symbol first
+			// For references, we need to search for the symbol first
+			symbols, err := lspClient.WorkspaceSymbols(query)
+			if err != nil {
+				return mcp.NewToolResultError("Failed to get workspace symbols for reference search"), nil
+			}
+
 			response.WriteString("=== REFERENCES ===\n")
-			response.WriteString("Note: Reference search requires specific file position. Use workspace_symbols first to locate the symbol.\n")
+			if len(symbols) == 0 {
+				response.WriteString("No symbols found matching the query.\n")
+				break
+			}
+
+			// Use the first symbol found to get references
+			symbol := symbols[0]
+			// Extract position from symbol location
+			uri := string(symbol.Location.Uri)
+			line := symbol.Location.Range.Start.Line
+			character := symbol.Location.Range.Start.Character
+
+			references, err := bridge.FindSymbolReferences(activeLanguage, uri, int32(line), int32(character), true)
+			if err != nil {
+				response.WriteString(fmt.Sprintf("Failed to find references: %v\n", err))
+				break
+			}
+
+			for i, ref := range references {
+				response.WriteString(fmt.Sprintf("%d. %v\n", i+1, ref))
+			}
+
+		case "definitions":
+			// For definitions, search for the symbol first
+			symbols, err := lspClient.WorkspaceSymbols(query)
+			if err != nil {
+				return mcp.NewToolResultError("Failed to get workspace symbols for definition search"), nil
+			}
+
+			response.WriteString("=== DEFINITIONS ===\n")
+			if len(symbols) == 0 {
+				response.WriteString("No symbols found matching the query.\n")
+				break
+			}
+
+			// Use the first symbol found to get definitions
+			symbol := symbols[0]
+			uri := string(symbol.Location.Uri)
+			line := symbol.Location.Range.Start.Line
+			character := symbol.Location.Range.Start.Character
+
+			definitions, err := bridge.FindSymbolDefinitions(activeLanguage, uri, int32(line), int32(character))
+			if err != nil {
+				response.WriteString(fmt.Sprintf("Failed to find definitions: %v\n", err))
+				break
+			}
+
+			for i, def := range definitions {
+				response.WriteString(fmt.Sprintf("%d. %v\n", i+1, def))
+			}
+
+		case "text_search":
+			response.WriteString("=== TEXT SEARCH ===\n")
+			// Use workspace symbols as a text search mechanism
+			searchResults, err := bridge.SearchTextInWorkspace(activeLanguage, query)
+			if err != nil {
+				response.WriteString(fmt.Sprintf("Failed to perform text search: %v\n", err))
+				break
+			}
+
+			if len(searchResults) == 0 {
+				response.WriteString("No results found for the search query.\n")
+				break
+			}
+
+			for i, result := range searchResults {
+				response.WriteString(fmt.Sprintf("%d. %v\n", i+1, result))
+			}
 
 		default:
 			return mcp.NewToolResultError(fmt.Sprintf("Unknown analysis type: %s", analysisType)), nil

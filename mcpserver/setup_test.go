@@ -36,6 +36,28 @@ func (m *MockBridge) DetectPrimaryProjectLanguage(projectPath string) (string, e
 	return "go", nil
 }
 
+func (m *MockBridge) FindSymbolReferences(language, uri string, line, character int32, includeDeclaration bool) ([]any, error) {
+	return []any{}, nil
+}
+
+func (m *MockBridge) FindSymbolDefinitions(language, uri string, line, character int32) ([]any, error) {
+	return []any{}, nil
+}
+
+func (m *MockBridge) SearchTextInWorkspace(language, query string) ([]any, error) {
+	return []any{}, nil
+}
+
+func (m *MockBridge) GetMultiLanguageClients(languages []string) (map[string]any, error) {
+	result := make(map[string]any)
+	for _, lang := range languages {
+		if lang == "go" {
+			result[lang] = &lsp.LanguageClient{}
+		}
+	}
+	return result, nil
+}
+
 func TestMCPServerSetup(t *testing.T) {
 	// Create a mock bridge
 	mockBridge := &MockBridge{}

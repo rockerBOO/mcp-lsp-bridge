@@ -18,6 +18,11 @@ type BridgeInterface interface {
 	GetConfig() *lsp.LSPServerConfig
 	DetectProjectLanguages(projectPath string) ([]string, error)
 	DetectPrimaryProjectLanguage(projectPath string) (string, error)
+	// Enhanced project analysis methods
+	FindSymbolReferences(language, uri string, line, character int32, includeDeclaration bool) ([]any, error)
+	FindSymbolDefinitions(language, uri string, line, character int32) ([]any, error)
+	SearchTextInWorkspace(language, query string) ([]any, error)
+	GetMultiLanguageClients(languages []string) (map[string]any, error)
 }
 
 // SetupMCPServer configures the MCP server with AI-powered tools

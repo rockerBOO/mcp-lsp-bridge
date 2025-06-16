@@ -216,3 +216,87 @@ func (b *MCPLSPBridge) DetectPrimaryProjectLanguage(projectPath string) (string,
 	}
 	return b.config.DetectPrimaryProjectLanguage(projectPath)
 }
+
+// FindSymbolReferences finds all references to a symbol at a given position
+func (b *MCPLSPBridge) FindSymbolReferences(language, uri string, line, character int32, includeDeclaration bool) ([]any, error) {
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+
+	references, err := client.References(uri, line, character, includeDeclaration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find references: %w", err)
+	}
+
+	// Convert to []any for interface compatibility
+	result := make([]any, len(references))
+	for i, ref := range references {
+		result[i] = ref
+	}
+	return result, nil
+}
+
+// FindSymbolDefinitions finds all definitions for a symbol at a given position
+func (b *MCPLSPBridge) FindSymbolDefinitions(language, uri string, line, character int32) ([]any, error) {
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+
+	definitions, err := client.Definition(uri, line, character)
+	if err != nil {
+		// Log the error but return empty results instead of failing
+		logger.Warn(fmt.Sprintf("Failed to find definitions for %s at %s:%d:%d: %v", language, uri, line, character, err))
+		return []any{}, nil
+	}
+
+	// Convert to []any for interface compatibility
+	result := make([]any, len(definitions))
+	for i, def := range definitions {
+		result[i] = def
+	}
+	return result, nil
+}
+
+// SearchTextInWorkspace performs a text search across the workspace
+func (b *MCPLSPBridge) SearchTextInWorkspace(language, query string) ([]any, error) {
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+
+	symbols, err := client.WorkspaceSymbols(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search workspace symbols: %w", err)
+	}
+
+	// Convert to []any for interface compatibility
+	result := make([]any, len(symbols))
+	for i, symbol := range symbols {
+		result[i] = symbol
+	}
+	return result, nil
+}
+
+// GetMultiLanguageClients gets language clients for multiple languages with fallback
+func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[string]any, error) {
+	clients := make(map[string]any)
+	var lastErr error
+
+	for _, language := range languages {
+		client, err := b.GetClientForLanguage(language)
+		if err != nil {
+			logger.Error(fmt.Sprintf("Failed to get client for language %s: %v", language, err))
+			lastErr = err
+			continue
+		}
+		clients[language] = client
+	}
+
+	if len(clients) == 0 && lastErr != nil {
+		return nil, fmt.Errorf("failed to get any language clients: %w", lastErr)
+	}
+
+	return clients, nil
+}

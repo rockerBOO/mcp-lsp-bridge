@@ -1,6 +1,8 @@
 package lsp
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
@@ -91,4 +93,88 @@ func (lc *LanguageClient) WorkspaceSymbols(query string) ([]protocol.SymbolInfor
 		return nil, err
 	}
 	return result, nil
+}
+
+// Definition requests definition locations for a symbol at a given position
+// Returns LocationLink[] or converts Location[] to LocationLink[]
+func (lc *LanguageClient) Definition(uri string, line, character int32) ([]protocol.LocationLink, error) {
+	// Use raw JSON response to handle both Location[] and LocationLink[] formats
+	var rawResult json.RawMessage
+	err := lc.SendRequest("textDocument/definition", protocol.DefinitionParams{
+		TextDocument: protocol.TextDocumentIdentifier{
+			Uri: protocol.DocumentUri(uri),
+		},
+		Position: protocol.Position{
+			Line:      uint32(line),
+			Character: uint32(character),
+		},
+	}, &rawResult, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	// First try to unmarshal as LocationLink[]
+	var resultLinks []protocol.LocationLink
+	if err := json.Unmarshal(rawResult, &resultLinks); err == nil {
+		// Check if we got valid LocationLink data
+		if len(resultLinks) > 0 && resultLinks[0].TargetUri != "" {
+			return resultLinks, nil
+		}
+	}
+
+	// Try to unmarshal as Location[]
+	var resultLocations []protocol.Location
+	if err := json.Unmarshal(rawResult, &resultLocations); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal definition response: %w", err)
+	}
+
+	// Convert Location[] to LocationLink[]
+	links := make([]protocol.LocationLink, len(resultLocations))
+	for i, loc := range resultLocations {
+		links[i] = protocol.LocationLink{
+			TargetUri:         loc.Uri,
+			TargetRange:       loc.Range,
+			TargetSelectionRange: loc.Range,
+		}
+	}
+	return links, nil
+}
+
+// References finds all references to a symbol at a given position
+func (lc *LanguageClient) References(uri string, line, character int32, includeDeclaration bool) ([]protocol.Location, error) {
+	var result []protocol.Location
+	err := lc.SendRequest("textDocument/references", protocol.ReferenceParams{
+		TextDocument: protocol.TextDocumentIdentifier{
+			Uri: protocol.DocumentUri(uri),
+		},
+		Position: protocol.Position{
+			Line:      uint32(line),
+			Character: uint32(character),
+		},
+		Context: protocol.ReferenceContext{
+			IncludeDeclaration: includeDeclaration,
+		},
+	}, &result, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// Hover provides hover information at a given position
+func (lc *LanguageClient) Hover(uri string, line, character int32) (*protocol.Hover, error) {
+	var result protocol.Hover
+	err := lc.SendRequest("textDocument/hover", protocol.HoverParams{
+		TextDocument: protocol.TextDocumentIdentifier{
+			Uri: protocol.DocumentUri(uri),
+		},
+		Position: protocol.Position{
+			Line:      uint32(line),
+			Character: uint32(character),
+		},
+	}, &result, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }

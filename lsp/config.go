@@ -153,7 +153,7 @@ func (c LSPServerConfig) DetectProjectLanguages(projectPath string) ([]string, e
 	}
 
 	// Simple sorting by score (descending)
-	for i := 0; i < len(sortedLanguages); i++ {
+	for i := range sortedLanguages {
 		for j := i + 1; j < len(sortedLanguages); j++ {
 			if sortedLanguages[j].score > sortedLanguages[i].score {
 				sortedLanguages[i], sortedLanguages[j] = sortedLanguages[j], sortedLanguages[i]

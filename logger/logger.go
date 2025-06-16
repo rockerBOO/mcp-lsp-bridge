@@ -104,6 +104,15 @@ func Info(v ...interface{}) {
 	}
 }
 
+// Warn logs an informational message with caller context
+func Warn(v ...interface{}) {
+	if config.LogLevel == "info" || config.LogLevel == "warn" {
+		if infoLogger != nil {
+			_ = infoLogger.Output(2, fmt.Sprintln(v...))
+		}
+	}
+}
+
 // Error logs an error message with caller context
 func Error(v ...interface{}) {
 	if errorLogger != nil {
