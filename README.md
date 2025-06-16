@@ -13,6 +13,7 @@ A Go-based bridge that combines MCP (Model Context Protocol) server capabilities
 ## Usage
 
 ### Basic Usage
+
 ```bash
 # Build the project
 go build
@@ -56,24 +57,28 @@ The MCP-LSP Bridge supports flexible configuration through command-line flags:
 ### Default Directory Locations
 
 **Regular Users:**
+
 - Config: `~/.config/mcp-lsp-bridge/lsp_config.json`
 - Logs: `~/.local/share/mcp-lsp-bridge/logs/mcp-lsp-bridge.log`
 - Data: `~/.local/share/mcp-lsp-bridge/`
 - Cache: `~/.cache/mcp-lsp-bridge/`
 
 **Root User:**
+
 - Config: `/etc/mcp-lsp-bridge/lsp_config.json`
 - Logs: `/var/log/mcp-lsp-bridge/mcp-lsp-bridge.log`
 - Data: `/var/lib/mcp-lsp-bridge/`
 - Cache: `/var/cache/mcp-lsp-bridge/`
 
 **Windows Users:**
+
 - Config: `%APPDATA%\mcp-lsp-bridge\lsp_config.json`
 - Logs: `%LOCALAPPDATA%\mcp-lsp-bridge\logs\mcp-lsp-bridge.log`
 
 ### Configuration Fallback
 
 The bridge attempts to load configuration from multiple locations in order:
+
 1. Command-line specified path
 2. Platform-appropriate config directory
 3. Current directory (`lsp_config.json`)
@@ -107,11 +112,11 @@ The logger can be configured through the `lsp_config.json` file under the `globa
 
 ```json
 {
-    "global": {
-        "log_file_path": "/var/log/mcp-lsp-bridge/bridge.log",
-        "log_level": "info",
-        "max_log_files": 5
-    }
+  "global": {
+    "log_file_path": "/var/log/mcp-lsp-bridge/bridge.log",
+    "log_level": "info",
+    "max_log_files": 5
+  }
 }
 ```
 
@@ -142,4 +147,3 @@ logger.InitLogger(logConfig)
 - `logger.Info()`: Log informational messages
 - `logger.Debug()`: Log debug messages (only when log level is "debug")
 - `logger.Error()`: Log error messages
-
