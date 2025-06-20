@@ -102,6 +102,10 @@ func (m *MockBridge) GetOutgoingCalls(item any) ([]any, error) {
 	return []any{}, nil
 }
 
+func (m *MockBridge) GetDocumentSymbols(uri string) ([]any, error) {
+	return []any{}, nil
+}
+
 func TestMCPServerSetup(t *testing.T) {
 	// Create a mock bridge
 	mockBridge := &MockBridge{}

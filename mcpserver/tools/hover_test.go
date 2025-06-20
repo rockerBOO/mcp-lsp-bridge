@@ -66,6 +66,7 @@ func (m *MockBridge) PrepareCallHierarchy(uri string, line, character int32) ([]
 }
 func (m *MockBridge) GetIncomingCalls(item any) ([]any, error) { return []any{}, nil }
 func (m *MockBridge) GetOutgoingCalls(item any) ([]any, error) { return []any{}, nil }
+func (m *MockBridge) GetDocumentSymbols(uri string) ([]any, error) { return []any{}, nil }
 
 // Test hover tool registration and functionality
 func TestHoverTool(t *testing.T) {
@@ -79,6 +80,22 @@ func TestHoverTool(t *testing.T) {
 		expectError  bool
 		description  string
 	}{
+		{
+			name:      "successful hover with proper Hover type",
+			uri:       "file:///test.go",
+			line:      10,
+			character: 5,
+			mockResponse: &protocol.Hover{
+				Contents: protocol.Or3[protocol.MarkupContent, protocol.MarkedString, []protocol.MarkedString]{
+					Value: protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
+						Value: "**function main()**\n\nMain function of the program",
+					},
+				},
+			},
+			expectError: false,
+			description: "Should handle proper protocol.Hover response",
+		},
 		{
 			name:      "successful hover with map contents",
 			uri:       "file:///test.go",
@@ -95,11 +112,9 @@ func TestHoverTool(t *testing.T) {
 			uri:       "file:///test.go",
 			line:      10,
 			character: 5,
-			mockResponse: protocol.HoverResponse{
-				Result: nil,
-			},
+			mockResponse: (*protocol.Hover)(nil),
 			expectError: false,
-			description: "Should handle HoverResponse with nil result",
+			description: "Should handle nil Hover result",
 		},
 		{
 			name:        "hover error - column beyond line",
@@ -118,6 +133,22 @@ func TestHoverTool(t *testing.T) {
 			mockError:   fmt.Errorf("hover request failed: response must have an id and jsonrpc field"),
 			expectError: true,
 			description: "Should handle invalid JSON-RPC responses",
+		},
+		{
+			name:      "hover with absolute path (should normalize to file URI)",
+			uri:       "/home/user/test.go",
+			line:      5,
+			character: 10,
+			mockResponse: &protocol.Hover{
+				Contents: protocol.Or3[protocol.MarkupContent, protocol.MarkedString, []protocol.MarkedString]{
+					Value: protocol.MarkupContent{
+						Kind:  protocol.MarkupKindPlainText,
+						Value: "variable: int",
+					},
+				},
+			},
+			expectError: false,
+			description: "Should handle absolute paths by normalizing to file URI",
 		},
 	}
 

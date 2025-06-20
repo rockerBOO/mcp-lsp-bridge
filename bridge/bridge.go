@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"rockerboo/mcp-lsp-bridge/logger"
@@ -127,13 +128,19 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 }
 
 func (b *MCPLSPBridge) GetClientForLanguage(language string) (*lsp.LanguageClient, error) {
-	// Check if client already exists and is connected
+	// Check if client already exists
 	if existingClient, exists := b.clients[language]; exists {
-		// Additional check to ensure client is still valid
-		metrics := existingClient.GetMetrics()
-		if metrics != nil && metrics["is_connected"] == true {
+		// Check if client context is still valid (not cancelled)
+		if existingClient.Context().Err() == nil {
+			// Reset status to connected if it was in error state but context is still valid
+			metrics := existingClient.GetMetrics()
+			logger.Info(fmt.Sprintf("GetClientForLanguage: Existing client for %s, metrics: %+v", language, metrics))
 			return existingClient, nil
 		}
+		// Client context is cancelled, remove it and create a new one
+		logger.Warn(fmt.Sprintf("Removing client with cancelled context for language %s", language))
+		existingClient.Close()
+		delete(b.clients, language)
 	}
 
 	// Find the server configuration
@@ -292,12 +299,42 @@ func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[string]a
 	return clients, nil
 }
 
+// normalizeURI ensures the URI has the proper file:// scheme
+func normalizeURI(uri string) string {
+	// If it already has a file scheme, return as-is
+	if strings.HasPrefix(uri, "file://") {
+		return uri
+	}
+	
+	// If it has any other scheme (http://, https://, etc.), return as-is
+	if strings.Contains(uri, "://") {
+		return uri
+	}
+	
+	// If it's an absolute path, convert to file URI
+	if strings.HasPrefix(uri, "/") {
+		return "file://" + uri
+	}
+	
+	// If it's a relative path, convert to absolute path first, then to file URI
+	if absPath, err := filepath.Abs(uri); err == nil {
+		return "file://" + absPath
+	}
+	
+	// Fallback: assume it's a file path and add file:// prefix
+	return "file://" + uri
+}
+
 // GetHoverInformation gets hover information for a symbol at a specific position
 func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character int32) (any, error) {
 	// Extensive debug logging
 	logger.Info(fmt.Sprintf("GetHoverInformation: Starting hover request for URI: %s, Line: %d, Character: %d", uri, line, character))
 
-	// Infer language from URI
+	// Normalize URI to ensure proper file:// scheme
+	normalizedURI := normalizeURI(uri)
+	logger.Info(fmt.Sprintf("GetHoverInformation: Normalized URI: %s -> %s", uri, normalizedURI))
+
+	// Infer language from URI (use original URI for file extension detection)
 	language, err := b.InferLanguage(uri)
 	if err != nil {
 		logger.Error("GetHoverInformation: Failed to infer language", fmt.Sprintf("URI: %s, Error: %v", uri, err))
@@ -312,9 +349,16 @@ func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character int32) (a
 		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
 	}
 
-	// Execute hover request directly to get HoverResponse
+	// Ensure the document is opened in the language server
+	err = b.ensureDocumentOpen(client, normalizedURI, language)
+	if err != nil {
+		logger.Error("GetHoverInformation: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+		// Continue anyway, as some servers might still work without explicit didOpen
+	}
+
+	// Execute hover request to get Hover result using normalized URI
 	hoverParams := protocol.HoverParams{
-		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(normalizedURI)},
 		Position: protocol.Position{
 			Line:      uint32(line),
 			Character: uint32(character),
@@ -323,7 +367,8 @@ func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character int32) (a
 
 	logger.Info("GetHoverInformation: Sending hover request to language server")
 
-	var result protocol.HoverResponse
+	// LSP hover response is either a Hover object or null, not wrapped in HoverResponse
+	var result *protocol.Hover
 	err = client.SendRequest("textDocument/hover", hoverParams, &result, 5*time.Second)
 	if err != nil {
 		logger.Error("GetHoverInformation: Hover request failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
@@ -333,6 +378,94 @@ func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character int32) (a
 	// Log hover response details
 	logger.Info(fmt.Sprintf("GetHoverInformation: Received hover response. Type: %T, Contents: %+v", result, result))
 
+	return result, nil
+}
+
+// ensureDocumentOpen sends a textDocument/didOpen notification to the language server
+// This is often required before other document operations can be performed
+func (b *MCPLSPBridge) ensureDocumentOpen(client *lsp.LanguageClient, uri, language string) error {
+	// Read the file content
+	// Remove file:// prefix to get the actual file path
+	filePath := strings.TrimPrefix(uri, "file://")
+	
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+
+	// Determine the language ID based on the language parameter
+	languageId := language
+	if language == "typescript" {
+		languageId = "typescript"
+	} else if language == "javascript" {
+		languageId = "javascript"
+	}
+
+	// Send textDocument/didOpen notification
+	didOpenParams := protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			Uri:        protocol.DocumentUri(uri),
+			LanguageId: protocol.LanguageKind(languageId),
+			Version:    1,
+			Text:       string(content),
+		},
+	}
+
+	err = client.SendNotification("textDocument/didOpen", didOpenParams)
+	if err != nil {
+		return fmt.Errorf("failed to send didOpen notification: %w", err)
+	}
+
+	logger.Info(fmt.Sprintf("Document opened in LSP server: %s (language: %s)", uri, languageId))
+	return nil
+}
+
+// GetDocumentSymbols gets all symbols in a document
+func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]any, error) {
+	// Normalize URI to ensure proper file:// scheme
+	normalizedURI := normalizeURI(uri)
+	logger.Info(fmt.Sprintf("GetDocumentSymbols: Starting request for URI: %s -> %s", uri, normalizedURI))
+
+	// Infer language from URI
+	language, err := b.InferLanguage(uri)
+	if err != nil {
+		logger.Error("GetDocumentSymbols: Failed to infer language", fmt.Sprintf("URI: %s, Error: %v", uri, err))
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+	logger.Info(fmt.Sprintf("GetDocumentSymbols: Inferred language: %s", language))
+
+	// Get language client
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		logger.Error("GetDocumentSymbols: Failed to get language client", fmt.Sprintf("Language: %s, Error: %v", language, err))
+		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+	
+	// Additional debugging: check client status
+	metrics := client.GetMetrics()
+	logger.Info(fmt.Sprintf("GetDocumentSymbols: Client metrics: %+v", metrics))
+
+	// Ensure the document is opened in the language server
+	err = b.ensureDocumentOpen(client, normalizedURI, language)
+	if err != nil {
+		logger.Error("GetDocumentSymbols: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+		// Continue anyway, as some servers might still work without explicit didOpen
+	}
+
+	// Get document symbols
+	symbols, err := client.DocumentSymbols(normalizedURI)
+	if err != nil {
+		logger.Error("GetDocumentSymbols: Request failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
+		return nil, fmt.Errorf("document symbols request failed: %w", err)
+	}
+
+	// Convert to []any for interface compatibility
+	result := make([]any, len(symbols))
+	for i, symbol := range symbols {
+		result[i] = symbol
+	}
+
+	logger.Info(fmt.Sprintf("GetDocumentSymbols: Found %d symbols", len(result)))
 	return result, nil
 }
 
@@ -346,34 +479,39 @@ func (b *MCPLSPBridge) GetDiagnostics(uri string) ([]any, error) {
 
 // GetSignatureHelp gets signature help for a function at a specific position
 func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character int32) (any, error) {
+	// Normalize URI
+	normalizedURI := normalizeURI(uri)
+	
 	// Infer language from URI
-	language, err := b.InferLanguage(uri)
+	language, err := b.InferLanguage(normalizedURI)
 	if err != nil {
+		logger.Error("GetSignatureHelp: Language inference failed", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
 		return nil, fmt.Errorf("failed to infer language: %w", err)
 	}
 
 	// Get language client
 	client, err := b.GetClientForLanguage(language)
 	if err != nil {
+		logger.Error("GetSignatureHelp: Client creation failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
 		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
 	}
 
-	// Execute signature help request
-	signatureParams := protocol.SignatureHelpParams{
-		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
-		Position: protocol.Position{
-			Line:      uint32(line),
-			Character: uint32(character),
-		},
+	// Ensure document is open in the language server
+	err = b.ensureDocumentOpen(client, normalizedURI, language)
+	if err != nil {
+		logger.Error("GetSignatureHelp: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+		// Continue anyway, as some servers might still work without explicit didOpen
 	}
 
-	var result protocol.SignatureHelpResponse
-	err = client.SendRequest("textDocument/signatureHelp", signatureParams, &result, 5*time.Second)
+	// Execute signature help request using the LSP client method
+	signatureHelp, err := client.SignatureHelp(normalizedURI, line, character)
 	if err != nil {
+		logger.Error("GetSignatureHelp: Request failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
 		return nil, fmt.Errorf("signature help request failed: %w", err)
 	}
 
-	return result, nil
+	logger.Info(fmt.Sprintf("GetSignatureHelp: Found signature help for position %d:%d", line, character))
+	return signatureHelp, nil
 }
 
 // GetCodeActions gets code actions for a specific range
@@ -490,40 +628,45 @@ func (b *MCPLSPBridge) RenameSymbol(uri string, line, character int32, newName s
 
 // FindImplementations finds implementations of a symbol
 func (b *MCPLSPBridge) FindImplementations(uri string, line, character int32) ([]any, error) {
+	// Normalize URI
+	normalizedURI := normalizeURI(uri)
+	
 	// Infer language from URI
-	language, err := b.InferLanguage(uri)
+	language, err := b.InferLanguage(normalizedURI)
 	if err != nil {
+		logger.Error("FindImplementations: Language inference failed", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
 		return nil, fmt.Errorf("failed to infer language: %w", err)
 	}
 
 	// Get language client
 	client, err := b.GetClientForLanguage(language)
 	if err != nil {
+		logger.Error("FindImplementations: Client creation failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
 		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
 	}
 
-	// Execute implementation request
-	params := protocol.ImplementationParams{
-		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
-		Position: protocol.Position{
-			Line:      uint32(line),
-			Character: uint32(character),
-		},
+	// Ensure document is open in the language server
+	err = b.ensureDocumentOpen(client, normalizedURI, language)
+	if err != nil {
+		logger.Error("FindImplementations: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+		// Continue anyway, as some servers might still work without explicit didOpen
 	}
 
-	var result []protocol.Location
-	err = client.SendRequest("textDocument/implementation", params, &result, 5*time.Second)
+	// Execute implementation request using the LSP client method
+	implementations, err := client.Implementation(normalizedURI, line, character)
 	if err != nil {
+		logger.Error("FindImplementations: Request failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
 		return nil, fmt.Errorf("implementation request failed: %w", err)
 	}
 
 	// Convert to []any for interface compatibility
-	implementations := make([]any, len(result))
-	for i, impl := range result {
-		implementations[i] = impl
+	result := make([]any, len(implementations))
+	for i, impl := range implementations {
+		result[i] = impl
 	}
 
-	return implementations, nil
+	logger.Info(fmt.Sprintf("FindImplementations: Found %d implementations", len(result)))
+	return result, nil
 }
 
 // PrepareCallHierarchy prepares call hierarchy items

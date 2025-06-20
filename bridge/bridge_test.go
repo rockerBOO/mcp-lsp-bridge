@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"path/filepath"
 	"testing"
 
 	"rockerboo/mcp-lsp-bridge/lsp"
@@ -102,4 +103,50 @@ func TestInvalidLanguageConnection(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error for non-existent language, got nil")
 	}
+}
+
+func TestNormalizeURI(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "already proper file URI",
+			input:    "file:///home/user/test.go",
+			expected: "file:///home/user/test.go",
+		},
+		{
+			name:     "absolute path",
+			input:    "/home/user/test.go",
+			expected: "file:///home/user/test.go",
+		},
+		{
+			name:     "relative path",
+			input:    "test.go",
+			expected: "file://" + mustAbs("test.go"),
+		},
+		{
+			name:     "other scheme",
+			input:    "http://example.com",
+			expected: "http://example.com",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := normalizeURI(tc.input)
+			if result != tc.expected {
+				t.Errorf("normalizeURI(%q) = %q, expected %q", tc.input, result, tc.expected)
+			}
+		})
+	}
+}
+
+func mustAbs(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		panic(err)
+	}
+	return abs
 }

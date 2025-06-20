@@ -29,4 +29,7 @@ type BridgeInterface interface {
 	PrepareCallHierarchy(uri string, line, character int32) ([]any, error)
 	GetIncomingCalls(item any) ([]any, error)
 	GetOutgoingCalls(item any) ([]any, error)
+	
+	// Document symbol operations
+	GetDocumentSymbols(uri string) ([]any, error)
 }

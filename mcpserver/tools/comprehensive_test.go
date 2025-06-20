@@ -204,6 +204,10 @@ func (m *ComprehensiveMockBridge) GetOutgoingCalls(item any) ([]any, error) {
 	return []any{}, nil
 }
 
+func (m *ComprehensiveMockBridge) GetDocumentSymbols(uri string) ([]any, error) {
+	return []any{}, nil
+}
+
 // Helper function for testing - removed unused createMockRequest
 
 // Test actual tool handler execution

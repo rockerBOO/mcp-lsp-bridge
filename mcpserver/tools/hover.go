@@ -72,16 +72,23 @@ func RegisterHoverTool(mcpServer *server.MCPServer, bridge interfaces.BridgeInte
 		// Extract contents from the hover response with multiple type checks
 		var content string
 		switch v := result.(type) {
+		case *protocol.Hover:
+			// Direct Hover pointer type (most common case from LSP)
+			if v == nil {
+				content = "=== HOVER INFORMATION ===\nNo hover information available"
+			} else {
+				content = formatHoverContent(v.Contents)
+			}
+		case protocol.Hover:
+			// Direct Hover value type
+			content = formatHoverContent(v.Contents)
 		case protocol.HoverResponse:
-			// Check for result explicitly
+			// Legacy HoverResponse type (if still used somewhere)
 			if v.Result == nil {
 				content = "=== HOVER INFORMATION ===\nNo hover result available"
 			} else {
 				content = formatHoverContent(v.Result.Contents)
 			}
-		case *protocol.Hover:
-			// Direct Hover type
-			content = formatHoverContent(v.Contents)
 		case map[string]any:
 			// Fallback for generic map responses
 			contents, hasContents := v["contents"]

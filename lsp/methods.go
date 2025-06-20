@@ -178,3 +178,80 @@ func (lc *LanguageClient) Hover(uri string, line, character int32) (*protocol.Ho
 	}
 	return &result, nil
 }
+
+// DocumentSymbols returns all symbols in a document
+func (lc *LanguageClient) DocumentSymbols(uri string) ([]protocol.DocumentSymbol, error) {
+	// Try DocumentSymbol[] first (newer format)
+	var symbolResult []protocol.DocumentSymbol
+	err := lc.SendRequest("textDocument/documentSymbol", protocol.DocumentSymbolParams{
+		TextDocument: protocol.TextDocumentIdentifier{
+			Uri: protocol.DocumentUri(uri),
+		},
+	}, &symbolResult, 5*time.Second)
+	
+	if err == nil && len(symbolResult) > 0 {
+		return symbolResult, nil
+	}
+
+	// Fallback to SymbolInformation[] (older format)
+	var infoResult []protocol.SymbolInformation
+	err = lc.SendRequest("textDocument/documentSymbol", protocol.DocumentSymbolParams{
+		TextDocument: protocol.TextDocumentIdentifier{
+			Uri: protocol.DocumentUri(uri),
+		},
+	}, &infoResult, 5*time.Second)
+	
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert SymbolInformation[] to DocumentSymbol[]
+	result := make([]protocol.DocumentSymbol, len(infoResult))
+	for i, info := range infoResult {
+		result[i] = protocol.DocumentSymbol{
+			Name:           info.Name,
+			Kind:           info.Kind,
+			Range:          info.Location.Range,
+			SelectionRange: info.Location.Range, // For SymbolInformation, this is the best we can do
+			// Note: Children will be empty since SymbolInformation is flat
+		}
+	}
+	
+	return result, nil
+}
+
+// Implementation finds implementations of a symbol at a given position
+func (lc *LanguageClient) Implementation(uri string, line, character int32) ([]protocol.Location, error) {
+	var result []protocol.Location
+	err := lc.SendRequest("textDocument/implementation", protocol.ImplementationParams{
+		TextDocument: protocol.TextDocumentIdentifier{
+			Uri: protocol.DocumentUri(uri),
+		},
+		Position: protocol.Position{
+			Line:      uint32(line),
+			Character: uint32(character),
+		},
+	}, &result, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// SignatureHelp provides signature help at a given position
+func (lc *LanguageClient) SignatureHelp(uri string, line, character int32) (*protocol.SignatureHelp, error) {
+	var result protocol.SignatureHelp
+	err := lc.SendRequest("textDocument/signatureHelp", protocol.SignatureHelpParams{
+		TextDocument: protocol.TextDocumentIdentifier{
+			Uri: protocol.DocumentUri(uri),
+		},
+		Position: protocol.Position{
+			Line:      uint32(line),
+			Character: uint32(character),
+		},
+	}, &result, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

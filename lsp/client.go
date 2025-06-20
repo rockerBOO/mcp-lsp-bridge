@@ -176,9 +176,15 @@ func (lc *LanguageClient) SendRequest(method string, params any, result any, tim
 	// Increment total requests
 	atomic.AddInt64(&lc.totalRequests, 1)
 
-	// Ensure connection is still valid
-	if !lc.IsConnected() {
-		return fmt.Errorf("language server not connected")
+	// Ensure connection is still valid by checking context and connection
+	if lc.ctx.Err() != nil || lc.conn == nil {
+		return fmt.Errorf("language server connection is closed")
+	}
+	
+	// Reset status to connected if we have a valid connection
+	if lc.status == StatusError && lc.ctx.Err() == nil && lc.conn != nil {
+		lc.status = StatusConnected
+		logger.Info("LSP client status reset from error to connected")
 	}
 
 	reqCtx, cancel := context.WithTimeout(lc.ctx, timeout)

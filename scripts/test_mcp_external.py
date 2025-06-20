@@ -221,7 +221,7 @@ class MCPTestClient:
     
     def run_all_tests(self) -> List[TestResult]:
         """Run all MCP tests"""
-        self.print_colored("🧪 Running MCP Tool Tests...", Colors.YELLOW)
+        self.print_colored("🧪 Running Comprehensive MCP Tool Tests...", Colors.YELLOW)
         print()
         
         results = []
@@ -255,26 +255,229 @@ class MCPTestClient:
         self.run_test(result)
         results.append(result)
         
+        # Core Analysis Tools
+        print()
+        self.print_colored("🔍 Testing Core Analysis Tools", Colors.BLUE)
+        
         # Test 3: Infer Language Tool
         result = self.test_tool_call("infer_language", {"file_path": "/test/example.go"})
         self.run_test(result)
         results.append(result)
         
-        # Test 4: LSP Connect Tool
+        # Test 4: Detect Project Languages Tool
+        result = self.test_tool_call("detect_project_languages", {
+            "project_path": str(self.project_dir),
+            "mode": "all"
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 5: Project Analysis Tool - Workspace Symbols
+        result = self.test_tool_call("project_analysis", {
+            "workspace_uri": f"file://{self.project_dir}",
+            "analysis_type": "workspace_symbols",
+            "query": "RegisterAllTools",
+            "limit": 5
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 6: Project Analysis Tool - Document Symbols
+        result = self.test_tool_call("project_analysis", {
+            "workspace_uri": f"file://{self.project_dir}",
+            "analysis_type": "document_symbols",
+            "query": f"file://{self.project_dir}/mcpserver/tools.go",
+            "limit": 10
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # LSP Connection Management
+        print()
+        self.print_colored("🔗 Testing LSP Connection Management", Colors.BLUE)
+        
+        # Test 7: LSP Connect Tool
         result = self.test_tool_call("lsp_connect", {"language": "go"})
         self.run_test(result)
         results.append(result)
         
-        # Test 5: Analyze Code Tool
+        # Code Intelligence Tools (require active LSP connection)
+        print()
+        self.print_colored("🧠 Testing Code Intelligence Tools", Colors.BLUE)
+        
+        # Test 8: Analyze Code Tool
         result = self.test_tool_call("analyze_code", {
-            "uri": "file:///test/example.go",
-            "line": 10,
+            "uri": f"file://{self.project_dir}/mcpserver/tools.go",
+            "line": 11,
             "character": 5
         })
         self.run_test(result)
         results.append(result)
         
-        # Test 6: LSP Disconnect Tool
+        # Test 9: Hover Tool
+        result = self.test_tool_call("hover", {
+            "uri": f"file://{self.project_dir}/mcpserver/tools.go",
+            "line": 11,
+            "character": 5
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 10: Signature Help Tool (NEW - recently fixed)
+        result = self.test_tool_call("signature_help", {
+            "uri": f"file://{self.project_dir}/mcpserver/tools.go",
+            "line": 13,
+            "character": 40  # Position after function call opening parenthesis
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 11: Diagnostics Tool
+        result = self.test_tool_call("diagnostics", {
+            "uri": f"file://{self.project_dir}/mcpserver/tools.go"
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Code Improvement Tools
+        print()
+        self.print_colored("🛠️ Testing Code Improvement Tools", Colors.BLUE)
+        
+        # Test 12: Code Actions Tool
+        result = self.test_tool_call("code_actions", {
+            "uri": f"file://{self.project_dir}/mcpserver/tools.go",
+            "line": 11,
+            "character": 0,
+            "end_line": 11,
+            "end_character": 50
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 13: Format Document Tool
+        result = self.test_tool_call("format_document", {
+            "uri": f"file://{self.project_dir}/mcpserver/tools.go",
+            "tab_size": 4
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Advanced Navigation Tools
+        print()
+        self.print_colored("🧭 Testing Advanced Navigation Tools", Colors.BLUE)
+        
+        # Test 14: Implementation Tool (NEW - recently fixed)
+        result = self.test_tool_call("implementation", {
+            "uri": f"file://{self.project_dir}/mcpserver/tools.go",
+            "line": 11,
+            "character": 19  # Position on function name "RegisterAllTools"
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 15: Rename Tool
+        result = self.test_tool_call("rename", {
+            "uri": f"file://{self.project_dir}/mcpserver/tools.go",
+            "line": 11,
+            "character": 19,
+            "new_name": "RegisterAllMCPTools",
+            "preview": True  # Preview mode to avoid actual changes
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 16: Call Hierarchy Tool
+        result = self.test_tool_call("call_hierarchy", {
+            "uri": f"file://{self.project_dir}/mcpserver/tools.go",
+            "line": 11,
+            "character": 19,
+            "direction": "both"
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Workspace Analysis Tools
+        print()
+        self.print_colored("🌐 Testing Workspace Analysis Tools", Colors.BLUE)
+        
+        # Test 17: Workspace Diagnostics Tool
+        result = self.test_tool_call("workspace_diagnostics", {
+            "workspace_uri": f"file://{self.project_dir}",
+            "identifier": "test-session"
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 18: Project Analysis - References
+        result = self.test_tool_call("project_analysis", {
+            "workspace_uri": f"file://{self.project_dir}",
+            "analysis_type": "references",
+            "query": "RegisterAllTools",
+            "limit": 5
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 19: Project Analysis - Definitions
+        result = self.test_tool_call("project_analysis", {
+            "workspace_uri": f"file://{self.project_dir}",
+            "analysis_type": "definitions",
+            "query": "RegisterAllTools",
+            "limit": 3
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 20: Project Analysis - Text Search
+        result = self.test_tool_call("project_analysis", {
+            "workspace_uri": f"file://{self.project_dir}",
+            "analysis_type": "text_search",
+            "query": "MCP tools",
+            "limit": 5
+        })
+        self.run_test(result)
+        results.append(result)
+        
+        # Special Integration Tests
+        print()
+        self.print_colored("🎯 Testing Hover Optimization Workflow", Colors.BLUE)
+        
+        # Test 21: Document symbols + hover optimization workflow
+        # This demonstrates the exact workflow mentioned by the user
+        result = self.test_tool_call("project_analysis", {
+            "analysis_type": "document_symbols",
+            "query": "mcpserver/tools.go",
+            "workspace_uri": f"file://{self.project_dir}"
+        })
+        result.description = "Document Symbols for Hover Optimization"
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 22: Hover at document symbol coordinates (expected to fail)
+        result = self.test_tool_call("hover", {
+            "uri": f"file://{self.project_dir}/mcpserver/tools.go",
+            "line": 10,
+            "character": 0
+        })
+        result.description = "Hover at Document Symbol Coordinates (line=10, char=0)"
+        self.run_test(result)
+        results.append(result)
+        
+        # Test 23: Hover at optimized position (expected to succeed)
+        result = self.test_tool_call("hover", {
+            "uri": f"file://{self.project_dir}/mcpserver/tools.go",
+            "line": 10,
+            "character": 5  # Inside the function name
+        })
+        result.description = "Hover at Optimized Position (line=10, char=5)"
+        self.run_test(result)
+        results.append(result)
+        
+        # Cleanup - LSP Disconnect
+        print()
+        self.print_colored("🧹 Testing Cleanup", Colors.BLUE)
+        
+        # Test 24: LSP Disconnect Tool
         result = self.test_tool_call("lsp_disconnect", {})
         self.run_test(result)
         results.append(result)

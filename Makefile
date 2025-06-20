@@ -38,10 +38,11 @@ test-race:
 	@echo "Running tests with race detection..."
 	go test -v -race ./...
 
-# Run external MCP tests
+# Run comprehensive external MCP tests (all 21 tools)
 .PHONY: test-mcp-external
 test-mcp-external:
-	@echo "Running external MCP integration tests..."
+	@echo "Running comprehensive external MCP integration tests..."
+	@echo "Testing all 15 MCP tools including newly fixed implementation and signature help..."
 	@cd scripts && python3 test_mcp_external.py
 
 # Run external MCP tests (shell version)
@@ -61,6 +62,23 @@ test-mcp-simple:
 test-mcp-tools:
 	@echo "Running MCP tools test..."
 	@cd scripts && python3 test_mcp_tools.py
+
+# Test newly fixed tools (implementation and signature help)
+.PHONY: test-mcp-new-tools
+test-mcp-new-tools:
+	@echo "Testing newly fixed implementation and signature help tools..."
+	@cd scripts && python3 test_new_tools.py
+
+# Test hover optimization workflow
+.PHONY: test-mcp-hover-optimization
+test-mcp-hover-optimization:
+	@echo "Testing hover optimization workflow (document symbols → hover coordination)..."
+	@cd scripts && python3 test_hover_optimization.py
+
+# Run all MCP testing (comprehensive suite)
+.PHONY: test-mcp-all
+test-mcp-all: test-mcp-simple test-mcp-tools test-mcp-external test-mcp-new-tools test-mcp-hover-optimization
+	@echo "All MCP tests completed!"
 
 # Lint the code
 .PHONY: lint
@@ -190,10 +208,13 @@ help:
 	@echo "  test         - Run tests"
 	@echo "  test-coverage- Run tests with coverage report"
 	@echo "  test-race    - Run tests with race detection"
-	@echo "  test-mcp-external - Run external MCP integration tests"
+	@echo "  test-mcp-external - Run comprehensive external MCP tests (all 15 tools)"
 	@echo "  test-mcp-external-shell - Run external MCP tests (shell)"
 	@echo "  test-mcp-simple  - Run simple MCP connectivity test"
 	@echo "  test-mcp-tools   - Run individual MCP tools test"
+	@echo "  test-mcp-new-tools - Test newly fixed implementation and signature help tools"
+	@echo "  test-mcp-hover-optimization - Test hover optimization workflow"
+	@echo "  test-mcp-all     - Run complete MCP testing suite"
 	@echo "  lint         - Lint the code"
 	@echo "  fmt          - Format the code"
 	@echo "  vet          - Vet the code"

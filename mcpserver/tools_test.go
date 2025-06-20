@@ -255,6 +255,10 @@ func (m *TestMockBridge) GetOutgoingCalls(item any) ([]any, error) {
 	return []any{}, nil
 }
 
+func (m *TestMockBridge) GetDocumentSymbols(uri string) ([]any, error) {
+	return []any{}, nil
+}
+
 // TestRegisterAllTools tests that all tools can be registered without errors
 func TestRegisterAllTools(t *testing.T) {
 	mockBridge := &TestMockBridge{

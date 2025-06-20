@@ -12,6 +12,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
 // RegisterProjectAnalysisTool registers the project_analysis tool
@@ -20,7 +21,9 @@ func RegisterProjectAnalysisTool(mcpServer *server.MCPServer, bridge interfaces.
 		mcp.WithDescription("Analyze project structure, find references, and search across files"),
 		mcp.WithString("workspace_uri", mcp.Description("URI to the workspace/project root")),
 		mcp.WithString("query", mcp.Description("Symbol or text to search for")),
-		mcp.WithString("analysis_type", mcp.Description("Type of analysis: 'references', 'definitions', 'workspace_symbols', or 'text_search'")),
+		mcp.WithString("analysis_type", mcp.Description("Type of analysis: 'references', 'definitions', 'workspace_symbols', 'document_symbols', or 'text_search'")),
+		mcp.WithNumber("offset", mcp.Description("Result offset for pagination (default: 0)")),
+		mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default: 20, max: 100)")),
 	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		workspaceUri, err := request.RequireString("workspace_uri")
 		if err != nil {
@@ -35,6 +38,19 @@ func RegisterProjectAnalysisTool(mcpServer *server.MCPServer, bridge interfaces.
 		analysisType, err := request.RequireString("analysis_type")
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		// Parse pagination parameters with defaults
+		offset := 0
+		if offsetVal, err := request.RequireInt("offset"); err == nil {
+			offset = offsetVal
+		}
+
+		limit := 20
+		if limitVal, err := request.RequireInt("limit"); err == nil {
+			if limitVal > 0 && limitVal <= 100 {
+				limit = limitVal
+			}
 		}
 
 		// Convert URI to local file path
@@ -94,17 +110,32 @@ func RegisterProjectAnalysisTool(mcpServer *server.MCPServer, bridge interfaces.
 				break
 			}
 
-			// Limit results and format nicely
-			maxResults := 20
-			actualCount := len(symbols)
-			if actualCount > maxResults {
-				response.WriteString(fmt.Sprintf("Showing first %d of %d results:\n\n", maxResults, actualCount))
-				symbols = symbols[:maxResults]
+			// Apply pagination
+			totalCount := len(symbols)
+			
+			// Handle offset
+			if offset >= totalCount {
+				response.WriteString(fmt.Sprintf("Offset %d exceeds total results (%d). No results to display.\n", offset, totalCount))
+				break
+			}
+			
+			// Apply offset and limit
+			end := offset + limit
+			if end > totalCount {
+				end = totalCount
+			}
+			
+			paginatedSymbols := symbols[offset:end]
+			resultCount := len(paginatedSymbols)
+			
+			// Format pagination info
+			if offset > 0 || end < totalCount {
+				response.WriteString(fmt.Sprintf("Showing results %d-%d of %d total:\n\n", offset+1, offset+resultCount, totalCount))
 			} else {
-				response.WriteString(fmt.Sprintf("Found %d results:\n\n", actualCount))
+				response.WriteString(fmt.Sprintf("Found %d results:\n\n", totalCount))
 			}
 
-			for i, symbol := range symbols {
+			for i, symbol := range paginatedSymbols {
 				// Extract filename from URI
 				uri := string(symbol.Location.Uri)
 				filename := filepath.Base(strings.TrimPrefix(uri, "file://"))
@@ -112,15 +143,89 @@ func RegisterProjectAnalysisTool(mcpServer *server.MCPServer, bridge interfaces.
 				// Format symbol kind in a readable way
 				kindStr := symbolKindToString(symbol.Kind)
 
-				response.WriteString(fmt.Sprintf("%d. %s (%s) in %s\n", 
-					i+1, 
+				// Extract location coordinates
+				startLine := symbol.Location.Range.Start.Line
+				startChar := symbol.Location.Range.Start.Character
+				endLine := symbol.Location.Range.End.Line
+				endChar := symbol.Location.Range.End.Character
+
+				// Format with coordinates for precise targeting
+				response.WriteString(fmt.Sprintf("%d. %s (%s) in %s:%d:%d-%d:%d\n", 
+					offset+i+1, 
 					symbol.Name, 
 					kindStr,
-					filename))
+					filename,
+					startLine, startChar, endLine, endChar))
+				response.WriteString(fmt.Sprintf("   %s\n", uri))
+				response.WriteString(fmt.Sprintf("   💡 To target this symbol: uri=\"%s\", line=%d, character=%d\n", uri, startLine, startChar))
+				response.WriteString("   ℹ️  Use these coordinates for hover, references, definitions, rename, etc.\n")
 			}
 
-			if actualCount > maxResults {
-				response.WriteString(fmt.Sprintf("\n... and %d more results\n", actualCount-maxResults))
+			// Show pagination info
+			if end < totalCount {
+				remaining := totalCount - end
+				response.WriteString(fmt.Sprintf("\n... and %d more results available (use offset=%d to see next page)\n", remaining, end))
+			}
+
+		case "document_symbols":
+			// For document symbols, the query should be a file URI
+			docUri := query
+			if !strings.HasPrefix(query, "file://") {
+				// If query is not a URI, treat it as a file path and normalize it
+				docUri = normalizeURI(query)
+			}
+			
+			response.WriteString("=== DOCUMENT SYMBOLS ===\n")
+			response.WriteString(fmt.Sprintf("Document: %s\n\n", docUri))
+
+			symbols, err := bridge.GetDocumentSymbols(docUri)
+			if err != nil {
+				logger.Error("Document symbols query failed", fmt.Sprintf("URI: %s, Error: %v", docUri, err))
+				response.WriteString(fmt.Sprintf("Error: Failed to get document symbols: %v\n", err))
+				break
+			}
+
+			if len(symbols) == 0 {
+				response.WriteString("No symbols found in document.\n")
+				break
+			}
+
+			// Apply pagination to document symbols
+			totalCount := len(symbols)
+			
+			// Handle offset
+			if offset >= totalCount {
+				response.WriteString(fmt.Sprintf("Offset %d exceeds total results (%d). No results to display.\n", offset, totalCount))
+				break
+			}
+			
+			// Apply offset and limit
+			end := offset + limit
+			if end > totalCount {
+				end = totalCount
+			}
+			
+			paginatedSymbols := symbols[offset:end]
+			resultCount := len(paginatedSymbols)
+			
+			// Format pagination info
+			if offset > 0 || end < totalCount {
+				response.WriteString(fmt.Sprintf("Showing symbols %d-%d of %d total:\n\n", offset+1, offset+resultCount, totalCount))
+			} else {
+				response.WriteString(fmt.Sprintf("Found %d symbols:\n\n", totalCount))
+			}
+
+			// Format symbols with hierarchy
+			for i, sym := range paginatedSymbols {
+				if docSymbol, ok := sym.(protocol.DocumentSymbol); ok {
+					formatDocumentSymbolWithTargeting(&response, docSymbol, 0, offset+i+1, docUri)
+				}
+			}
+
+			// Show pagination info
+			if end < totalCount {
+				remaining := totalCount - end
+				response.WriteString(fmt.Sprintf("\n... and %d more symbols available (use offset=%d to see next page)\n", remaining, end))
 			}
 
 		case "references":
@@ -210,22 +315,39 @@ func RegisterProjectAnalysisTool(mcpServer *server.MCPServer, bridge interfaces.
 				break
 			}
 
-			// Limit results 
-			maxResults := 20
-			actualCount := len(searchResults)
-			if actualCount > maxResults {
-				response.WriteString(fmt.Sprintf("Showing first %d of %d results:\n\n", maxResults, actualCount))
-				searchResults = searchResults[:maxResults]
+			// Apply pagination to text search results
+			totalCount := len(searchResults)
+			
+			// Handle offset
+			if offset >= totalCount {
+				response.WriteString(fmt.Sprintf("Offset %d exceeds total results (%d). No results to display.\n", offset, totalCount))
+				break
+			}
+			
+			// Apply offset and limit
+			end := offset + limit
+			if end > totalCount {
+				end = totalCount
+			}
+			
+			paginatedResults := searchResults[offset:end]
+			resultCount := len(paginatedResults)
+			
+			// Format pagination info
+			if offset > 0 || end < totalCount {
+				response.WriteString(fmt.Sprintf("Showing results %d-%d of %d total:\n\n", offset+1, offset+resultCount, totalCount))
 			} else {
-				response.WriteString(fmt.Sprintf("Found %d results:\n\n", actualCount))
+				response.WriteString(fmt.Sprintf("Found %d results:\n\n", totalCount))
 			}
 			
-			for i, result := range searchResults {
-				response.WriteString(fmt.Sprintf("%d. %v\n", i+1, result))
+			for i, result := range paginatedResults {
+				response.WriteString(fmt.Sprintf("%d. %v\n", offset+i+1, result))
 			}
 			
-			if actualCount > maxResults {
-				response.WriteString(fmt.Sprintf("\n... and %d more results\n", actualCount-maxResults))
+			// Show pagination info
+			if end < totalCount {
+				remaining := totalCount - end
+				response.WriteString(fmt.Sprintf("\n... and %d more results available (use offset=%d to see next page)\n", remaining, end))
 			}
 
 		default:
@@ -234,4 +356,75 @@ func RegisterProjectAnalysisTool(mcpServer *server.MCPServer, bridge interfaces.
 
 		return mcp.NewToolResultText(response.String()), nil
 	})
+}
+
+// normalizeURI ensures the URI has the proper file:// scheme
+func normalizeURI(uri string) string {
+	// If it already has a file scheme, return as-is
+	if strings.HasPrefix(uri, "file://") {
+		return uri
+	}
+	
+	// If it has any other scheme (http://, https://, etc.), return as-is
+	if strings.Contains(uri, "://") {
+		return uri
+	}
+	
+	// If it's an absolute path, convert to file URI
+	if strings.HasPrefix(uri, "/") {
+		return "file://" + uri
+	}
+	
+	// If it's a relative path, convert to absolute path first, then to file URI
+	if absPath, err := filepath.Abs(uri); err == nil {
+		return "file://" + absPath
+	}
+	
+	// Fallback: assume it's a file path and add file:// prefix
+	return "file://" + uri
+}
+
+
+// formatDocumentSymbolWithTargeting formats a document symbol with precise targeting coordinates
+func formatDocumentSymbolWithTargeting(response *strings.Builder, symbol protocol.DocumentSymbol, depth int, number int, docUri string) {
+	indent := strings.Repeat("  ", depth)
+	kindStr := symbolKindToString(symbol.Kind)
+	
+	// Extract full range coordinates
+	startLine := symbol.Range.Start.Line
+	startChar := symbol.Range.Start.Character
+	endLine := symbol.Range.End.Line
+	endChar := symbol.Range.End.Character
+	
+	// Use SelectionRange for precise targeting (this should point to the symbol name itself)
+	targetLine := symbol.SelectionRange.Start.Line
+	targetChar := symbol.SelectionRange.Start.Character
+	
+	// Check if SelectionRange is actually different from Range
+	selectionRangeUseful := !(targetLine == startLine && targetChar == startChar)
+	
+	if depth == 0 {
+		response.WriteString(fmt.Sprintf("%s%d. %s (%s) at %d:%d-%d:%d\n", 
+			indent, number, symbol.Name, kindStr, startLine, startChar, endLine, endChar))
+		if docUri != "" {
+			response.WriteString(fmt.Sprintf("%s   %s\n", indent, docUri))
+		}
+		
+		if selectionRangeUseful {
+			response.WriteString(fmt.Sprintf("%s   💡 Target coordinates: line=%d, character=%d (precise symbol location)\n", indent, targetLine, targetChar))
+		} else {
+			response.WriteString(fmt.Sprintf("%s   💡 Target coordinates: line=%d, character=%d (LSP server provided same range)\n", indent, targetLine, targetChar))
+			response.WriteString(fmt.Sprintf("%s   💡 For better targeting, try: project_analysis with analysis_type='references', query='%s'\n", indent, symbol.Name))
+		}
+		response.WriteString(fmt.Sprintf("%s   ℹ️  Use these coordinates for hover, references, definitions, rename, etc.\n", indent))
+	} else {
+		response.WriteString(fmt.Sprintf("%s├─ %s (%s) at %d:%d-%d:%d\n", 
+			indent, symbol.Name, kindStr, startLine, startChar, endLine, endChar))
+		response.WriteString(fmt.Sprintf("%s   💡 Target: line=%d, character=%d\n", indent, targetLine, targetChar))
+	}
+	
+	// Recursively format children
+	for _, child := range symbol.Children {
+		formatDocumentSymbolWithTargeting(response, child, depth+1, 0, "")
+	}
 }

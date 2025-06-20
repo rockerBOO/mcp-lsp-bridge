@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"fmt"
 
 	"rockerboo/mcp-lsp-bridge/logger"
 	"rockerboo/mcp-lsp-bridge/interfaces"
@@ -41,7 +42,7 @@ func RegisterImplementationTool(mcpServer *server.MCPServer, bridge interfaces.B
 		implementations, err := bridge.FindImplementations(uri, int32(line), int32(character))
 		if err != nil {
 			logger.Error("implementation: Request failed", err)
-			return mcp.NewToolResultError("Failed to find implementations"), nil
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to find implementations: %v", err)), nil
 		}
 
 		// Format and return result
