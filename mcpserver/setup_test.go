@@ -106,6 +106,14 @@ func (m *MockBridge) GetDocumentSymbols(uri string) ([]any, error) {
 	return []any{}, nil
 }
 
+func (m *MockBridge) ApplyTextEdits(uri string, edits []any) error {
+	return nil
+}
+
+func (m *MockBridge) ApplyWorkspaceEdit(edit any) error {
+	return nil
+}
+
 func TestMCPServerSetup(t *testing.T) {
 	// Create a mock bridge
 	mockBridge := &MockBridge{}

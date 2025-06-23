@@ -161,7 +161,7 @@ func RegisterProjectAnalysisTool(mcpServer *server.MCPServer, bridge interfaces.
 				
 				// Provide agent-optimized targeting coordinates
 				nameLen := len(symbol.Name)
-				response.WriteString(fmt.Sprintf("   Target coordinates for hover/references/definitions:\n"))
+				response.WriteString("   Target coordinates for hover/references/definitions:\n")
 				response.WriteString(fmt.Sprintf("     - Primary: line=%d, character=%d\n", startLine, startChar))
 				
 				// Calculate precise positions within the identifier

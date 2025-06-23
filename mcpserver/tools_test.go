@@ -259,6 +259,14 @@ func (m *TestMockBridge) GetDocumentSymbols(uri string) ([]any, error) {
 	return []any{}, nil
 }
 
+func (m *TestMockBridge) ApplyTextEdits(uri string, edits []any) error {
+	return nil
+}
+
+func (m *TestMockBridge) ApplyWorkspaceEdit(edit any) error {
+	return nil
+}
+
 // TestRegisterAllTools tests that all tools can be registered without errors
 func TestRegisterAllTools(t *testing.T) {
 	mockBridge := &TestMockBridge{

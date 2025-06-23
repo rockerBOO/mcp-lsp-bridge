@@ -1,253 +1,178 @@
 #!/usr/bin/env python3
-"""
-MCP Tools Test
-Tests individual MCP tools functionality
-"""
-
-import json
-import subprocess
-import time
-import os
 import sys
-import select
-from pathlib import Path
+import json
+import re
+import subprocess
+import logging
+import uuid
 
-def test_mcp_tools():
-    """Test individual MCP tools"""
-    project_dir = Path(__file__).parent.parent
-    build_output = project_dir / "mcp-lsp-bridge"
-    
-    print("🔨 Building MCP-LSP Bridge...")
-    # Build the project
-    result = subprocess.run(
-        ["go", "build", "-o", str(build_output), "."],
-        cwd=project_dir,
-        capture_output=True,
-        text=True
-    )
-    
-    if result.returncode != 0:
-        print(f"❌ Build failed: {result.stderr}")
-        return False
-    
-    print("✅ Build successful")
-    
-    print("🚀 Starting MCP server...")
-    # Start the server
-    try:
-        process = subprocess.Popen(
-            [str(build_output)],
-            cwd=project_dir,
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
+
+class MCPToolRunner:
+    def __init__(self):
+        """
+        Initialize MCP server process
+        """
+        self.mcp_process = None
+
+    def start_mcp_server(self):
+        """
+        Start the MCP server
+        """
+        logger.info("Starting MCP server...")
+        
+        # Build command to start MCP server
+        cmd = [
+            "go", "run", 
+            "/home/rockerboo/code/mcp-lsp-bridge/main.go"
+        ]
+        
+        # Start the server process
+        self.mcp_process = subprocess.Popen(
+            cmd, 
+            stdout=subprocess.PIPE, 
             stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
         )
         
-        # Wait a moment for server to start
-        time.sleep(1)
+        logger.info("MCP server started")
+
+    def stop_mcp_server(self):
+        """
+        Stop the MCP server process
+        """
+        if self.mcp_process:
+            logger.info("Stopping MCP server...")
+            self.mcp_process.terminate()
+            try:
+                self.mcp_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.mcp_process.kill()
+            
+            # Capture and log any output
+            stdout, stderr = self.mcp_process.communicate()
+            if stdout:
+                logger.info(f"Server STDOUT: {stdout}")
+            if stderr:
+                logger.error(f"Server STDERR: {stderr}")
+            
+            self.mcp_process = None
+
+    def parse_mcp_command(self, command_str):
+        """
+        Parse MCP command string into components.
         
-        # Check if server is running
-        if process.poll() is not None:
-            stderr_output = process.stderr.read()
-            print(f"❌ Server failed to start: {stderr_output}")
-            return False
+        Example input: 
+        lsp:project_analysis (MCP)(analysis_type="definitions", query="handle_add_directory", workspace_uri="file:///path/to/project")
+        """
+        # Extract tool name and parameters
+        match = re.match(r'●?\s*lsp:(\w+)\s*\(MCP\)\((.*)\)', command_str)
+        if not match:
+            raise ValueError(f"Invalid MCP command format: {command_str}")
         
-        print(f"✅ Server started (PID: {process.pid})")
+        tool_name = match.group(1)
+        params_str = match.group(2)
         
-        # Initialize
-        print("🔗 Initializing connection...")
-        init_request = {
+        # Parse parameters
+        params = {}
+        for param in re.findall(r'(\w+)\s*:\s*"([^"]*)"', params_str):
+            params[param[0]] = param[1]
+        
+        return tool_name, params
+
+    def run_mcp_tool(self, tool_name, params):
+        """
+        Run MCP tool by sending JSON-RPC request via stdio
+        """
+        # Generate a unique request ID
+        request_id = str(uuid.uuid4())
+        
+        # Construct the JSON-RPC request
+        request = {
             "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {"tools": {}},
-                "clientInfo": {"name": "test-client", "version": "1.0.0"}
-            }
-        }
-        
-        # Send the request
-        request_json = json.dumps(init_request) + "\n"
-        process.stdin.write(request_json)
-        process.stdin.flush()
-        
-        # Read response
-        ready, _, _ = select.select([process.stdout], [], [], 5.0)
-        if not ready:
-            print("❌ Initialize timeout")
-            return False
-        
-        response_line = process.stdout.readline()
-        print("✅ Initialized successfully")
-        
-        # Test individual tools
-        tests_passed = 0
-        tests_total = 0
-        
-        # Test 1: infer_language
-        print("\n🔍 Testing infer_language tool...")
-        tests_total += 1
-        tool_request = {
-            "jsonrpc": "2.0",
-            "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "infer_language",
-                "arguments": {
-                    "file_path": "/test/example.go"
-                }
-            }
+                "name": tool_name,
+                "arguments": params
+            },
+            "id": request_id
         }
         
-        request_json = json.dumps(tool_request) + "\n"
-        process.stdin.write(request_json)
-        process.stdin.flush()
+        # Serialize the request
+        request_json = json.dumps(request)
         
-        ready, _, _ = select.select([process.stdout], [], [], 5.0)
-        if ready:
-            response_line = process.stdout.readline()
-            if response_line.strip():
-                response = json.loads(response_line.strip())
-                if "result" in response and response["result"]["content"]:
-                    content = response["result"]["content"][0]["text"]
-                    print(f"✅ infer_language: {content}")
-                    tests_passed += 1
-                else:
-                    print(f"❌ infer_language failed: {response}")
-        else:
-            print("❌ infer_language timeout")
+        logger.info(f"Running MCP Tool: {tool_name}")
+        logger.info(f"Parameters: {params}")
+        logger.info(f"Request: {request_json}")
         
-        # Test 2: lsp_connect
-        print("\n🔍 Testing lsp_connect tool...")
-        tests_total += 1
-        tool_request = {
-            "jsonrpc": "2.0",
-            "id": 3,
-            "method": "tools/call",
-            "params": {
-                "name": "lsp_connect",
-                "arguments": {
-                    "language": "go"
-                }
-            }
-        }
-        
-        request_json = json.dumps(tool_request) + "\n"
-        process.stdin.write(request_json)
-        process.stdin.flush()
-        
-        ready, _, _ = select.select([process.stdout], [], [], 5.0)
-        if ready:
-            response_line = process.stdout.readline()
-            if response_line.strip():
-                response = json.loads(response_line.strip())
-                if "result" in response and response["result"]["content"]:
-                    content = response["result"]["content"][0]["text"]
-                    print(f"✅ lsp_connect: {content}")
-                    tests_passed += 1
-                else:
-                    print(f"❌ lsp_connect failed: {response}")
-        else:
-            print("❌ lsp_connect timeout")
-        
-        # Test 3: detect_project_languages
-        print("\n🔍 Testing detect_project_languages tool...")
-        tests_total += 1
-        tool_request = {
-            "jsonrpc": "2.0",
-            "id": 4,
-            "method": "tools/call",
-            "params": {
-                "name": "detect_project_languages",
-                "arguments": {
-                    "project_path": str(project_dir),
-                    "mode": "primary"
-                }
-            }
-        }
-        
-        request_json = json.dumps(tool_request) + "\n"
-        process.stdin.write(request_json)
-        process.stdin.flush()
-        
-        ready, _, _ = select.select([process.stdout], [], [], 5.0)
-        if ready:
-            response_line = process.stdout.readline()
-            if response_line.strip():
-                response = json.loads(response_line.strip())
-                if "result" in response and response["result"]["content"]:
-                    content = response["result"]["content"][0]["text"]
-                    print(f"✅ detect_project_languages: {content}")
-                    tests_passed += 1
-                else:
-                    print(f"❌ detect_project_languages failed: {response}")
-        else:
-            print("❌ detect_project_languages timeout")
-        
-        # Test 4: lsp_disconnect
-        print("\n🔍 Testing lsp_disconnect tool...")
-        tests_total += 1
-        tool_request = {
-            "jsonrpc": "2.0",
-            "id": 5,
-            "method": "tools/call",
-            "params": {
-                "name": "lsp_disconnect",
-                "arguments": {}
-            }
-        }
-        
-        request_json = json.dumps(tool_request) + "\n"
-        process.stdin.write(request_json)
-        process.stdin.flush()
-        
-        ready, _, _ = select.select([process.stdout], [], [], 5.0)
-        if ready:
-            response_line = process.stdout.readline()
-            if response_line.strip():
-                response = json.loads(response_line.strip())
-                if "result" in response and response["result"]["content"]:
-                    content = response["result"]["content"][0]["text"]
-                    print(f"✅ lsp_disconnect: {content}")
-                    tests_passed += 1
-                else:
-                    print(f"❌ lsp_disconnect failed: {response}")
-        else:
-            print("❌ lsp_disconnect timeout")
-        
-        print(f"\n📊 Results: {tests_passed}/{tests_total} tools passed")
-        
-        return tests_passed == tests_total
-        
-    except Exception as e:
-        print(f"❌ Error testing tools: {e}")
-        return False
-    
-    finally:
-        # Cleanup
         try:
-            if 'process' in locals():
-                process.terminate()
-                process.wait(timeout=2)
-        except:
-            if 'process' in locals():
-                process.kill()
+            # Communicate with the running MCP server process
+            if not self.mcp_process:
+                logger.error("MCP server process is not running")
+                return False
+            
+            # Write request to stdin
+            self.mcp_process.stdin.write(request_json + "\n")
+            self.mcp_process.stdin.flush()
+            
+            # Read response from stdout
+            response_data = self.mcp_process.stdout.readline().strip()
+            
+            logger.info(f"Raw Response: {response_data}")
+            
+            # Validate response is a non-empty JSON
+            if not response_data:
+                logger.error("Received empty response")
+                return False
+            
+            # Parse response
+            try:
+                response = json.loads(response_data)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse response JSON: {e}")
+                logger.error(f"Response data: {response_data}")
+                return False
+            
+            # Check for success or error
+            if 'error' in response:
+                logger.error(f"MCP Tool Error: {response['error']}")
+                return False
+            
+            # Print result if exists
+            if 'result' in response:
+                print(json.dumps(response['result'], indent=2))
+            
+            return True
         
-        # Remove build output
-        if build_output.exists():
-            build_output.unlink()
+        except Exception as e:
+            logger.error(f"Error running MCP tool: {e}")
+            return False
+
+    def __enter__(self):
+        self.start_mcp_server()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop_mcp_server()
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python test_mcp_tools.py \"lsp:tool_name (MCP)(param1=value1, param2=value2)\"")
+        sys.exit(1)
+    
+    command_str = sys.argv[1]
+    
+    try:
+        with MCPToolRunner() as runner:
+            tool_name, params = runner.parse_mcp_command(command_str)
+            success = runner.run_mcp_tool(tool_name, params)
+            sys.exit(0 if success else 1)
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    print("🧪 MCP Tools Test")
-    print("=" * 40)
-    
-    success = test_mcp_tools()
-    
-    if success:
-        print("\n🎉 All tools tests passed!")
-        sys.exit(0)
-    else:
-        print("\n❌ Some tools tests failed!")
-        sys.exit(1)
+    main()

@@ -71,18 +71,28 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 			continue
 		}
 
-		root_uri := protocol.DocumentUri(fmt.Sprintf("file://%s", dir))
+		root_path := fmt.Sprintf("file://%s", dir)
+		root_uri := protocol.DocumentUri(root_path)
 		process_id := int32(os.Getpid())
 
 		// Prepare initialization parameters
+		// Prepare workspace folders list, including the root directory
+		workspaceFolders := []protocol.WorkspaceFolder{
+			{
+				Uri:  protocol.URI(fmt.Sprintf("file://%s", dir)),
+				Name: filepath.Base(dir),
+			},
+		}
+
 		params := protocol.InitializeParams{
 			ProcessId: &process_id,
 			ClientInfo: &protocol.ClientInfo{
 				Name:    "MCP-LSP Bridge",
 				Version: "1.0.0",
 			},
-			RootUri:      &root_uri,
-			Capabilities: lc.ClientCapabilities(),
+			RootUri:           &root_uri,
+			WorkspaceFolders:  &workspaceFolders,
+			Capabilities:      lc.ClientCapabilities(),
 		}
 
 		// Apply any initialization options from the configuration
@@ -108,6 +118,21 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 			logger.Info(fmt.Sprintf("Initialize result - Server Info: %+v", *result.ServerInfo))
 		}
 		logger.Info(fmt.Sprintf("Initialize result - Capabilities: %+v", result.Capabilities))
+		
+		// Enhanced logging for Workspace and WorkspaceFolders capabilities
+		if result.Capabilities.Workspace != nil {
+			logger.Info(fmt.Sprintf("Workspace Capabilities: %+v", *result.Capabilities.Workspace))
+			
+			// Specifically log WorkspaceFolders support
+			if result.Capabilities.Workspace.WorkspaceFolders != nil {
+				logger.Info(fmt.Sprintf("WorkspaceFolders Support: Supported = %v", 
+					*result.Capabilities.Workspace.WorkspaceFolders))
+			} else {
+				logger.Warn("WorkspaceFolders Capability is nil")
+			}
+		} else {
+			logger.Warn("Workspace Capabilities are nil")
+		}
 
 		// Send initialized notification
 		err = lc.SendNotification("initialized", map[string]any{})

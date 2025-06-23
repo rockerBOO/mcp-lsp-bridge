@@ -50,14 +50,14 @@ func (h *ClientHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *js
 		}
 
 	default:
-		fmt.Printf("Unhandled method: %s with params: %s\n", req.Method, string(*req.Params))
+		logger.Error(fmt.Sprintf("Unhandled method: %s with params: %s", req.Method, string(*req.Params)))
 
 		err := &jsonrpc2.Error{
 			Code:    jsonrpc2.CodeMethodNotFound,
 			Message: "Method not found",
 		}
 		if replyErr := conn.ReplyWithError(ctx, req.ID, err); replyErr != nil {
-			logger.Debug(fmt.Sprintf("Failed to reply with error: %v\n", replyErr))
+			logger.Error(fmt.Sprintf("Failed to reply with error: %v", replyErr))
 		}
 	}
 }

@@ -393,7 +393,7 @@ func formatWorkspaceEdit(edit any) string {
 	if totalFiles == 0 {
 		result.WriteString("No rename changes found")
 	} else {
-		result.WriteString(fmt.Sprintf("\n=== RENAME SUMMARY ===\n"))
+		result.WriteString("\n=== RENAME SUMMARY ===\n")
 		result.WriteString(fmt.Sprintf("Files to be modified: %d\n", totalFiles))
 		result.WriteString(fmt.Sprintf("Total edits: %d\n", totalEdits))
 	}
