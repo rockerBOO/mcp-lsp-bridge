@@ -8,11 +8,10 @@ import (
 	"rockerboo/mcp-lsp-bridge/interfaces"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 )
 
 // RegisterProjectLanguageDetectionTool registers the detect_project_languages tool
-func RegisterProjectLanguageDetectionTool(mcpServer *server.MCPServer, bridge interfaces.BridgeInterface) {
+func RegisterProjectLanguageDetectionTool(mcpServer ToolServer, bridge interfaces.BridgeInterface) {
 	mcpServer.AddTool(mcp.NewTool("detect_project_languages",
 		mcp.WithDescription("Detect all programming languages used in a project by examining root markers and file extensions"),
 		mcp.WithString("project_path", mcp.Description("Path to the project directory to analyze")),

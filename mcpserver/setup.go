@@ -10,6 +10,8 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+
+
 // SetupMCPServer configures the MCP server with AI-powered tools
 func SetupMCPServer(bridge interfaces.BridgeInterface) *server.MCPServer {
 	hooks := &server.Hooks{}

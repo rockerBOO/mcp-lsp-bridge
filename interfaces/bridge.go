@@ -1,6 +1,10 @@
 package interfaces
 
-import "rockerboo/mcp-lsp-bridge/lsp"
+import (
+	"rockerboo/mcp-lsp-bridge/lsp"
+
+	"github.com/myleshyson/lsprotocol-go/protocol"
+)
 
 // BridgeInterface defines the interface that the bridge must implement
 type BridgeInterface interface {
@@ -11,27 +15,27 @@ type BridgeInterface interface {
 	DetectProjectLanguages(projectPath string) ([]string, error)
 	DetectPrimaryProjectLanguage(projectPath string) (string, error)
 	// Enhanced project analysis methods
-	FindSymbolReferences(language, uri string, line, character int32, includeDeclaration bool) ([]any, error)
-	FindSymbolDefinitions(language, uri string, line, character int32) ([]any, error)
-	SearchTextInWorkspace(language, query string) ([]any, error)
+	FindSymbolReferences(language, uri string, line, character int32, includeDeclaration bool) ([]protocol.Location, error)
+	FindSymbolDefinitions(language, uri string, line, character int32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error)
+	SearchTextInWorkspace(language, query string) ([]protocol.WorkspaceSymbol, error)
 	GetMultiLanguageClients(languages []string) (map[string]lsp.LanguageClientInterface, error)
 	// Core information tools
-	GetHoverInformation(uri string, line, character int32) (any, error)
+	GetHoverInformation(uri string, line, character int32) (*protocol.Hover, error)
 	GetDiagnostics(uri string) ([]any, error)
-	GetWorkspaceDiagnostics(workspaceUri string, identifier string) (any, error)
-	GetSignatureHelp(uri string, line, character int32) (any, error)
+	GetWorkspaceDiagnostics(workspaceUri string, identifier string) ([]protocol.WorkspaceDiagnosticReport, error)
+	GetSignatureHelp(uri string, line, character int32) (*protocol.SignatureHelp, error)
 	// Code actions and formatting tools
-	GetCodeActions(uri string, line, character, endLine, endCharacter int32) ([]any, error)
-	FormatDocument(uri string, tabSize int32, insertSpaces bool) ([]any, error)
-	ApplyTextEdits(uri string, edits []any) error
+	GetCodeActions(uri string, line, character, endLine, endCharacter int32) ([]protocol.CodeAction, error)
+	FormatDocument(uri string, tabSize int32, insertSpaces bool) ([]protocol.TextEdit, error)
+	ApplyTextEdits(uri string, edits []protocol.TextEdit) error
 	// Advanced navigation tools
-	RenameSymbol(uri string, line, character int32, newName string, preview bool) (any, error)
-	ApplyWorkspaceEdit(edit any) error
-	FindImplementations(uri string, line, character int32) ([]any, error)
-	PrepareCallHierarchy(uri string, line, character int32) ([]any, error)
-	GetIncomingCalls(item any) ([]any, error)
-	GetOutgoingCalls(item any) ([]any, error)
-	
+	RenameSymbol(uri string, line, character int32, newName string, preview bool) (*protocol.WorkspaceEdit, error)
+	ApplyWorkspaceEdit(edit *protocol.WorkspaceEdit) error
+	FindImplementations(uri string, line, character int32) ([]protocol.Location, error)
+	PrepareCallHierarchy(uri string, line, character int32) ([]protocol.CallHierarchyItem, error)
+	GetIncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error)
+	GetOutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error)
+
 	// Document symbol operations
-	GetDocumentSymbols(uri string) ([]any, error)
+	GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol, error)
 }

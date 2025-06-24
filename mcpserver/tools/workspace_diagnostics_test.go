@@ -2,6 +2,7 @@ package tools
 
 import (
 	"fmt"
+	"rockerboo/mcp-lsp-bridge/mocks"
 	"strings"
 	"testing"
 
@@ -9,31 +10,18 @@ import (
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
-// WorkspaceDiagnosticsMockBridge for workspace diagnostics testing
-type WorkspaceDiagnosticsMockBridge struct {
-	*MockBridge
-	mockGetWorkspaceDiagnostics func(string, string) (any, error)
-}
-
-func (m *WorkspaceDiagnosticsMockBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier string) (any, error) {
-	if m.mockGetWorkspaceDiagnostics != nil {
-		return m.mockGetWorkspaceDiagnostics(workspaceUri, identifier)
-	}
-	return []any{}, nil
-}
-
 // TestWorkspaceDiagnosticsTool tests workspace diagnostics functionality
 func TestWorkspaceDiagnosticsTool(t *testing.T) {
 	tests := []struct {
-		name                string
-		workspaceUri        string
-		mockDiagnostics     any
-		mockError           error
-		expectError         bool
-		description         string
+		name            string
+		workspaceUri    string
+		mockDiagnostics any
+		mockError       error
+		expectError     bool
+		description     string
 	}{
 		{
-			name: "successful workspace diagnostics",
+			name:         "successful workspace diagnostics",
 			workspaceUri: "/home/rockerboo/code/mcp-lsp-bridge",
 			mockDiagnostics: []any{
 				protocol.WorkspaceDiagnosticReport{
@@ -75,16 +63,7 @@ func TestWorkspaceDiagnosticsTool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bridge := &WorkspaceDiagnosticsMockBridge{
-				MockBridge: &MockBridge{},
-				mockGetWorkspaceDiagnostics: func(uri, identifier string) (any, error) {
-					cleanUri := strings.TrimPrefix(uri, "file://")
-					if cleanUri != uri {
-						t.Logf("Converted URI from %s to %s", uri, cleanUri)
-					}
-					return tt.mockDiagnostics, tt.mockError
-				},
-			}
+			bridge := &mocks.MockBridge{}
 
 			mcpServer := server.NewMCPServer(
 				"test-server",
@@ -107,7 +86,7 @@ func TestWorkspaceDiagnosticsTool(t *testing.T) {
 func TestFormatWorkspaceDiagnostics(t *testing.T) {
 	testCases := []struct {
 		name     string
-		input    any
+		input    []protocol.WorkspaceDiagnosticReport
 		expected []string // Expected strings to be present in output
 	}{
 		{
@@ -117,13 +96,13 @@ func TestFormatWorkspaceDiagnostics(t *testing.T) {
 		},
 		{
 			name:     "empty diagnostics",
-			input:    []any{},
+			input:    []protocol.WorkspaceDiagnosticReport{},
 			expected: []string{"No workspace diagnostics found"},
 		},
 		{
 			name: "workspace report with diagnostics",
-			input: []any{
-				protocol.WorkspaceDiagnosticReport{
+			input: []protocol.WorkspaceDiagnosticReport{
+				{
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
 						// Simplified test case - union type handling will be implemented later
 					},
@@ -137,8 +116,8 @@ func TestFormatWorkspaceDiagnostics(t *testing.T) {
 		},
 		{
 			name: "workspace report with no issues",
-			input: []any{
-				protocol.WorkspaceDiagnosticReport{
+			input: []protocol.WorkspaceDiagnosticReport{
+				{
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{},
 				},
 			},
@@ -152,7 +131,7 @@ func TestFormatWorkspaceDiagnostics(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := formatWorkspaceDiagnostics(tc.input)
-			
+
 			for _, expected := range tc.expected {
 				if !strings.Contains(result, expected) {
 					t.Errorf("Expected result to contain '%s', got: %s", expected, result)
@@ -169,7 +148,7 @@ func TestDiagnosticSeverityFunctions(t *testing.T) {
 		warnSev := protocol.DiagnosticSeverityWarning
 		infoSev := protocol.DiagnosticSeverityInformation
 		hintSev := protocol.DiagnosticSeverityHint
-		
+
 		tests := []struct {
 			severity *protocol.DiagnosticSeverity
 			expected string

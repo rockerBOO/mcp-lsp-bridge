@@ -6,45 +6,10 @@ import (
 	"testing"
 
 	"rockerboo/mcp-lsp-bridge/lsp"
+	"rockerboo/mcp-lsp-bridge/mocks"
+
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
-
-// MockCallToolRequest implements the mcp.CallToolRequest interface for testing
-type MockCallToolRequest struct {
-	arguments map[string]any
-}
-
-func (m *MockCallToolRequest) RequireString(key string) (string, error) {
-	if val, ok := m.arguments[key]; ok {
-		if str, ok := val.(string); ok {
-			return str, nil
-		}
-		return "", fmt.Errorf("value for %s is not a string", key)
-	}
-	return "", fmt.Errorf("missing required parameter: %s", key)
-}
-
-func (m *MockCallToolRequest) RequireInt(key string) (int, error) {
-	if val, ok := m.arguments[key]; ok {
-		switch v := val.(type) {
-		case int:
-			return v, nil
-		case int32:
-			return int(v), nil
-		case int64:
-			return int(v), nil
-		case float64:
-			return int(v), nil
-		}
-		return 0, fmt.Errorf("value for %s is not an integer", key)
-	}
-	return 0, fmt.Errorf("missing required parameter: %s", key)
-}
-
-// ToolTestBridge extends ComprehensiveMockBridge with additional testing functionality
-type ToolTestBridge struct {
-	*ComprehensiveMockBridge
-}
 
 // Test the actual tool handler execution through MCP framework
 func TestAnalyzeCodeToolExecution(t *testing.T) {
@@ -85,19 +50,20 @@ func TestAnalyzeCodeToolExecution(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bridge := &ComprehensiveMockBridge{
-				inferLanguageFunc: func(filePath string) (string, error) {
-					if tc.mockLanguage != "" {
-						return tc.mockLanguage, nil
-					}
-					return "", fmt.Errorf("unknown language")
-				},
-				getClientForLanguageFunc: func(language string) (any, error) {
-					if tc.mockClient != nil {
-						return tc.mockClient, nil
-					}
-					return nil, fmt.Errorf("no client available")
-				},
+			bridge := &mocks.MockBridge{}
+
+			// Set up mock expectations based on test case
+			if tc.expectError {
+				// For error cases, mock should return an error
+				bridge.On("InferLanguage", tc.uri).Return("", fmt.Errorf("unknown language"))
+			} else {
+				// For success cases, mock should return the expected language
+				bridge.On("InferLanguage", tc.uri).Return(tc.mockLanguage, nil)
+
+				// Also set up the client mock if we have one
+				if tc.mockClient != nil {
+					bridge.On("GetClientForLanguageInterface", tc.mockLanguage).Return(tc.mockClient, nil)
+				}
 			}
 
 			// Test the bridge functionality that the tool would use
@@ -127,10 +93,12 @@ func TestAnalyzeCodeToolExecution(t *testing.T) {
 			if client == nil {
 				t.Error("Expected client but got nil")
 			}
+
+			// Assert that all expected calls were made
+			bridge.AssertExpectations(t)
 		})
 	}
 }
-
 func TestInferLanguageToolExecution(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -184,11 +152,10 @@ func TestInferLanguageToolExecution(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bridge := &ComprehensiveMockBridge{
-				getConfigFunc: func() *lsp.LSPServerConfig {
-					return tc.mockConfig
-				},
-			}
+			bridge := &mocks.MockBridge{}
+
+			// Set up mock expectations
+			bridge.On("GetConfig").Return(tc.mockConfig)
 
 			// Simulate what the actual tool handler does
 			config := bridge.GetConfig()
@@ -196,9 +163,10 @@ func TestInferLanguageToolExecution(t *testing.T) {
 				t.Error("Expected config but got nil")
 				return
 			}
-
 			if tc.expectError && config == nil {
-				return // Expected error case
+				// Assert expectations and return early for this error case
+				bridge.AssertExpectations(t)
+				return
 			}
 
 			// Extract file extension (simulate filepath.Ext)
@@ -215,18 +183,21 @@ func TestInferLanguageToolExecution(t *testing.T) {
 				t.Errorf("Expected to find language for extension %s", ext)
 				return
 			}
-
 			if tc.expectError && !found {
-				return // Expected error case
+				// Assert expectations and return early for this error case
+				bridge.AssertExpectations(t)
+				return
 			}
 
 			if language != tc.expectedLang {
 				t.Errorf("Expected language %s, got %s", tc.expectedLang, language)
 			}
+
+			// Assert that all expected calls were made
+			bridge.AssertExpectations(t)
 		})
 	}
 }
-
 func TestLSPConnectToolExecution(t *testing.T) {
 	testCases := []struct {
 		name        string
@@ -266,16 +237,22 @@ func TestLSPConnectToolExecution(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bridge := &ComprehensiveMockBridge{
-				getConfigFunc: func() *lsp.LSPServerConfig {
-					return tc.mockConfig
-				},
-				getClientForLanguageFunc: func(language string) (any, error) {
-					if tc.mockClient != nil {
-						return tc.mockClient, nil
+			bridge := &mocks.MockBridge{}
+
+			// Set up mock expectations
+			bridge.On("GetConfig").Return(tc.mockConfig)
+
+			// Only set up GetClientForLanguageInterface expectation if we'll call it
+			if tc.mockConfig != nil {
+				if _, exists := tc.mockConfig.LanguageServers[tc.language]; exists {
+					if tc.expectError && tc.mockClient == nil {
+						// This test case expects an error when getting the client
+						bridge.On("GetClientForLanguageInterface", tc.language).Return(nil, fmt.Errorf("failed to create client"))
+					} else if tc.mockClient != nil {
+						// This test case expects success
+						bridge.On("GetClientForLanguageInterface", tc.language).Return(tc.mockClient, nil)
 					}
-					return nil, fmt.Errorf("failed to create client")
-				},
+				}
 			}
 
 			// Simulate what the actual tool handler does
@@ -284,6 +261,7 @@ func TestLSPConnectToolExecution(t *testing.T) {
 				if !tc.expectError {
 					t.Error("Expected config but got nil")
 				}
+				bridge.AssertExpectations(t)
 				return
 			}
 
@@ -292,6 +270,7 @@ func TestLSPConnectToolExecution(t *testing.T) {
 				if !tc.expectError {
 					t.Errorf("Expected language server config for %s", tc.language)
 				}
+				bridge.AssertExpectations(t)
 				return
 			}
 
@@ -300,21 +279,25 @@ func TestLSPConnectToolExecution(t *testing.T) {
 				if err == nil {
 					t.Error("Expected error but got none")
 				}
+				bridge.AssertExpectations(t)
 				return
 			}
 
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
+				bridge.AssertExpectations(t)
 				return
 			}
 
 			if client == nil {
 				t.Error("Expected client but got nil")
 			}
+
+			// Assert that all expected calls were made
+			bridge.AssertExpectations(t)
 		})
 	}
 }
-
 func TestProjectLanguageDetectionToolExecution(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -348,19 +331,22 @@ func TestProjectLanguageDetectionToolExecution(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bridge := &ComprehensiveMockBridge{
-				detectProjectLanguagesFunc: func(projectPath string) ([]string, error) {
-					if tc.expectError {
-						return nil, fmt.Errorf("detection failed")
-					}
-					return tc.mockLanguages, nil
-				},
-				detectPrimaryProjectLanguageFunc: func(projectPath string) (string, error) {
-					if tc.expectError {
-						return "", fmt.Errorf("detection failed")
-					}
-					return tc.mockPrimary, nil
-				},
+			bridge := &mocks.MockBridge{}
+
+			// Set up mock expectations based on mode and expected outcome
+			switch tc.mode {
+			case "primary":
+				if tc.expectError {
+					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return("", fmt.Errorf("detection failed"))
+				} else {
+					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return(tc.mockPrimary, nil)
+				}
+			default: // "all"
+				if tc.expectError {
+					bridge.On("DetectProjectLanguages", tc.projectPath).Return([]string(nil), fmt.Errorf("detection failed"))
+				} else {
+					bridge.On("DetectProjectLanguages", tc.projectPath).Return(tc.mockLanguages, nil)
+				}
 			}
 
 			// Test based on mode
@@ -371,51 +357,66 @@ func TestProjectLanguageDetectionToolExecution(t *testing.T) {
 					if err == nil {
 						t.Error("Expected error but got none")
 					}
+					bridge.AssertExpectations(t)
 					return
 				}
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
+					bridge.AssertExpectations(t)
 					return
 				}
 				if primary != tc.mockPrimary {
 					t.Errorf("Expected primary language %s, got %s", tc.mockPrimary, primary)
 				}
-
 			default: // "all"
 				languages, err := bridge.DetectProjectLanguages(tc.projectPath)
 				if tc.expectError {
 					if err == nil {
 						t.Error("Expected error but got none")
 					}
+					bridge.AssertExpectations(t)
 					return
 				}
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
+					bridge.AssertExpectations(t)
 					return
 				}
 				if len(languages) != len(tc.mockLanguages) {
 					t.Errorf("Expected %d languages, got %d", len(tc.mockLanguages), len(languages))
+					bridge.AssertExpectations(t)
+					return
+				}
+				// Optionally, you could also check the actual content of the slice
+				for i, expected := range tc.mockLanguages {
+					if i < len(languages) && languages[i] != expected {
+						t.Errorf("Expected language[%d] to be %s, got %s", i, expected, languages[i])
+					}
 				}
 			}
+
+			// Assert that all expected calls were made
+			bridge.AssertExpectations(t)
 		})
 	}
 }
-
 func TestSignatureHelpToolExecution(t *testing.T) {
-	bridge := &ComprehensiveMockBridge{
-		getSignatureHelpFunc: func(uri string, line, character int32) (any, error) {
-			if uri == "file:///error.go" {
-				return nil, fmt.Errorf("signature help failed")
-			}
-			return map[string]any{
-				"signatures": []map[string]any{
-					{
-						"label": "func(param string) error",
-					},
-				},
-			}, nil
+	bridge := &mocks.MockBridge{}
+
+	// Set up mock expectations for both test cases
+	successResult := protocol.SignatureHelp{
+		Signatures: []protocol.SignatureInformation{
+			{
+				Label: "func(param string) error",
+			},
 		},
 	}
+
+	// Expectation for successful case
+	bridge.On("GetSignatureHelp", "file:///test.go", int32(10), int32(15)).Return(&successResult, nil)
+
+	// Expectation for error case
+	bridge.On("GetSignatureHelp", "file:///error.go", int32(10), int32(15)).Return((*protocol.SignatureHelp)(nil), fmt.Errorf("signature help failed"))
 
 	// Test successful signature help
 	result, err := bridge.GetSignatureHelp("file:///test.go", 10, 15)
@@ -423,8 +424,13 @@ func TestSignatureHelpToolExecution(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	if result == nil {
-		t.Error("Expected signature help result but got nil")
+	// Validate the structure of the result
+	signatures := result.Signatures
+	label := signatures[0].Label
+	if len(signatures) != 1 {
+		t.Errorf("Expected 1 signature, got %d", len(signatures))
+	} else if label != "func(param string) error" {
+		t.Errorf("Expected label 'func(param string) error', got %v", label)
 	}
 
 	// Test signature help error
@@ -432,27 +438,40 @@ func TestSignatureHelpToolExecution(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error but got none")
 	}
-}
+	if err.Error() != "signature help failed" {
+		t.Errorf("Expected error message 'signature help failed', got '%s'", err.Error())
+	}
 
+	// Assert that all expected calls were made
+	bridge.AssertExpectations(t)
+}
 func TestCodeActionsToolExecution(t *testing.T) {
-	bridge := &ComprehensiveMockBridge{
-		getCodeActionsFunc: func(uri string, line, character, endLine, endCharacter int32) ([]any, error) {
-			if uri == "file:///error.go" {
-				return nil, fmt.Errorf("code actions failed")
-			}
-			return []any{
-				map[string]any{
-					"title": "Fix import",
-					"kind":  "quickfix",
-				},
-			}, nil
+	bridge := &mocks.MockBridge{}
+
+	quickfix := protocol.CodeActionKindQuickFix
+	// Set up mock expectations
+	successResult := []protocol.CodeAction{
+		{
+			Title: "Fix import",
+			Kind:  &quickfix,
 		},
 	}
+
+	// Expectation for successful case
+	bridge.On("GetCodeActions", "file:///test.go", int32(10), int32(5), int32(10), int32(15)).Return(successResult, nil)
+
+	// Expectation for error case
+	bridge.On("GetCodeActions", "file:///error.go", int32(10), int32(5), int32(10), int32(15)).Return([]protocol.CodeAction(nil), fmt.Errorf("code actions failed"))
 
 	// Test successful code actions
 	result, err := bridge.GetCodeActions("file:///test.go", 10, 5, 10, 15)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Verify the result
+	if len(result) != 1 {
+		t.Errorf("Expected 1 code action, got %d", len(result))
 	}
 
 	formatted := formatCodeActions(result)
@@ -465,30 +484,42 @@ func TestCodeActionsToolExecution(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error but got none")
 	}
-}
+	if err != nil && err.Error() != "code actions failed" {
+		t.Errorf("Expected error message 'code actions failed', got '%s'", err.Error())
+	}
 
+	// Assert that all expected calls were made
+	bridge.AssertExpectations(t)
+}
 func TestFormatDocumentToolExecution(t *testing.T) {
-	bridge := &ComprehensiveMockBridge{
-		formatDocumentFunc: func(uri string, tabSize int32, insertSpaces bool) ([]any, error) {
-			if uri == "file:///error.go" {
-				return nil, fmt.Errorf("formatting failed")
-			}
-			return []any{
-				map[string]any{
-					"range": map[string]any{
-						"start": map[string]int32{"line": 0, "character": 0},
-						"end":   map[string]int32{"line": 0, "character": 10},
-					},
-					"newText": "formatted code",
-				},
-			}, nil
+	bridge := &mocks.MockBridge{}
+
+	// Set up mock expectations
+	successResult := []protocol.TextEdit{
+		{
+			Range: protocol.Range{
+				Start: protocol.Position{Line: 0, Character: 0},
+				End:   protocol.Position{Line: 0, Character: 10},
+			},
+			NewText: "formatted code",
 		},
 	}
+
+	// Expectation for successful case
+	bridge.On("FormatDocument", "file:///test.go", int32(4), true).Return(successResult, nil)
+
+	// Expectation for error case
+	bridge.On("FormatDocument", "file:///error.go", int32(4), true).Return([]protocol.TextEdit(nil), fmt.Errorf("formatting failed"))
 
 	// Test successful formatting
 	result, err := bridge.FormatDocument("file:///test.go", 4, true)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Verify the result
+	if len(result) != 1 {
+		t.Errorf("Expected 1 text edit, got %d", len(result))
 	}
 
 	formatted := formatTextEdits(result)
@@ -501,29 +532,38 @@ func TestFormatDocumentToolExecution(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error but got none")
 	}
+	if err != nil && err.Error() != "formatting failed" {
+		t.Errorf("Expected error message 'formatting failed', got '%s'", err.Error())
+	}
+
+	// Assert that all expected calls were made
+	bridge.AssertExpectations(t)
 }
 
 func TestRenameToolExecution(t *testing.T) {
-	bridge := &ComprehensiveMockBridge{
-		renameSymbolFunc: func(uri string, line, character int32, newName string, preview bool) (any, error) {
-			if newName == "InvalidName" {
-				return nil, fmt.Errorf("rename failed")
-			}
-			return map[string]any{
-				"changes": map[string]any{
-					uri: []map[string]any{
-						{
-							"range": map[string]any{
-								"start": map[string]int32{"line": line, "character": character},
-								"end":   map[string]int32{"line": line, "character": character + 5},
-							},
-							"newText": newName,
-						},
+	bridge := &mocks.MockBridge{}
+
+	successResult := protocol.WorkspaceEdit{
+		Changes: map[protocol.DocumentUri][]protocol.TextEdit{
+			protocol.DocumentUri("file:///test.go"): []protocol.TextEdit{
+				{
+					Range: protocol.Range{
+						Start: protocol.Position{Line: 0, Character: 0},
+						End:   protocol.Position{Line: 0, Character: 10},
 					},
+					NewText: "renamed",
 				},
-			}, nil
+			},
 		},
 	}
+
+	// Expectation for successful case
+	// Match the arguments used in the actual call: uri, line, character, newName, dryRun
+	bridge.On("RenameSymbol", "file:///test.go", int32(10), int32(5), "newName", true).Return(&successResult, nil)
+
+	// Expectation for error case
+	// Assuming "InvalidName" is the new name that would cause an error
+	bridge.On("RenameSymbol", "file:///test.go", int32(10), int32(5), "InvalidName", true).Return((*protocol.WorkspaceEdit)(nil), fmt.Errorf("formatting failed"))
 
 	// Test successful rename
 	result, err := bridge.RenameSymbol("file:///test.go", 10, 5, "newName", true)
@@ -537,6 +577,7 @@ func TestRenameToolExecution(t *testing.T) {
 	}
 
 	// Test rename error
+	// The mock for this call should also match the arguments
 	_, err = bridge.RenameSymbol("file:///test.go", 10, 5, "InvalidName", true)
 	if err == nil {
 		t.Error("Expected error but got none")
@@ -544,21 +585,27 @@ func TestRenameToolExecution(t *testing.T) {
 }
 
 func TestImplementationToolExecution(t *testing.T) {
-	bridge := &ComprehensiveMockBridge{
-		findImplementationsFunc: func(uri string, line, character int32) ([]any, error) {
-			if uri == "file:///error.go" {
-				return nil, fmt.Errorf("implementation search failed")
-			}
-			return []any{
-				map[string]any{
-					"uri": "file:///impl.go",
-					"range": map[string]any{
-						"start": map[string]int32{"line": 20, "character": 0},
-					},
-				},
-			}, nil
+	bridge := &mocks.MockBridge{}
+
+	// Define the expected successful result
+	successResult := []protocol.Location{
+		{
+			Uri: "file:///main.go",
+			Range: protocol.Range{
+				Start: protocol.Position{Line: 5, Character: 0},
+				End:   protocol.Position{Line: 5, Character: 4},
+			},
 		},
 	}
+
+	// Expectation for successful implementation search
+	// When FindImplementations is called with "file:///test.go", 10, 5, it should return successResult and nil error.
+	bridge.On("FindImplementations", "file:///test.go", int32(10), int32(5)).Return(successResult, nil)
+
+	// Expectation for error case
+	// When FindImplementations is called with "file:///error.go", 10, 5, it should return nil and an error.
+	bridge.On("FindImplementations", "file:///error.go", int32(10), int32(5)).Return([]protocol.Location(nil), fmt.Errorf("implementation search failed"))
+
 
 	// Test successful implementation search
 	result, err := bridge.FindImplementations("file:///test.go", 10, 5)
@@ -568,7 +615,7 @@ func TestImplementationToolExecution(t *testing.T) {
 
 	formatted := formatImplementations(result)
 	if !strings.Contains(formatted, "IMPLEMENTATIONS") {
-		t.Error("Expected formatted result to contain 'IMPLEMENTATIONS'")
+		t.Errorf("Expected formatted result to contain 'IMPLEMENTATIONS', got:\n%s", formatted)
 	}
 
 	// Test implementation search error
@@ -576,30 +623,34 @@ func TestImplementationToolExecution(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error but got none")
 	}
-}
+	expectedErrMsg := "implementation search failed"
+	if err != nil && err.Error() != expectedErrMsg {
+		t.Errorf("Expected error message \"%s\", got \"%s\"", expectedErrMsg, err.Error())
+	}
 
+	// Assert that all expectations were met
+	bridge.AssertExpectations(t)
+}
 func TestCallHierarchyToolExecution(t *testing.T) {
-	bridge := &ComprehensiveMockBridge{
-		prepareCallHierarchyFunc: func(uri string, line, character int32) ([]any, error) {
-			if uri == "file:///error.go" {
-				return nil, fmt.Errorf("call hierarchy failed")
-			}
-			return []any{
-				map[string]any{
-					"name": "testFunction",
-					"kind": "function",
-					"uri":  uri,
-				},
-			}, nil
+	bridge := &mocks.MockBridge{}
+
+	// Set up mock expectations
+	successResult := []protocol.CallHierarchyItem{
+		{
+			Name: "testFunction",
+			Kind: protocol.SymbolKindFunction,
+			Uri:  "file:///test.go",
 		},
 	}
+
+	bridge.On("PrepareCallHierarchy", "file:///test.go", int32(10), int32(5)).Return(successResult, nil)
+	bridge.On("PrepareCallHierarchy", "file:///error.go", int32(10), int32(5)).Return([]protocol.CallHierarchyItem(nil), fmt.Errorf("call hierarchy failed"))
 
 	// Test successful call hierarchy preparation
 	result, err := bridge.PrepareCallHierarchy("file:///test.go", 10, 5)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-
 	if len(result) == 0 {
 		t.Error("Expected call hierarchy items but got empty result")
 	}
@@ -609,4 +660,6 @@ func TestCallHierarchyToolExecution(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error but got none")
 	}
+
+	bridge.AssertExpectations(t)
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"rockerboo/mcp-lsp-bridge/lsp"
+	"rockerboo/mcp-lsp-bridge/mocks"
 
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -124,19 +125,18 @@ func TestInferLanguageTool(t *testing.T) {
 			expectedLang: "json",
 		},
 	}
-
+	
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bridge := &ComprehensiveMockBridge{
-				getConfigFunc: func() *lsp.LSPServerConfig {
-					return tc.mockConfig
-				},
-			}
-
+			bridge := &mocks.MockBridge{}
+			
+			// Set up mock expectation for GetConfig
+			bridge.On("GetConfig").Return(tc.mockConfig)
+			
 			// Create MCP server and register tool
 			mcpServer := server.NewMCPServer("test", "1.0.0", server.WithToolCapabilities(false))
 			RegisterInferLanguageTool(mcpServer, bridge)
-
+			
 			// Test config retrieval
 			config := bridge.GetConfig()
 			if config == nil && !tc.expectError {
@@ -144,9 +144,11 @@ func TestInferLanguageTool(t *testing.T) {
 				return
 			}
 			if tc.expectError && config == nil {
-				return // Expected error case
+				// Verify expectations and return for expected error case
+				bridge.AssertExpectations(t)
+				return
 			}
-
+			
 			// Extract file extension manually (simulating filepath.Ext)
 			var ext string
 			for i := len(tc.filePath) - 1; i >= 0; i-- {
@@ -158,47 +160,49 @@ func TestInferLanguageTool(t *testing.T) {
 					break // No extension found
 				}
 			}
-
+			
 			// Test language mapping
 			if ext == "" && !tc.expectError {
 				t.Error("Expected to find file extension")
 				return
 			}
-
+			
 			language, found := config.ExtensionLanguageMap[ext]
 			if !found && !tc.expectError {
 				t.Errorf("Expected to find language for extension %s", ext)
 				return
 			}
-
 			if tc.expectError && !found {
-				return // Expected error case
+				// Verify expectations and return for expected error case
+				bridge.AssertExpectations(t)
+				return
 			}
-
+			
 			if language != tc.expectedLang {
 				t.Errorf("Expected language %s, got %s", tc.expectedLang, language)
 			}
+			
+			// Verify all mock expectations were met
+			bridge.AssertExpectations(t)
 		})
 	}
 }
-
 func TestInferLanguageEdgeCases(t *testing.T) {
 	t.Run("empty file path", func(t *testing.T) {
-		bridge := &ComprehensiveMockBridge{
-			getConfigFunc: func() *lsp.LSPServerConfig {
-				return &lsp.LSPServerConfig{
-					ExtensionLanguageMap: map[string]string{".go": "go"},
-				}
-			},
-		}
-
+		bridge := &mocks.MockBridge{}
+		
+		// Set up the mock expectation for GetConfig
+		bridge.On("GetConfig").Return(&lsp.LSPServerConfig{
+			ExtensionLanguageMap: map[string]string{".go": "go"},
+		})
+		
 		// Empty file path should not have an extension
 		filePath := ""
 		config := bridge.GetConfig()
 		if config == nil {
 			t.Fatal("Expected config")
 		}
-
+		
 		// Extract extension from empty path
 		var ext string
 		for i := len(filePath) - 1; i >= 0; i-- {
@@ -207,24 +211,22 @@ func TestInferLanguageEdgeCases(t *testing.T) {
 				break
 			}
 		}
-
 		if ext != "" {
 			t.Error("Expected no extension for empty path")
 		}
 	})
-
+	
 	t.Run("path with multiple dots", func(t *testing.T) {
-		bridge := &ComprehensiveMockBridge{
-			getConfigFunc: func() *lsp.LSPServerConfig {
-				return &lsp.LSPServerConfig{
-					ExtensionLanguageMap: map[string]string{".go": "go", ".js": "javascript"},
-				}
-			},
-		}
-
+		bridge := &mocks.MockBridge{}
+		
+		// Set up the mock expectation for GetConfig
+		bridge.On("GetConfig").Return(&lsp.LSPServerConfig{
+			ExtensionLanguageMap: map[string]string{".go": "go", ".js": "javascript"},
+		})
+		
 		filePath := "/path/to/app.min.js"
 		config := bridge.GetConfig()
-
+		
 		// Extract extension (should get .js, not .min.js)
 		var ext string
 		for i := len(filePath) - 1; i >= 0; i-- {
@@ -233,17 +235,16 @@ func TestInferLanguageEdgeCases(t *testing.T) {
 				break
 			}
 		}
-
 		if ext != ".js" {
 			t.Errorf("Expected .js extension, got %s", ext)
 		}
-
+		
 		// Check if language mapping works
 		language, found := config.ExtensionLanguageMap[ext]
 		if !found {
 			t.Error("Expected to find language for .js extension")
 		}
-		if language != "javascript" { // According to our mock config, .js maps to "javascript"
+		if language != "javascript" {
 			t.Errorf("Expected 'javascript', got '%s'", language)
 		}
 	})

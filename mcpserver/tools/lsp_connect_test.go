@@ -5,18 +5,20 @@ import (
 	"testing"
 
 	"rockerboo/mcp-lsp-bridge/lsp"
+	"rockerboo/mcp-lsp-bridge/mocks"
 
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/mark3labs/mcp-go/mcptest"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestLSPConnectTool(t *testing.T) {
 	testCases := []struct {
-		name         string
-		language     string
-		mockConfig   *lsp.LSPServerConfig
-		mockClient   any
-		expectError  bool
-		description  string
+		name        string
+		language    string
+		mockConfig  *lsp.LSPServerConfig
+		mockClient  any
+		expectError bool
+		description string
 	}{
 		{
 			name:     "successful Go connection",
@@ -141,20 +143,27 @@ func TestLSPConnectTool(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bridge := &ComprehensiveMockBridge{
-				getConfigFunc: func() *lsp.LSPServerConfig {
-					return tc.mockConfig
-				},
-				getClientForLanguageFunc: func(language string) (any, error) {
-					if tc.mockClient != nil && language == tc.language {
-						return tc.mockClient, nil
-					}
-					return nil, fmt.Errorf("failed to create client for language: %s", language)
-				},
+			bridge := &mocks.MockBridge{}
+
+			// Set up mock expectations for GetConfig
+			bridge.On("GetConfig").Return(tc.mockConfig)
+
+			// Set up mock expectations for GetClientForLanguageInterface
+			if tc.mockClient != nil {
+				bridge.On("GetClientForLanguageInterface", tc.language).Return(tc.mockClient, nil)
+			} else if tc.expectError && tc.name == "client creation failure" {
+				bridge.On("GetClientForLanguageInterface", tc.language).Return(nil, fmt.Errorf("failed to create client for language: %s", tc.language))
+			} else if tc.expectError {
+				// For other error cases, we might not even call GetClientForLanguageInterface
+				// or it might return an error - set up based on your actual implementation
+				bridge.On("GetClientForLanguageInterface", mock.Anything).Return(nil, fmt.Errorf("client creation failed")).Maybe()
 			}
 
 			// Create MCP server and register tool
-			mcpServer := server.NewMCPServer("test", "1.0.0", server.WithToolCapabilities(false))
+			mcpServer, err := mcptest.NewServer(t)
+			if err != nil {
+				t.Errorf("Could not create MCP server: %v", err)
+			}
 			RegisterLSPConnectTool(mcpServer, bridge)
 
 			// Test configuration retrieval
@@ -192,6 +201,9 @@ func TestLSPConnectTool(t *testing.T) {
 			}
 
 			t.Logf("Test completed: %s", tc.description)
+
+			// Verify all expectations were met
+			bridge.AssertExpectations(t)
 		})
 	}
 }

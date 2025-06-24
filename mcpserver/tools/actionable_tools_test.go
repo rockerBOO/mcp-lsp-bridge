@@ -11,8 +11,8 @@ import (
 
 func TestFormatDocumentActionable(t *testing.T) {
 	// Test format output formatting
-	mockEdits := []any{
-		protocol.TextEdit{
+	mockEdits := []protocol.TextEdit{
+		{
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 2, Character: 0},
 				End:   protocol.Position{Line: 2, Character: 1},
@@ -67,7 +67,7 @@ func TestRenameSymbolActionable(t *testing.T) {
 		Changes: changes,
 	}
 
-	result := formatWorkspaceEdit(mockWorkspaceEdit)
+	result := formatWorkspaceEdit(&mockWorkspaceEdit)
 	
 	if !strings.Contains(result, "RENAME PREVIEW") {
 		t.Errorf("Expected rename preview header, got: %s", result)
@@ -116,7 +116,7 @@ func TestFormatWorkspaceEditOutput(t *testing.T) {
 		},
 	}
 
-	result = formatWorkspaceEdit(mockWorkspaceEdit)
+	result = formatWorkspaceEdit(&mockWorkspaceEdit)
 	
 	// Check for expected content
 	if !strings.Contains(result, "RENAME PREVIEW") {

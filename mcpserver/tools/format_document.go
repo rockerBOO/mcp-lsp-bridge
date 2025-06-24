@@ -7,11 +7,10 @@ import (
 	"rockerboo/mcp-lsp-bridge/interfaces"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 )
 
 // RegisterFormatDocumentTool registers the document formatting tool
-func RegisterFormatDocumentTool(mcpServer *server.MCPServer, bridge interfaces.BridgeInterface) {
+func RegisterFormatDocumentTool(mcpServer ToolServer, bridge interfaces.BridgeInterface) {
 	mcpServer.AddTool(mcp.NewTool("format_document",
 		mcp.WithDescription("ACTIONABLE: Format a document according to language conventions with dual-mode operation. PREVIEW MODE (apply='false', default): Shows detailed formatting changes without modifying files - displays line-by-line changes, whitespace adjustments, and content modifications. APPLY MODE (apply='true'): Actually applies all formatting changes to the file. Supports customizable indentation and language-specific formatting rules. Always preview first for safety."),
 		mcp.WithString("uri", mcp.Description("URI to the file to format (file:// scheme required, e.g., 'file:///path/to/file.go')")),

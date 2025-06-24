@@ -6,249 +6,46 @@ import (
 	"testing"
 
 	"rockerboo/mcp-lsp-bridge/lsp"
+	"rockerboo/mcp-lsp-bridge/mocks"
 
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/mark3labs/mcp-go/mcptest"
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
-
-// ComprehensiveMockBridge provides a full mock implementation for testing tool handlers
-type ComprehensiveMockBridge struct {
-	// Language inference
-	inferLanguageFunc func(string) (string, error)
-	
-	// Client management
-	getClientForLanguageFunc func(string) (any, error)
-	closeAllClientsFunc func()
-	getConfigFunc func() *lsp.LSPServerConfig
-	
-	// Project analysis
-	detectProjectLanguagesFunc func(string) ([]string, error)
-	detectPrimaryProjectLanguageFunc func(string) (string, error)
-	getMultiLanguageClientsFunc func([]string) (map[string]lsp.LanguageClientInterface, error)
-	
-	// Symbol operations
-	findSymbolReferencesFunc func(string, string, int32, int32, bool) ([]any, error)
-	findSymbolDefinitionsFunc func(string, string, int32, int32) ([]any, error)
-	searchTextInWorkspaceFunc func(string, string) ([]any, error)
-	
-	// Code intelligence
-	getHoverInformationFunc func(string, int32, int32) (any, error)
-	getSignatureHelpFunc func(string, int32, int32) (any, error)
-	getDiagnosticsFunc func(string) ([]any, error)
-	getWorkspaceDiagnosticsFunc func(string, string) (any, error)
-	
-	// Code improvement
-	getCodeActionsFunc func(string, int32, int32, int32, int32) ([]any, error)
-	formatDocumentFunc func(string, int32, bool) ([]any, error)
-	
-	// Advanced navigation
-	renameSymbolFunc func(string, int32, int32, string, bool) (any, error)
-	findImplementationsFunc func(string, int32, int32) ([]any, error)
-	prepareCallHierarchyFunc func(string, int32, int32) ([]any, error)
-	getIncomingCallsFunc func(any) ([]any, error)
-	getOutgoingCallsFunc func(any) ([]any, error)
-}
-
-func (m *ComprehensiveMockBridge) InferLanguage(filePath string) (string, error) {
-	if m.inferLanguageFunc != nil {
-		return m.inferLanguageFunc(filePath)
-	}
-	return "go", nil
-}
-
-func (m *ComprehensiveMockBridge) GetClientForLanguageInterface(language string) (any, error) {
-	if m.getClientForLanguageFunc != nil {
-		return m.getClientForLanguageFunc(language)
-	}
-	return &lsp.LanguageClient{}, nil
-}
-
-func (m *ComprehensiveMockBridge) CloseAllClients() {
-	if m.closeAllClientsFunc != nil {
-		m.closeAllClientsFunc()
-	}
-}
-
-func (m *ComprehensiveMockBridge) GetConfig() *lsp.LSPServerConfig {
-	if m.getConfigFunc != nil {
-		return m.getConfigFunc()
-	}
-	return &lsp.LSPServerConfig{
-		LanguageServers: map[string]lsp.LanguageServerConfig{
-			"go": {Command: "gopls", Filetypes: []string{".go"}},
-		},
-		ExtensionLanguageMap: map[string]string{".go": "go"},
-	}
-}
-
-func (m *ComprehensiveMockBridge) DetectProjectLanguages(projectPath string) ([]string, error) {
-	if m.detectProjectLanguagesFunc != nil {
-		return m.detectProjectLanguagesFunc(projectPath)
-	}
-	return []string{"go"}, nil
-}
-
-func (m *ComprehensiveMockBridge) DetectPrimaryProjectLanguage(projectPath string) (string, error) {
-	if m.detectPrimaryProjectLanguageFunc != nil {
-		return m.detectPrimaryProjectLanguageFunc(projectPath)
-	}
-	return "go", nil
-}
-
-func (m *ComprehensiveMockBridge) GetMultiLanguageClients(languages []string) (map[string]lsp.LanguageClientInterface, error) {
-	if m.getMultiLanguageClientsFunc != nil {
-		return m.getMultiLanguageClientsFunc(languages)
-	}
-	result := make(map[string]lsp.LanguageClientInterface)
-	for _, lang := range languages {
-		result[lang] = &lsp.LanguageClient{}
-	}
-	return result, nil
-}
-
-func (m *ComprehensiveMockBridge) FindSymbolReferences(language, uri string, line, character int32, includeDeclaration bool) ([]any, error) {
-	if m.findSymbolReferencesFunc != nil {
-		return m.findSymbolReferencesFunc(language, uri, line, character, includeDeclaration)
-	}
-	return []any{}, nil
-}
-
-func (m *ComprehensiveMockBridge) FindSymbolDefinitions(language, uri string, line, character int32) ([]any, error) {
-	if m.findSymbolDefinitionsFunc != nil {
-		return m.findSymbolDefinitionsFunc(language, uri, line, character)
-	}
-	return []any{}, nil
-}
-
-func (m *ComprehensiveMockBridge) SearchTextInWorkspace(language, query string) ([]any, error) {
-	if m.searchTextInWorkspaceFunc != nil {
-		return m.searchTextInWorkspaceFunc(language, query)
-	}
-	return []any{}, nil
-}
-
-func (m *ComprehensiveMockBridge) GetHoverInformation(uri string, line, character int32) (any, error) {
-	if m.getHoverInformationFunc != nil {
-		return m.getHoverInformationFunc(uri, line, character)
-	}
-	return map[string]any{"contents": "test hover"}, nil
-}
-
-func (m *ComprehensiveMockBridge) GetSignatureHelp(uri string, line, character int32) (any, error) {
-	if m.getSignatureHelpFunc != nil {
-		return m.getSignatureHelpFunc(uri, line, character)
-	}
-	return protocol.SignatureHelpResponse{}, nil
-}
-
-func (m *ComprehensiveMockBridge) GetDiagnostics(uri string) ([]any, error) {
-	if m.getDiagnosticsFunc != nil {
-		return m.getDiagnosticsFunc(uri)
-	}
-	return []any{}, nil
-}
-
-func (m *ComprehensiveMockBridge) GetWorkspaceDiagnostics(workspaceUri, identifier string) (any, error) {
-	if m.getWorkspaceDiagnosticsFunc != nil {
-		return m.getWorkspaceDiagnosticsFunc(workspaceUri, identifier)
-	}
-	return []any{}, nil
-}
-
-func (m *ComprehensiveMockBridge) GetCodeActions(uri string, line, character, endLine, endCharacter int32) ([]any, error) {
-	if m.getCodeActionsFunc != nil {
-		return m.getCodeActionsFunc(uri, line, character, endLine, endCharacter)
-	}
-	return []any{}, nil
-}
-
-func (m *ComprehensiveMockBridge) FormatDocument(uri string, tabSize int32, insertSpaces bool) ([]any, error) {
-	if m.formatDocumentFunc != nil {
-		return m.formatDocumentFunc(uri, tabSize, insertSpaces)
-	}
-	return []any{}, nil
-}
-
-func (m *ComprehensiveMockBridge) RenameSymbol(uri string, line, character int32, newName string, preview bool) (any, error) {
-	if m.renameSymbolFunc != nil {
-		return m.renameSymbolFunc(uri, line, character, newName, preview)
-	}
-	return map[string]any{"changes": map[string]any{}}, nil
-}
-
-func (m *ComprehensiveMockBridge) FindImplementations(uri string, line, character int32) ([]any, error) {
-	if m.findImplementationsFunc != nil {
-		return m.findImplementationsFunc(uri, line, character)
-	}
-	return []any{}, nil
-}
-
-func (m *ComprehensiveMockBridge) PrepareCallHierarchy(uri string, line, character int32) ([]any, error) {
-	if m.prepareCallHierarchyFunc != nil {
-		return m.prepareCallHierarchyFunc(uri, line, character)
-	}
-	return []any{}, nil
-}
-
-func (m *ComprehensiveMockBridge) GetIncomingCalls(item any) ([]any, error) {
-	if m.getIncomingCallsFunc != nil {
-		return m.getIncomingCallsFunc(item)
-	}
-	return []any{}, nil
-}
-
-func (m *ComprehensiveMockBridge) GetOutgoingCalls(item any) ([]any, error) {
-	if m.getOutgoingCallsFunc != nil {
-		return m.getOutgoingCallsFunc(item)
-	}
-	return []any{}, nil
-}
-
-func (m *ComprehensiveMockBridge) GetDocumentSymbols(uri string) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *ComprehensiveMockBridge) ApplyTextEdits(uri string, edits []any) error {
-	return nil
-}
-
-func (m *ComprehensiveMockBridge) ApplyWorkspaceEdit(edit any) error {
-	return nil
-}
 
 // Helper function for testing - removed unused createMockRequest
 
 // Test actual tool handler execution
 func TestInferLanguageToolHandler(t *testing.T) {
-	bridge := &ComprehensiveMockBridge{
-		getConfigFunc: func() *lsp.LSPServerConfig {
-			return &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]string{
-					".go": "go",
-					".py": "python",
-					".js": "javascript",
-				},
-			}
+	bridge := &mocks.MockBridge{}
+
+	// Setup mock expectations
+	mockConfig := &lsp.LSPServerConfig{
+		ExtensionLanguageMap: map[string]string{
+			".go":   "go",
+			".js":   "javascript",
+			".py":   "python",
+			".java": "java",
 		},
 	}
+	bridge.On("GetConfig").Return(mockConfig)
 
 	// Create MCP server and register tool
-	mcpServer := server.NewMCPServer("test", "1.0.0", server.WithToolCapabilities(false))
+	mcpServer, err := mcptest.NewServer(t)
+	if err != nil {
+		t.Errorf("Could not make a MCP server: %v", err)
+	}
 	RegisterInferLanguageTool(mcpServer, bridge)
 
 	// Test successful inference
 	t.Run("successful language inference", func(t *testing.T) {
-		// This tests the actual tool handler code path
 		config := bridge.GetConfig()
 		if config == nil {
 			t.Fatal("Expected config to be available")
 		}
-		
 		language, found := config.ExtensionLanguageMap[".go"]
 		if !found {
 			t.Fatal("Expected .go extension to be mapped")
 		}
-		
 		if language != "go" {
 			t.Errorf("Expected 'go', got '%s'", language)
 		}
@@ -260,57 +57,67 @@ func TestInferLanguageToolHandler(t *testing.T) {
 		if config == nil {
 			t.Fatal("Expected config to be available")
 		}
-		
 		_, found := config.ExtensionLanguageMap[".unknown"]
 		if found {
 			t.Error("Expected .unknown extension to not be found")
 		}
 	})
-}
 
+	// Verify all expectations were met
+	bridge.AssertExpectations(t)
+}
 func TestHoverToolHandler(t *testing.T) {
 	testCases := []struct {
-		name           string
-		mockResponse   any
-		mockError      error
-		expectError    bool
+		name             string
+		mockResponse     any
+		mockError        error
+		expectError      bool
 		expectedInResult string
 	}{
 		{
-			name: "successful hover",
-			mockResponse: map[string]any{
-				"contents": "Function documentation",
+			name: "successful hover with explicit mock",
+			mockResponse: &protocol.Hover{
+				Contents: protocol.Or3[protocol.MarkupContent, protocol.MarkedString, []protocol.MarkedString]{
+					Value: "Function documentation",
+				},
 			},
+			mockError:   nil,
 			expectError: false,
+		},
+		{
+			name: "successful hover with expected result",
+			mockResponse: &protocol.Hover{
+				Contents: protocol.Or3[protocol.MarkupContent, protocol.MarkedString, []protocol.MarkedString]{
+					Value: "Function documentation",
+				},
+			},
+			expectError:      false,
 			expectedInResult: "HOVER INFORMATION",
 		},
 		{
 			name:         "hover error",
+			mockResponse: (*protocol.Hover)(nil),
 			mockError:    fmt.Errorf("hover failed"),
 			expectError:  true,
 		},
 		{
-			name:         "nil hover result", 
-			mockResponse: nil,
-			expectError:  false,
+			name:             "nil hover result",
+			mockResponse:     (*protocol.Hover)(nil),
+			expectError:      false,
 			expectedInResult: "Content: <nil>",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bridge := &ComprehensiveMockBridge{
-				getHoverInformationFunc: func(uri string, line, character int32) (any, error) {
-					return tc.mockResponse, tc.mockError
-				},
-				inferLanguageFunc: func(filePath string) (string, error) {
-					return "go", nil
-				},
-			}
+			bridge := &mocks.MockBridge{}
+
+			// Set up mock expectation
+			bridge.On("GetHoverInformation", "file:///test.go", int32(10), int32(5)).Return(tc.mockResponse, tc.mockError)
 
 			// Test the actual hover functionality
 			result, err := bridge.GetHoverInformation("file:///test.go", 10, 5)
-			
+
 			if tc.expectError {
 				if err == nil {
 					t.Error("Expected error but got none")
@@ -319,41 +126,41 @@ func TestHoverToolHandler(t *testing.T) {
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
 				}
-				
-				if tc.expectedInResult != "" {
+				if tc.expectedInResult != "" && result != nil {
 					// Test formatting
-					formatted := formatHoverContent(result)
+					formatted := formatHoverContent(result.Contents)
 					if !strings.Contains(formatted, tc.expectedInResult) {
 						t.Errorf("Expected result to contain '%s', got: %s", tc.expectedInResult, formatted)
 					}
 				}
 			}
+
+			// Verify mock expectations were met
+			bridge.AssertExpectations(t)
 		})
 	}
 }
 
 func TestDiagnosticsToolHandler(t *testing.T) {
-	bridge := &ComprehensiveMockBridge{
-		getDiagnosticsFunc: func(uri string) ([]any, error) {
-			if uri == "file:///error.go" {
-				return nil, fmt.Errorf("diagnostics failed")
-			}
-			return []any{
-				protocol.Diagnostic{
-					Message: "Test diagnostic",
-					Source:  "test",
-				},
-			}, nil
-		},
-	}
+	bridge := &mocks.MockBridge{}
 
 	// Test successful diagnostics
 	t.Run("successful diagnostics", func(t *testing.T) {
+		hint := protocol.DiagnosticSeverityHint
+		// Define a mock diagnostic
+		mockDiagnostic := protocol.Diagnostic{
+			Message: "Test diagnostic message",
+			Range: protocol.Range{
+				Start: protocol.Position{Line: 5, Character: 0},
+				End:   protocol.Position{Line: 5, Character: 10},
+			},
+			Severity: &hint, // Or Warning, Error, Information
+		}
+		bridge.On("GetDiagnostics", "file:///test.go").Return([]any{mockDiagnostic}, nil)
 		result, err := bridge.GetDiagnostics("file:///test.go")
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		
 		formatted := formatDiagnostics(result)
 		if !strings.Contains(formatted, "DIAGNOSTICS") {
 			t.Errorf("Expected formatted result to contain 'DIAGNOSTICS'")
@@ -362,6 +169,8 @@ func TestDiagnosticsToolHandler(t *testing.T) {
 
 	// Test diagnostics error
 	t.Run("diagnostics error", func(t *testing.T) {
+		// Return empty slice instead of nil when there's an error
+		bridge.On("GetDiagnostics", "file:///error.go").Return([]any{}, fmt.Errorf("diagnostics failed"))
 		_, err := bridge.GetDiagnostics("file:///error.go")
 		if err == nil {
 			t.Error("Expected error but got none")
@@ -370,19 +179,16 @@ func TestDiagnosticsToolHandler(t *testing.T) {
 }
 
 func TestLSPDisconnectToolHandler(t *testing.T) {
-	disconnectCalled := false
-	bridge := &ComprehensiveMockBridge{
-		closeAllClientsFunc: func() {
-			disconnectCalled = true
-		},
-	}
-
+	bridge := &mocks.MockBridge{}
+	
+	// Set up mock expectation - CloseAllClients should be called once and return nothing
+	bridge.On("CloseAllClients").Return().Once()
+	
 	// Test disconnect functionality
 	bridge.CloseAllClients()
 	
-	if !disconnectCalled {
-		t.Error("Expected CloseAllClients to be called")
-	}
+	// Verify that the mock expectations were met
+	bridge.AssertExpectations(t)
 }
 
 func TestUtilityFunctions(t *testing.T) {
@@ -415,8 +221,8 @@ func TestUtilityFunctions(t *testing.T) {
 	})
 
 	t.Run("formatTextEdits", func(t *testing.T) {
-		edits := []any{
-			protocol.TextEdit{
+		edits := []protocol.TextEdit{
+			{
 				Range: protocol.Range{
 					Start: protocol.Position{Line: 0, Character: 0},
 					End:   protocol.Position{Line: 0, Character: 5},
@@ -431,16 +237,16 @@ func TestUtilityFunctions(t *testing.T) {
 	})
 
 	t.Run("formatWorkspaceEdit", func(t *testing.T) {
-		edit := map[string]any{"changes": map[string]any{}}
-		result := formatWorkspaceEdit(edit)
+		edit := protocol.WorkspaceEdit{Changes: map[protocol.DocumentUri][]protocol.TextEdit{}}
+		result := formatWorkspaceEdit(&edit)
 		if !strings.Contains(result, "RENAME PREVIEW") {
 			t.Error("Expected result to contain 'RENAME PREVIEW'")
 		}
 	})
 
 	t.Run("formatImplementations", func(t *testing.T) {
-		impls := []any{
-			protocol.Location{
+		impls := []protocol.Location{
+			{
 				Uri: "file:///test.go",
 				Range: protocol.Range{
 					Start: protocol.Position{Line: 10, Character: 0},

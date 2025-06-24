@@ -11,15 +11,15 @@ import (
 
 func TestFormatTextEdits(t *testing.T) {
 	// Test formatTextEdits function with simple protocol.TextEdit
-	edits := []any{
-		protocol.TextEdit{
+	edits := []protocol.TextEdit{
+		{
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 2, Character: 0},
 				End:   protocol.Position{Line: 2, Character: 1},
 			},
 			NewText: "",
 		},
-		protocol.TextEdit{
+		{
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 5, Character: 0},
 				End:   protocol.Position{Line: 5, Character: 4},
@@ -95,7 +95,7 @@ func TestFormatWorkspaceEditSimple(t *testing.T) {
 		Changes: changes,
 	}
 
-	result = formatWorkspaceEdit(mockWorkspaceEdit)
+	result = formatWorkspaceEdit(&mockWorkspaceEdit)
 
 	// Check for expected content
 	if !strings.Contains(result, "=== RENAME PREVIEW ===") {

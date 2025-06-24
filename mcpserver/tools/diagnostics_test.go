@@ -2,24 +2,12 @@ package tools
 
 import (
 	"fmt"
+	"rockerboo/mcp-lsp-bridge/mocks"
 	"strings"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/server"
 )
-
-// MockBridge for diagnostics testing - extend the hover MockBridge
-type DiagnosticsMockBridge struct {
-	*MockBridge
-	mockGetDiagnostics func(string) ([]any, error)
-}
-
-func (m *DiagnosticsMockBridge) GetDiagnostics(uri string) ([]any, error) {
-	if m.mockGetDiagnostics != nil {
-		return m.mockGetDiagnostics(uri)
-	}
-	return []any{}, nil
-}
 
 // Test diagnostics tool registration and functionality
 func TestDiagnosticsTool(t *testing.T) {
@@ -49,14 +37,13 @@ func TestDiagnosticsTool(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bridge := &DiagnosticsMockBridge{
-				MockBridge: &MockBridge{},
-				mockGetDiagnostics: func(uri string) ([]any, error) {
-					if tc.mockError != nil {
-						return nil, tc.mockError
-					}
-					return tc.mockResponse, nil
-				},
+			bridge := &mocks.MockBridge{
+				// mockGetDiagnostics: func(uri string) ([]any, error) {
+				// 	if tc.mockError != nil {
+				// 		return nil, tc.mockError
+				// 	}
+				// 	return tc.mockResponse, nil
+				// },
 			}
 
 			mcpServer := server.NewMCPServer(

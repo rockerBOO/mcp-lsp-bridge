@@ -14,20 +14,6 @@ import (
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
-// ClientFactory is an interface for creating LanguageClient instances.
-// This allows for mocking and dependency injection.
-type ClientFactory interface {
-	NewLanguageClient(command string, args ...string) (lsp.LanguageClientInterface, error)
-}
-
-// DefaultClientFactory is the default implementation of the ClientFactory interface.
-type DefaultClientFactory struct{}
-
-// NewLanguageClient creates a new LanguageClient.
-func (f *DefaultClientFactory) NewLanguageClient(command string, args ...string) (lsp.LanguageClientInterface, error) {
-	return lsp.NewLanguageClient(command, args...)
-}
-
 // NewMCPLSPBridge creates a new bridge instance with provided configuration and client factory
 func NewMCPLSPBridge(config *lsp.LSPServerConfig) *MCPLSPBridge {
 	bridge := &MCPLSPBridge{
@@ -258,7 +244,7 @@ func (b *MCPLSPBridge) DetectPrimaryProjectLanguage(projectPath string) (string,
 }
 
 // FindSymbolReferences finds all references to a symbol at a given position
-func (b *MCPLSPBridge) FindSymbolReferences(language, uri string, line, character int32, includeDeclaration bool) ([]any, error) {
+func (b *MCPLSPBridge) FindSymbolReferences(language, uri string, line, character int32, includeDeclaration bool) ([]protocol.Location, error) {
 	client, err := b.GetClientForLanguage(language)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
@@ -269,16 +255,11 @@ func (b *MCPLSPBridge) FindSymbolReferences(language, uri string, line, characte
 		return nil, fmt.Errorf("failed to find references: %w", err)
 	}
 
-	// Convert to []any for interface compatibility
-	result := make([]any, len(references))
-	for i, ref := range references {
-		result[i] = ref
-	}
-	return result, nil
+	return references, nil
 }
 
 // FindSymbolDefinitions finds all definitions for a symbol at a given position
-func (b *MCPLSPBridge) FindSymbolDefinitions(language, uri string, line, character int32) ([]any, error) {
+func (b *MCPLSPBridge) FindSymbolDefinitions(language, uri string, line, character int32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error) {
 	client, err := b.GetClientForLanguage(language)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
@@ -288,19 +269,14 @@ func (b *MCPLSPBridge) FindSymbolDefinitions(language, uri string, line, charact
 	if err != nil {
 		// Log the error but return empty results instead of failing
 		logger.Warn(fmt.Sprintf("Failed to find definitions for %s at %s:%d:%d: %v", language, uri, line, character, err))
-		return []any{}, nil
+		return []protocol.Or2[protocol.LocationLink, protocol.Location]{}, nil
 	}
 
-	// Convert to []any for interface compatibility
-	result := make([]any, len(definitions))
-	for i, def := range definitions {
-		result[i] = def
-	}
-	return result, nil
+	return definitions, nil
 }
 
 // SearchTextInWorkspace performs a text search across the workspace
-func (b *MCPLSPBridge) SearchTextInWorkspace(language, query string) ([]any, error) {
+func (b *MCPLSPBridge) SearchTextInWorkspace(language, query string) ([]protocol.WorkspaceSymbol, error) {
 	client, err := b.GetClientForLanguage(language)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
@@ -311,12 +287,7 @@ func (b *MCPLSPBridge) SearchTextInWorkspace(language, query string) ([]any, err
 		return nil, fmt.Errorf("failed to search workspace symbols: %w", err)
 	}
 
-	// Convert to []any for interface compatibility
-	result := make([]any, len(symbols))
-	for i, symbol := range symbols {
-		result[i] = symbol
-	}
-	return result, nil
+	return symbols, nil
 }
 
 // GetMultiLanguageClients gets language clients for multiple languages with fallback
@@ -368,7 +339,7 @@ func normalizeURI(uri string) string {
 }
 
 // GetHoverInformation gets hover information for a symbol at a specific position
-func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character int32) (any, error) {
+func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character int32) (*protocol.Hover, error) {
 	// Extensive debug logging
 	logger.Info(fmt.Sprintf("GetHoverInformation: Starting hover request for URI: %s, Line: %d, Character: %d", uri, line, character))
 
@@ -464,7 +435,7 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client lsp.LanguageClientInterface, ur
 }
 
 // GetDocumentSymbols gets all symbols in a document
-func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]any, error) {
+func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol, error) {
 	// Normalize URI to ensure proper file:// scheme
 	normalizedURI := normalizeURI(uri)
 	logger.Info(fmt.Sprintf("GetDocumentSymbols: Starting request for URI: %s -> %s", uri, normalizedURI))
@@ -502,14 +473,9 @@ func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]any, error) {
 		return nil, fmt.Errorf("document symbols request failed: %w", err)
 	}
 
-	// Convert to []any for interface compatibility
-	result := make([]any, len(symbols))
-	for i, symbol := range symbols {
-		result[i] = symbol
-	}
 
-	logger.Info(fmt.Sprintf("GetDocumentSymbols: Found %d symbols", len(result)))
-	return result, nil
+	logger.Info(fmt.Sprintf("GetDocumentSymbols: Found %d symbols", len(symbols)))
+	return symbols, nil
 }
 
 // GetDiagnostics gets diagnostics for a document
@@ -521,7 +487,7 @@ func (b *MCPLSPBridge) GetDiagnostics(uri string) ([]any, error) {
 }
 
 // GetSignatureHelp gets signature help for a function at a specific position
-func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character int32) (any, error) {
+func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character int32) (*protocol.SignatureHelp, error) {
 	// Normalize URI
 	normalizedURI := normalizeURI(uri)
 
@@ -558,7 +524,7 @@ func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character int32) (any,
 }
 
 // GetCodeActions gets code actions for a specific range
-func (b *MCPLSPBridge) GetCodeActions(uri string, line, character, endLine, endCharacter int32) ([]any, error) {
+func (b *MCPLSPBridge) GetCodeActions(uri string, line, character, endLine, endCharacter int32) ([]protocol.CodeAction, error) {
 	// Infer language from URI
 	language, err := b.InferLanguage(uri)
 	if err != nil {
@@ -589,17 +555,11 @@ func (b *MCPLSPBridge) GetCodeActions(uri string, line, character, endLine, endC
 		return nil, fmt.Errorf("code action request failed: %w", err)
 	}
 
-	// Convert to []any for interface compatibility
-	actions := make([]any, len(result))
-	for i, action := range result {
-		actions[i] = action
-	}
-
-	return actions, nil
+	return result, nil
 }
 
 // FormatDocument formats a document
-func (b *MCPLSPBridge) FormatDocument(uri string, tabSize int32, insertSpaces bool) ([]any, error) {
+func (b *MCPLSPBridge) FormatDocument(uri string, tabSize int32, insertSpaces bool) ([]protocol.TextEdit, error) {
 	// Infer language from URI
 	language, err := b.InferLanguage(uri)
 	if err != nil {
@@ -627,17 +587,11 @@ func (b *MCPLSPBridge) FormatDocument(uri string, tabSize int32, insertSpaces bo
 		return nil, fmt.Errorf("document formatting request failed: %w", err)
 	}
 
-	// Convert to []any for interface compatibility
-	edits := make([]any, len(result))
-	for i, edit := range result {
-		edits[i] = edit
-	}
-
-	return edits, nil
+	return result, nil
 }
 
 // ApplyTextEdits applies text edits to a file
-func (b *MCPLSPBridge) ApplyTextEdits(uri string, edits []any) error {
+func (b *MCPLSPBridge) ApplyTextEdits(uri string, edits []protocol.TextEdit) error {
 	// Convert URI to file path
 	filePath := strings.TrimPrefix(uri, "file://")
 
@@ -647,16 +601,8 @@ func (b *MCPLSPBridge) ApplyTextEdits(uri string, edits []any) error {
 		return fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
 
-	// Convert edits to protocol.TextEdit
-	textEdits := make([]protocol.TextEdit, 0, len(edits))
-	for _, edit := range edits {
-		if textEdit, ok := edit.(protocol.TextEdit); ok {
-			textEdits = append(textEdits, textEdit)
-		}
-	}
-
 	// Apply edits to content
-	modifiedContent, err := applyTextEditsToContent(string(content), textEdits)
+	modifiedContent, err := applyTextEditsToContent(string(content), edits)
 	if err != nil {
 		return fmt.Errorf("failed to apply text edits: %w", err)
 	}
@@ -741,7 +687,7 @@ func applyTextEditsToContent(content string, edits []protocol.TextEdit) (string,
 }
 
 // RenameSymbol renames a symbol with optional preview
-func (b *MCPLSPBridge) RenameSymbol(uri string, line, character int32, newName string, preview bool) (any, error) {
+func (b *MCPLSPBridge) RenameSymbol(uri string, line, character int32, newName string, preview bool) (*protocol.WorkspaceEdit, error) {
 	// Normalize URI to ensure proper file:// scheme
 	normalizedURI := normalizeURI(uri)
 	logger.Info(fmt.Sprintf("RenameSymbol: Starting rename request for URI: %s -> %s, Line: %d, Character: %d, NewName: %s", uri, normalizedURI, line, character, newName))
@@ -790,15 +736,11 @@ func (b *MCPLSPBridge) RenameSymbol(uri string, line, character int32, newName s
 	// Log the response details
 	logger.Info(fmt.Sprintf("RenameSymbol: Received rename response. Changes: %+v, DocumentChanges: %+v", result.Changes, result.DocumentChanges))
 
-	return result, nil
+	return &result, nil
 }
 
 // ApplyWorkspaceEdit applies a workspace edit to multiple files
-func (b *MCPLSPBridge) ApplyWorkspaceEdit(edit any) error {
-	workspaceEdit, ok := edit.(protocol.WorkspaceEdit)
-	if !ok {
-		return fmt.Errorf("invalid workspace edit type: %T", edit)
-	}
+func (b *MCPLSPBridge) ApplyWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit) error {
 
 	logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Processing workspace edit. Changes: %+v, DocumentChanges: %+v", workspaceEdit.Changes, workspaceEdit.DocumentChanges))
 
@@ -813,7 +755,7 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(edit any) error {
 				logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Found TextDocumentEdit for URI: %s", textDocEdit.TextDocument.Uri))
 
 				// Convert protocol.TextEdit to []any for ApplyTextEdits
-				textEdits := make([]any, len(textDocEdit.Edits))
+				textEdits := make([]protocol.TextEdit, len(textDocEdit.Edits))
 				for i, edit := range textDocEdit.Edits {
 					// Edits might also be a union type, extract the actual TextEdit
 					if actualEdit, ok := edit.Value.(protocol.TextEdit); ok {
@@ -845,13 +787,7 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(edit any) error {
 	// Apply changes map (alternative format)
 	if workspaceEdit.Changes != nil {
 		for uri, edits := range workspaceEdit.Changes {
-			// Convert []protocol.TextEdit to []any
-			anyEdits := make([]any, len(edits))
-			for i, edit := range edits {
-				anyEdits[i] = edit
-			}
-
-			err := b.ApplyTextEdits(string(uri), anyEdits)
+			err := b.ApplyTextEdits(string(uri), edits)
 			if err != nil {
 				return fmt.Errorf("failed to apply edits to %s: %w", uri, err)
 			}
@@ -862,7 +798,7 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(edit any) error {
 }
 
 // FindImplementations finds implementations of a symbol
-func (b *MCPLSPBridge) FindImplementations(uri string, line, character int32) ([]any, error) {
+func (b *MCPLSPBridge) FindImplementations(uri string, line, character int32) ([]protocol.Location, error) {
 	// Normalize URI
 	normalizedURI := normalizeURI(uri)
 
@@ -894,18 +830,12 @@ func (b *MCPLSPBridge) FindImplementations(uri string, line, character int32) ([
 		return nil, fmt.Errorf("implementation request failed: %w", err)
 	}
 
-	// Convert to []any for interface compatibility
-	result := make([]any, len(implementations))
-	for i, impl := range implementations {
-		result[i] = impl
-	}
-
-	logger.Info(fmt.Sprintf("FindImplementations: Found %d implementations", len(result)))
-	return result, nil
+	logger.Info(fmt.Sprintf("FindImplementations: Found %d implementations", len(implementations)))
+	return implementations, nil
 }
 
 // PrepareCallHierarchy prepares call hierarchy items
-func (b *MCPLSPBridge) PrepareCallHierarchy(uri string, line, character int32) ([]any, error) {
+func (b *MCPLSPBridge) PrepareCallHierarchy(uri string, line, character int32) ([]protocol.CallHierarchyItem, error) {
 	// Infer language from URI
 	language, err := b.InferLanguage(uri)
 	if err != nil {
@@ -933,31 +863,25 @@ func (b *MCPLSPBridge) PrepareCallHierarchy(uri string, line, character int32) (
 		return nil, fmt.Errorf("prepare call hierarchy request failed: %w", err)
 	}
 
-	// Convert to []any for interface compatibility
-	items := make([]any, len(result))
-	for i, item := range result {
-		items[i] = item
-	}
-
-	return items, nil
+	return result, nil
 }
 
 // GetIncomingCalls gets incoming calls for a call hierarchy item
-func (b *MCPLSPBridge) GetIncomingCalls(item any) ([]any, error) {
+func (b *MCPLSPBridge) GetIncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error) {
 	// For now, return empty since we need to handle the protocol.CallHierarchyItem properly
 	// TODO: Implement proper call hierarchy item handling
-	return []any{}, nil
+	return []protocol.CallHierarchyIncomingCall{}, nil
 }
 
 // GetOutgoingCalls gets outgoing calls for a call hierarchy item
-func (b *MCPLSPBridge) GetOutgoingCalls(item any) ([]any, error) {
+func (b *MCPLSPBridge) GetOutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error) {
 	// For now, return empty since we need to handle the protocol.CallHierarchyItem properly
 	// TODO: Implement proper call hierarchy item handling
-	return []any{}, nil
+	return []protocol.CallHierarchyOutgoingCall{}, nil
 }
 
 // GetWorkspaceDiagnostics gets diagnostics for entire workspace
-func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier string) (any, error) {
+func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier string) ([]protocol.WorkspaceDiagnosticReport, error) {
 	// 1. Detect project languages or use multi-language approach
 	languages, err := b.DetectProjectLanguages(workspaceUri)
 	if err != nil {
@@ -965,7 +889,7 @@ func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier s
 	}
 
 	if len(languages) == 0 {
-		return []any{}, nil // No languages detected, return empty result
+		return []protocol.WorkspaceDiagnosticReport{}, nil // No languages detected, return empty result
 	}
 
 	// 2. Get language clients for detected languages
@@ -975,7 +899,7 @@ func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier s
 	}
 
 	// 3. Execute workspace diagnostic requests
-	var allReports []any
+	var allReports []protocol.WorkspaceDiagnosticReport
 	for language, clientInterface := range clients {
 		client := clientInterface
 		report, err := b.executeWorkspaceDiagnosticRequest(client, identifier)

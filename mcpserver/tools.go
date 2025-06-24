@@ -3,12 +3,11 @@ package mcpserver
 import (
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/mcpserver/tools"
-
-	"github.com/mark3labs/mcp-go/server"
 )
 
+
 // RegisterAllTools registers all MCP tools with the server
-func RegisterAllTools(mcpServer *server.MCPServer, bridge interfaces.BridgeInterface) {
+func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterface) {
 	// Core analysis tools
 	tools.RegisterAnalyzeCodeTool(mcpServer, bridge)
 	tools.RegisterProjectAnalysisTool(mcpServer, bridge)

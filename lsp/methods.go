@@ -76,16 +76,16 @@ func (lc *LanguageClient) DidSave(uri string, text *string) error {
 
 // DidClose sends a textDocument/didClose notification
 func (lc *LanguageClient) DidClose(uri string) error {
-	params := map[string]interface{}{
-		"textDocument": map[string]interface{}{
-			"uri": uri,
+	params := protocol.DidCloseTextDocumentParams{
+		TextDocument: protocol.TextDocumentIdentifier{
+			Uri: protocol.DocumentUri(uri),
 		},
 	}
 	return lc.SendNotification("textDocument/didClose", params)
 }
 
-func (lc *LanguageClient) WorkspaceSymbols(query string) ([]protocol.SymbolInformation, error) {
-	var result []protocol.SymbolInformation
+func (lc *LanguageClient) WorkspaceSymbols(query string) ([]protocol.WorkspaceSymbol, error) {
+	var result []protocol.WorkspaceSymbol
 	err := lc.SendRequest("workspace/symbol", protocol.WorkspaceSymbolParams{
 		Query: query,
 	}, &result, 5*time.Second)
@@ -97,7 +97,7 @@ func (lc *LanguageClient) WorkspaceSymbols(query string) ([]protocol.SymbolInfor
 
 // Definition requests definition locations for a symbol at a given position
 // Returns LocationLink[] or converts Location[] to LocationLink[]
-func (lc *LanguageClient) Definition(uri string, line, character int32) ([]protocol.LocationLink, error) {
+func (lc *LanguageClient) Definition(uri string, line, character int32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error) {
 	// Use raw JSON response to handle both Location[] and LocationLink[] formats
 	var rawResult json.RawMessage
 	err := lc.SendRequest("textDocument/definition", protocol.DefinitionParams{
@@ -114,29 +114,12 @@ func (lc *LanguageClient) Definition(uri string, line, character int32) ([]proto
 	}
 
 	// First try to unmarshal as LocationLink[]
-	var resultLinks []protocol.LocationLink
-	if err := json.Unmarshal(rawResult, &resultLinks); err == nil {
-		// Check if we got valid LocationLink data
-		if len(resultLinks) > 0 && resultLinks[0].TargetUri != "" {
-			return resultLinks, nil
-		}
-	}
-
-	// Try to unmarshal as Location[]
-	var resultLocations []protocol.Location
-	if err := json.Unmarshal(rawResult, &resultLocations); err != nil {
+	var links []protocol.Or2[protocol.LocationLink, protocol.Location]
+	err = json.Unmarshal(rawResult, &links)
+	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal definition response: %w", err)
 	}
 
-	// Convert Location[] to LocationLink[]
-	links := make([]protocol.LocationLink, len(resultLocations))
-	for i, loc := range resultLocations {
-		links[i] = protocol.LocationLink{
-			TargetUri:         loc.Uri,
-			TargetRange:       loc.Range,
-			TargetSelectionRange: loc.Range,
-		}
-	}
 	return links, nil
 }
 
@@ -188,7 +171,7 @@ func (lc *LanguageClient) DocumentSymbols(uri string) ([]protocol.DocumentSymbol
 			Uri: protocol.DocumentUri(uri),
 		},
 	}, &symbolResult, 5*time.Second)
-	
+
 	if err == nil && len(symbolResult) > 0 {
 		return symbolResult, nil
 	}
@@ -200,7 +183,7 @@ func (lc *LanguageClient) DocumentSymbols(uri string) ([]protocol.DocumentSymbol
 			Uri: protocol.DocumentUri(uri),
 		},
 	}, &infoResult, 5*time.Second)
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +199,7 @@ func (lc *LanguageClient) DocumentSymbols(uri string) ([]protocol.DocumentSymbol
 			// Note: Children will be empty since SymbolInformation is flat
 		}
 	}
-	
+
 	return result, nil
 }
 

@@ -9,11 +9,10 @@ import (
 	"rockerboo/mcp-lsp-bridge/interfaces"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 )
 
 // RegisterWorkspaceDiagnosticsTool registers the workspace_diagnostics tool
-func RegisterWorkspaceDiagnosticsTool(mcpServer *server.MCPServer, bridge interfaces.BridgeInterface) {
+func RegisterWorkspaceDiagnosticsTool(mcpServer ToolServer, bridge interfaces.BridgeInterface) {
 	mcpServer.AddTool(mcp.NewTool("workspace_diagnostics",
 		mcp.WithDescription("Get comprehensive diagnostics for entire workspace"),
 		mcp.WithString("workspace_uri", mcp.Description("URI to the workspace/project root")),
@@ -27,8 +26,8 @@ func RegisterWorkspaceDiagnosticsTool(mcpServer *server.MCPServer, bridge interf
 		}
 
 		// Strip file:// prefix if present
-		if strings.HasPrefix(workspaceUri, "file://") {
-			workspaceUri = strings.TrimPrefix(workspaceUri, "file://")
+		if after, ok :=strings.CutPrefix(workspaceUri, "file://"); ok  {
+			workspaceUri = after
 			logger.Info("workspace_diagnostics: stripped file:// prefix", 
 				fmt.Sprintf("Processed URI: %s", workspaceUri))
 		}

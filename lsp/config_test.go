@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"slices"
 	"os"
 	"path/filepath"
 	"testing"
@@ -118,13 +119,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 
 				// Check each expected language is in the detected languages
 				for _, expectedLang := range tc.expectedLangs {
-					found := false
-					for _, detectedLang := range languages {
-						if detectedLang == expectedLang {
-							found = true
-							break
-						}
-					}
+					found := slices.Contains(languages, expectedLang)
 					if !found {
 						t.Errorf("Expected language %s not found in detected languages", expectedLang)
 					}

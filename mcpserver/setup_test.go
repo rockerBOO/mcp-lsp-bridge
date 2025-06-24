@@ -4,119 +4,12 @@ import (
 	"reflect"
 	"testing"
 
-	"rockerboo/mcp-lsp-bridge/lsp"
+	"rockerboo/mcp-lsp-bridge/mocks"
 )
-
-// MockBridge implements BridgeInterface for testing
-type MockBridge struct{}
-
-func (m *MockBridge) GetClientForLanguageInterface(language string) (any, error) {
-	return nil, nil
-}
-
-func (m *MockBridge) InferLanguage(filePath string) (string, error) {
-	return "go", nil
-}
-
-func (m *MockBridge) CloseAllClients() {}
-
-func (m *MockBridge) GetConfig() *lsp.LSPServerConfig {
-	return &lsp.LSPServerConfig{
-		LanguageServers: map[string]lsp.LanguageServerConfig{
-			"go": {Command: "gopls"},
-		},
-	}
-}
-
-func (m *MockBridge) DetectProjectLanguages(projectPath string) ([]string, error) {
-	return []string{"go"}, nil
-}
-
-func (m *MockBridge) DetectPrimaryProjectLanguage(projectPath string) (string, error) {
-	return "go", nil
-}
-
-func (m *MockBridge) FindSymbolReferences(language, uri string, line, character int32, includeDeclaration bool) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *MockBridge) FindSymbolDefinitions(language, uri string, line, character int32) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *MockBridge) SearchTextInWorkspace(language, query string) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *MockBridge) GetMultiLanguageClients(languages []string) (map[string]lsp.LanguageClientInterface, error) {
-	result := make(map[string]lsp.LanguageClientInterface)
-	for _, lang := range languages {
-		if lang == "go" {
-			result[lang] = &lsp.LanguageClient{}
-		}
-	}
-	return result, nil
-}
-
-func (m *MockBridge) GetHoverInformation(uri string, line, character int32) (any, error) {
-	return map[string]any{"contents": "mock hover"}, nil
-}
-
-func (m *MockBridge) GetDiagnostics(uri string) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *MockBridge) GetWorkspaceDiagnostics(workspaceUri, identifier string) (any, error) {
-	return []any{}, nil
-}
-
-func (m *MockBridge) GetSignatureHelp(uri string, line, character int32) (any, error) {
-	return map[string]any{"signatures": []any{}}, nil
-}
-
-func (m *MockBridge) GetCodeActions(uri string, line, character, endLine, endCharacter int32) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *MockBridge) FormatDocument(uri string, tabSize int32, insertSpaces bool) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *MockBridge) RenameSymbol(uri string, line, character int32, newName string, preview bool) (any, error) {
-	return map[string]any{"changes": map[string]any{}}, nil
-}
-
-func (m *MockBridge) FindImplementations(uri string, line, character int32) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *MockBridge) PrepareCallHierarchy(uri string, line, character int32) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *MockBridge) GetIncomingCalls(item any) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *MockBridge) GetOutgoingCalls(item any) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *MockBridge) GetDocumentSymbols(uri string) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *MockBridge) ApplyTextEdits(uri string, edits []any) error {
-	return nil
-}
-
-func (m *MockBridge) ApplyWorkspaceEdit(edit any) error {
-	return nil
-}
 
 func TestMCPServerSetup(t *testing.T) {
 	// Create a mock bridge
-	mockBridge := &MockBridge{}
+	mockBridge := &mocks.MockBridge{}
 
 	// Set up the MCP server
 	mcpServer := SetupMCPServer(mockBridge)
@@ -167,10 +60,9 @@ func TestMCPServerSetup(t *testing.T) {
 
 // Benchmark server setup to ensure performance
 func BenchmarkMCPServerSetup(b *testing.B) {
-	mockBridge := &MockBridge{}
+	mockBridge := &mocks.MockBridge{}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		SetupMCPServer(mockBridge)
 	}
 }

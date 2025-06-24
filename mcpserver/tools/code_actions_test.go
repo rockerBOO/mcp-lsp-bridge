@@ -5,21 +5,11 @@ import (
 	"strings"
 	"testing"
 
+	"rockerboo/mcp-lsp-bridge/mocks"
+
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/myleshyson/lsprotocol-go/protocol"
 )
-
-// CodeActionsMockBridge for code actions testing
-type CodeActionsMockBridge struct {
-	*MockBridge
-	mockGetCodeActions func(string, int32, int32, int32, int32) ([]any, error)
-}
-
-func (m *CodeActionsMockBridge) GetCodeActions(uri string, line, character, endLine, endCharacter int32) ([]any, error) {
-	if m.mockGetCodeActions != nil {
-		return m.mockGetCodeActions(uri, line, character, endLine, endCharacter)
-	}
-	return []any{}, nil
-}
 
 // Test code actions tool registration and functionality
 func TestCodeActionsTool(t *testing.T) {
@@ -36,11 +26,11 @@ func TestCodeActionsTool(t *testing.T) {
 		expectError    bool
 	}{
 		{
-			name:      "successful code actions",
-			uri:       "file:///test.go",
-			line:      10,
-			character: 5,
-			endLine:   10,
+			name:         "successful code actions",
+			uri:          "file:///test.go",
+			line:         10,
+			character:    5,
+			endLine:      10,
 			endCharacter: 15,
 			mockResponse: []any{
 				map[string]any{
@@ -66,14 +56,13 @@ func TestCodeActionsTool(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bridge := &CodeActionsMockBridge{
-				MockBridge: &MockBridge{},
-				mockGetCodeActions: func(uri string, line, character, endLine, endCharacter int32) ([]any, error) {
-					if tc.mockError != nil {
-						return nil, tc.mockError
-					}
-					return tc.mockResponse, nil
-				},
+			bridge := &mocks.MockBridge{
+				// mockGetCodeActions: func(uri string, line, character, endLine, endCharacter int32) ([]any, error) {
+				// 	if tc.mockError != nil {
+				// 		return nil, tc.mockError
+				// 	}
+				// 	return tc.mockResponse, nil
+				// },
 			}
 
 			mcpServer := server.NewMCPServer(
@@ -95,22 +84,24 @@ func TestCodeActionsTool(t *testing.T) {
 }
 
 func TestFormatCodeActions(t *testing.T) {
+	quickfix := protocol.CodeActionKindQuickFix
+
 	testCases := []struct {
 		name     string
-		input    []any
+		input    []protocol.CodeAction
 		expected string
 	}{
 		{
 			name:     "empty actions",
-			input:    []any{},
+			input:    []protocol.CodeAction{},
 			expected: "No code actions available",
 		},
 		{
 			name: "valid actions",
-			input: []any{
-				map[string]any{
-					"title": "Fix import",
-					"kind":  "quickfix",
+			input: []protocol.CodeAction{
+				{
+					Title: "Fix import",
+					Kind:  &quickfix,
 				},
 			},
 			expected: "CODE ACTIONS",

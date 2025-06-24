@@ -92,8 +92,8 @@ type LanguageClientInterface interface {
 	DidClose(uri string) error
 
 	// Language features
-	WorkspaceSymbols(query string) ([]protocol.SymbolInformation, error)
-	Definition(uri string, line, character int32) ([]protocol.LocationLink, error)
+	WorkspaceSymbols(query string) ([]protocol.WorkspaceSymbol, error)
+	Definition(uri string, line, character int32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error)
 	References(uri string, line, character int32, includeDeclaration bool) ([]protocol.Location, error)
 	Hover(uri string, line, character int32) (*protocol.Hover, error)
 	DocumentSymbols(uri string) ([]protocol.DocumentSymbol, error)
@@ -101,21 +101,10 @@ type LanguageClientInterface interface {
 	SignatureHelp(uri string, line, character int32) (*protocol.SignatureHelp, error)
 }
 
-// type LSPConnection struct {
-// 	conn *jsonrpc2.Conn
-// }
-//
-// func (r *LSPConnection) Call(ctx LSPProcessInterface, method string, params, result interface{}) error {
-// 	return r.conn.Call(ctx, method, params, result)
-// }
-//
-// func (r *LSPConnection) Close() error {
-// 	return r.conn.Close()
-// }
-
 type LSPConnectionInterface interface {
 	Call(ctx context.Context, method string, params, result any, opts ...jsonrpc2.CallOption) error
 	Notify(ctx context.Context, method string, params any, opts ...jsonrpc2.CallOption) error
+	Reply(ctx context.Context, id jsonrpc2.ID, result any) error
 	Close() error
 }
 
@@ -161,4 +150,3 @@ type LSPServerConfig struct {
 	LanguageExtensionMap map[string][]string `json:"language_extension_map"`
 	ExtensionLanguageMap map[string]string   `json:"extension_language_map"`
 }
-
