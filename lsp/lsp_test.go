@@ -8,10 +8,13 @@ import (
 )
 
 func TestNewLanguageClient(t *testing.T) {
-	// Use echo as a simple mock command
 	client, err := NewLanguageClient("mock-lsp-server")
 	if err != nil {
 		t.Fatalf("Failed to create language client: %v", err)
+	}
+	_, err = client.Connect()
+	if err != nil {
+		t.Fatalf("Failed to connect to language client: %v", err)
 	}
 	defer client.Close()
 
@@ -30,6 +33,10 @@ func TestLanguageClientMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create language client: %v", err)
 	}
+	_, err = client.Connect()
+	if err != nil {
+		t.Fatalf("Failed to connect to language client: %v", err)
+	}
 	defer client.Close()
 
 	// Perform some requests to generate metrics
@@ -47,19 +54,19 @@ func TestLanguageClientMetrics(t *testing.T) {
 	// Retrieve and check metrics
 	metrics := client.GetMetrics()
 
-	if metrics["total_requests"].(int64) != 5 {
-		t.Errorf("Expected 5 total requests, got %v", metrics["total_requests"])
+	if metrics.TotalRequests != 5 {
+		t.Errorf("Expected 5 total requests, got %v", metrics.TotalRequests)
 	}
 
 	// Verify other metric properties
-	if metrics["command"] != "mock-lsp-server" {
-		t.Errorf("Unexpected command: %v", metrics["command"])
+	if metrics.Command != "mock-lsp-server" {
+		t.Errorf("Unexpected command: %v", metrics.Command)
 	}
 
 	t.Logf("Metrics: %v", metrics)
 
 	// Since we're sending invalid method requests, the client should be marked as disconnected
-	if metrics["is_connected"] != false {
+	if metrics.IsConnected != false {
 		t.Error("Client should be marked as disconnected after failed requests")
 	}
 }
@@ -69,7 +76,10 @@ func TestLanguageClientClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create language client: %v", err)
 	}
-
+	_, err = client.Connect()
+	if err != nil {
+		t.Fatalf("Failed to connect to language client: %v", err)
+	}
 	// Close the client
 	err = client.Close()
 	if err != nil {
@@ -81,19 +91,21 @@ func TestLanguageClientClose(t *testing.T) {
 		t.Error("Client should not be connected after Close()")
 	}
 
-	if client.status != StatusUninitialized {
-		t.Errorf("Expected status Uninitialized after Close(), got %v", client.status)
+	if client.Status() != StatusUninitialized {
+		t.Errorf("Expected status Uninitialized after Close(), got %v", client.Status())
 	}
 }
 
 func TestSendRequestErrorHandling(t *testing.T) {
 	client, err := NewLanguageClient("nonexistent_command")
-	if err == nil {
+	if err != nil {
 		t.Fatal("Expected error when creating client with nonexistent command")
 	}
-
-	// Client should be nil when creation fails
-	if client != nil {
+	connected_client, err := client.Connect()
+	if err == nil {
+		t.Fatalf("Expected to error when connecting to client: %v", err)
+	}
+	if connected_client != nil {
 		t.Error("Expected nil client when creation fails")
 		client.Close() // Clean up if somehow not nil
 	}
@@ -103,6 +115,10 @@ func TestClientCapabilitiesAndServerCapabilities(t *testing.T) {
 	client, err := NewLanguageClient("mock-lsp-server")
 	if err != nil {
 		t.Fatalf("Failed to create language client: %v", err)
+	}
+	_, err = client.Connect()
+	if err != nil {
+		t.Fatalf("Failed to connect to language client: %v", err)
 	}
 	defer client.Close()
 

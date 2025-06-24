@@ -44,7 +44,7 @@ func createTestLSPConfig() *lsp.LSPServerConfig {
 func TestLanguageClientConnection(t *testing.T) {
 	// Create test bridge
 	bridge := MCPLSPBridge{
-		clients: make(map[string]*lsp.LanguageClient),
+		clients: make(map[string]lsp.LanguageClientInterface),
 		config:  createTestLSPConfig(),
 	}
 
@@ -71,7 +71,7 @@ func TestLanguageClientConnection(t *testing.T) {
 
 func TestClientCaching(t *testing.T) {
 	bridge := MCPLSPBridge{
-		clients: make(map[string]*lsp.LanguageClient),
+		clients: make(map[string]lsp.LanguageClientInterface),
 		config:  createTestLSPConfig(),
 	}
 
@@ -94,7 +94,7 @@ func TestClientCaching(t *testing.T) {
 
 func TestInvalidLanguageConnection(t *testing.T) {
 	bridge := MCPLSPBridge{
-		clients: make(map[string]*lsp.LanguageClient),
+		clients: make(map[string]lsp.LanguageClientInterface),
 		config:  createTestLSPConfig(),
 	}
 

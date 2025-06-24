@@ -24,8 +24,8 @@ const (
 // LanguageClient wraps a Language Server Protocol client connection
 type LanguageClient struct {
 	mu                 sync.RWMutex
-	conn               *jsonrpc2.Conn
-	ctx                context.Context
+	conn               LSPConnectionInterface
+	ctx                LSPProcessInterface
 	cancel             context.CancelFunc
 	cmd                *exec.Cmd
 	clientCapabilities protocol.ClientCapabilities
@@ -61,6 +61,93 @@ type LanguageServerConfig struct {
 	InitializationOptions map[string]any `json:"initialization_options"`
 }
 
+// LanguageClientInterface defines the methods required for a language client.
+// This interface abstracts the concrete LanguageClient type for better testability.
+type LanguageClientInterface interface {
+	// Core client methods
+	Connect() (LanguageClientInterface, error)
+	SendRequest(method string, params any, result any, timeout time.Duration) error
+	SendNotification(method string, params any) error
+	Close() error
+	Context() context.Context
+	GetMetrics() ClientMetrics
+	IsConnected() bool
+	Status() ClientStatus
+
+	// Lifecycle methods
+	Initialize(params protocol.InitializeParams) (*protocol.InitializeResult, error)
+	Initialized() error
+	Shutdown() error
+	Exit() error
+
+	// Capabilities
+	ClientCapabilities() protocol.ClientCapabilities
+	ServerCapabilities() protocol.ServerCapabilities
+	SetServerCapabilities(capabilities protocol.ServerCapabilities)
+
+	// Text document synchronization
+	DidOpen(uri string, languageId protocol.LanguageKind, text string, version int32) error
+	DidChange(uri string, version int32, changes []protocol.TextDocumentContentChangeEvent) error
+	DidSave(uri string, text *string) error
+	DidClose(uri string) error
+
+	// Language features
+	WorkspaceSymbols(query string) ([]protocol.SymbolInformation, error)
+	Definition(uri string, line, character int32) ([]protocol.LocationLink, error)
+	References(uri string, line, character int32, includeDeclaration bool) ([]protocol.Location, error)
+	Hover(uri string, line, character int32) (*protocol.Hover, error)
+	DocumentSymbols(uri string) ([]protocol.DocumentSymbol, error)
+	Implementation(uri string, line, character int32) ([]protocol.Location, error)
+	SignatureHelp(uri string, line, character int32) (*protocol.SignatureHelp, error)
+}
+
+// type LSPConnection struct {
+// 	conn *jsonrpc2.Conn
+// }
+//
+// func (r *LSPConnection) Call(ctx LSPProcessInterface, method string, params, result interface{}) error {
+// 	return r.conn.Call(ctx, method, params, result)
+// }
+//
+// func (r *LSPConnection) Close() error {
+// 	return r.conn.Close()
+// }
+
+type LSPConnectionInterface interface {
+	Call(ctx context.Context, method string, params, result any, opts ...jsonrpc2.CallOption) error
+	Notify(ctx context.Context, method string, params any, opts ...jsonrpc2.CallOption) error
+	Close() error
+}
+
+// func (c *Conn) Call(ctx context.Context, method string, params, result interface{}, ...) error
+// func (c *Conn) Close() error
+// func (c *Conn) DisconnectNotify() <-chan struct{}
+// func (c *Conn) DispatchCall(ctx context.Context, method string, params interface{}, opts ...CallOption) (Waiter, error)
+// func (c *Conn) Notify(ctx context.Context, method string, params interface{}, opts ...CallOption) error
+// func (c *Conn) Reply(ctx context.Context, id ID, result interface{}) error
+// func (c *Conn) ReplyWithError(ctx context.Context, id ID, respErr *Error) error
+// func (c *Conn) SendResponse(ctx context.Context, resp *Response) error
+
+type LSPProcessInterface interface {
+	Deadline() (time.Time, bool)
+	Done() <-chan struct{}
+	Err() error
+	Value(key any) any
+}
+
+type ClientMetrics struct {
+	Command            string       `json:"command"`
+	Status             ClientStatus `json:"status"`
+	TotalRequests      int64        `json:"total_requests"`
+	SuccessfulRequests int64        `json:"successful_requests"`
+	FailedRequests     int64        `json:"failed_requests"`
+	LastInitialized    time.Time    `json:"last_initialized"`
+	LastErrorTime      time.Time    `json:"last_error_time"`
+	LastError          string       `json:"last_error,omitempty"`
+	IsConnected        bool         `json:"is_connected"`
+	ProcessID          int32        `json:"process_id"`
+}
+
 // LSPServerConfig represents the complete configuration for language servers
 type LSPServerConfig struct {
 	LanguageServers map[string]LanguageServerConfig `json:"language_servers"`
@@ -74,3 +161,4 @@ type LSPServerConfig struct {
 	LanguageExtensionMap map[string][]string `json:"language_extension_map"`
 	ExtensionLanguageMap map[string]string   `json:"extension_language_map"`
 }
+

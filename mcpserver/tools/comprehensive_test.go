@@ -24,7 +24,7 @@ type ComprehensiveMockBridge struct {
 	// Project analysis
 	detectProjectLanguagesFunc func(string) ([]string, error)
 	detectPrimaryProjectLanguageFunc func(string) (string, error)
-	getMultiLanguageClientsFunc func([]string) (map[string]any, error)
+	getMultiLanguageClientsFunc func([]string) (map[string]lsp.LanguageClientInterface, error)
 	
 	// Symbol operations
 	findSymbolReferencesFunc func(string, string, int32, int32, bool) ([]any, error)
@@ -95,11 +95,11 @@ func (m *ComprehensiveMockBridge) DetectPrimaryProjectLanguage(projectPath strin
 	return "go", nil
 }
 
-func (m *ComprehensiveMockBridge) GetMultiLanguageClients(languages []string) (map[string]any, error) {
+func (m *ComprehensiveMockBridge) GetMultiLanguageClients(languages []string) (map[string]lsp.LanguageClientInterface, error) {
 	if m.getMultiLanguageClientsFunc != nil {
 		return m.getMultiLanguageClientsFunc(languages)
 	}
-	result := make(map[string]any)
+	result := make(map[string]lsp.LanguageClientInterface)
 	for _, lang := range languages {
 		result[lang] = &lsp.LanguageClient{}
 	}

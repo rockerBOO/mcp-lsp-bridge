@@ -19,7 +19,7 @@ type TestMockBridge struct {
 	mockFindSymbolReferences    func(string, string, int32, int32, bool) ([]any, error)
 	mockFindSymbolDefinitions   func(string, string, int32, int32) ([]any, error)
 	mockSearchTextInWorkspace   func(string, string) ([]any, error)
-	mockGetMultiLanguageClients func([]string) (map[string]any, error)
+	mockGetMultiLanguageClients func([]string) (map[string]lsp.LanguageClientInterface, error)
 	mockGetHoverInformation     func(string, int32, int32) (any, error)
 	mockGetDiagnostics          func(string) ([]any, error)
 	mockGetWorkspaceDiagnostics func(string, string) (any, error)
@@ -60,11 +60,11 @@ func (m *TestMockBridge) GetConfig() *lsp.LSPServerConfig {
 	return &lsp.LSPServerConfig{
 		LanguageServers: map[string]lsp.LanguageServerConfig{
 			"go": {
-				Command: "gopls",
+				Command:   "gopls",
 				Filetypes: []string{".go"},
 			},
 			"python": {
-				Command: "pyright",
+				Command:   "pyright",
 				Filetypes: []string{".py"},
 			},
 		},
@@ -104,11 +104,11 @@ func (m *TestMockBridge) SearchTextInWorkspace(language, query string) ([]any, e
 	return []any{}, nil
 }
 
-func (m *TestMockBridge) GetMultiLanguageClients(languages []string) (map[string]any, error) {
+func (m *TestMockBridge) GetMultiLanguageClients(languages []string) (map[string]lsp.LanguageClientInterface, error) {
 	if m.mockGetMultiLanguageClients != nil {
 		return m.mockGetMultiLanguageClients(languages)
 	}
-	result := make(map[string]any)
+	result := make(map[string]lsp.LanguageClientInterface)
 	for _, lang := range languages {
 		if lang == "go" {
 			result[lang] = &lsp.LanguageClient{}
@@ -447,8 +447,7 @@ func TestIndividualToolRegistration(t *testing.T) {
 func BenchmarkMCPServerToolRegistration(b *testing.B) {
 	mockBridge := &TestMockBridge{}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		mcpServer := server.NewMCPServer(
 			"lsp-bridge-mcp",
 			"1.0.0",

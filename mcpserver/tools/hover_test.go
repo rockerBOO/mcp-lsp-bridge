@@ -35,8 +35,8 @@ func (m *MockBridge) FindSymbolDefinitions(language, uri string, line, character
 	return []any{}, nil
 }
 func (m *MockBridge) SearchTextInWorkspace(language, query string) ([]any, error) { return []any{}, nil }
-func (m *MockBridge) GetMultiLanguageClients(languages []string) (map[string]any, error) {
-	return map[string]any{}, nil
+func (m *MockBridge) GetMultiLanguageClients(languages []string) (map[string]lsp.LanguageClientInterface, error) {
+	return map[string]lsp.LanguageClientInterface{}, nil
 }
 func (m *MockBridge) GetHoverInformation(uri string, line, character int32) (any, error) {
 	if m.mockGetHoverInformation != nil {

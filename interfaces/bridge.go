@@ -14,7 +14,7 @@ type BridgeInterface interface {
 	FindSymbolReferences(language, uri string, line, character int32, includeDeclaration bool) ([]any, error)
 	FindSymbolDefinitions(language, uri string, line, character int32) ([]any, error)
 	SearchTextInWorkspace(language, query string) ([]any, error)
-	GetMultiLanguageClients(languages []string) (map[string]any, error)
+	GetMultiLanguageClients(languages []string) (map[string]lsp.LanguageClientInterface, error)
 	// Core information tools
 	GetHoverInformation(uri string, line, character int32) (any, error)
 	GetDiagnostics(uri string) ([]any, error)

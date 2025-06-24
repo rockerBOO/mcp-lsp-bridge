@@ -48,8 +48,8 @@ func (m *MockBridge) SearchTextInWorkspace(language, query string) ([]any, error
 	return []any{}, nil
 }
 
-func (m *MockBridge) GetMultiLanguageClients(languages []string) (map[string]any, error) {
-	result := make(map[string]any)
+func (m *MockBridge) GetMultiLanguageClients(languages []string) (map[string]lsp.LanguageClientInterface, error) {
+	result := make(map[string]lsp.LanguageClientInterface)
 	for _, lang := range languages {
 		if lang == "go" {
 			result[lang] = &lsp.LanguageClient{}

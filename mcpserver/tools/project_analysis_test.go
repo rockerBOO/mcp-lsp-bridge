@@ -2,6 +2,7 @@ package tools
 
 import (
 	"fmt"
+	"rockerboo/mcp-lsp-bridge/lsp"
 	"strings"
 	"testing"
 
@@ -122,10 +123,10 @@ func TestProjectAnalysisTool(t *testing.T) {
 					}
 					return tc.mockLanguages, nil
 				},
-				getMultiLanguageClientsFunc: func(languages []string) (map[string]any, error) {
-					clients := make(map[string]any)
+				getMultiLanguageClientsFunc: func(languages []string) (map[string]lsp.LanguageClientInterface, error) {
+					clients := make(map[string]lsp.LanguageClientInterface)
 					for _, lang := range languages {
-						clients[lang] = &MockLanguageClient{}
+						clients[lang] = &lsp.LanguageClient{}
 					}
 					return clients, nil
 				},
@@ -203,8 +204,6 @@ func TestProjectAnalysisTool(t *testing.T) {
 	}
 }
 
-// Mock language client for testing
-type MockLanguageClient struct{}
 
 func TestProjectAnalysisUtilityFunctions(t *testing.T) {
 	t.Run("parseSymbolPosition", func(t *testing.T) {

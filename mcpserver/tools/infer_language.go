@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"rockerboo/mcp-lsp-bridge/logger"
 	"rockerboo/mcp-lsp-bridge/interfaces"
+	"rockerboo/mcp-lsp-bridge/logger"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"

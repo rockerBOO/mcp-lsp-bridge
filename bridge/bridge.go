@@ -14,16 +14,29 @@ import (
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
-// NewMCPLSPBridge creates a new bridge instance with provided configuration
+// ClientFactory is an interface for creating LanguageClient instances.
+// This allows for mocking and dependency injection.
+type ClientFactory interface {
+	NewLanguageClient(command string, args ...string) (lsp.LanguageClientInterface, error)
+}
+
+// DefaultClientFactory is the default implementation of the ClientFactory interface.
+type DefaultClientFactory struct{}
+
+// NewLanguageClient creates a new LanguageClient.
+func (f *DefaultClientFactory) NewLanguageClient(command string, args ...string) (lsp.LanguageClientInterface, error) {
+	return lsp.NewLanguageClient(command, args...)
+}
+
+// NewMCPLSPBridge creates a new bridge instance with provided configuration and client factory
 func NewMCPLSPBridge(config *lsp.LSPServerConfig) *MCPLSPBridge {
 	bridge := &MCPLSPBridge{
-		clients: make(map[string]*lsp.LanguageClient),
+		clients: make(map[string]lsp.LanguageClientInterface),
 		config:  config,
 	}
 	return bridge
 }
 
-// GetClientForLanguage retrieves or creates a language server client for a specific language
 // ConnectionAttemptConfig defines retry parameters for language server connections
 type ConnectionAttemptConfig struct {
 	MaxRetries   int
@@ -40,24 +53,29 @@ func DefaultConnectionConfig() ConnectionAttemptConfig {
 	}
 }
 
-// validateAndConnectClient attempts to validate and establish a language server connection
-func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig lsp.LanguageServerConfig, config ConnectionAttemptConfig) (*lsp.LanguageClient, error) {
+// validateAndConnectClient attempts to validate and establish a language server connection using the injected factory
+func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig lsp.LanguageServerConfig, config ConnectionAttemptConfig) (lsp.LanguageClientInterface, error) {
 	// Attempt connection with retry mechanism
 	var lastErr error
 	startTime := time.Now()
 
-	for attempt := range config.MaxRetries {
+	for attempt := 0; attempt < config.MaxRetries; attempt++ {
 		// Check if total timeout exceeded
 		if time.Since(startTime) > config.TotalTimeout {
 			break
 		}
 
-		// Create language client
-		var lc *lsp.LanguageClient
+		// Create language client using the factory
+		var lc lsp.LanguageClientInterface
 		var err error
 		lc, err = lsp.NewLanguageClient(serverConfig.Command, serverConfig.Args...)
 		if err != nil {
 			lastErr = fmt.Errorf("failed to create language client on attempt %d: %w", attempt+1, err)
+			continue
+		}
+		_, err = lc.Connect()
+		if err != nil {
+			lastErr = fmt.Errorf("failed to connect to the LSP on attempt %d: %w", attempt+1, err)
 			time.Sleep(config.RetryDelay)
 			continue
 		}
@@ -76,7 +94,6 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 		process_id := int32(os.Getpid())
 
 		// Prepare initialization parameters
-		// Prepare workspace folders list, including the root directory
 		workspaceFolders := []protocol.WorkspaceFolder{
 			{
 				Uri:  protocol.URI(fmt.Sprintf("file://%s", dir)),
@@ -90,9 +107,9 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 				Name:    "MCP-LSP Bridge",
 				Version: "1.0.0",
 			},
-			RootUri:           &root_uri,
-			WorkspaceFolders:  &workspaceFolders,
-			Capabilities:      lc.ClientCapabilities(),
+			RootUri:          &root_uri,
+			WorkspaceFolders: &workspaceFolders,
+			Capabilities:     lc.ClientCapabilities(),
 		}
 
 		// Apply any initialization options from the configuration
@@ -118,14 +135,14 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 			logger.Info(fmt.Sprintf("Initialize result - Server Info: %+v", *result.ServerInfo))
 		}
 		logger.Info(fmt.Sprintf("Initialize result - Capabilities: %+v", result.Capabilities))
-		
+
 		// Enhanced logging for Workspace and WorkspaceFolders capabilities
 		if result.Capabilities.Workspace != nil {
 			logger.Info(fmt.Sprintf("Workspace Capabilities: %+v", *result.Capabilities.Workspace))
-			
+
 			// Specifically log WorkspaceFolders support
 			if result.Capabilities.Workspace.WorkspaceFolders != nil {
-				logger.Info(fmt.Sprintf("WorkspaceFolders Support: Supported = %v", 
+				logger.Info(fmt.Sprintf("WorkspaceFolders Support: Supported = %v",
 					*result.Capabilities.Workspace.WorkspaceFolders))
 			} else {
 				logger.Warn("WorkspaceFolders Capability is nil")
@@ -151,7 +168,8 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 		language, config.MaxRetries, lastErr)
 }
 
-func (b *MCPLSPBridge) GetClientForLanguage(language string) (*lsp.LanguageClient, error) {
+// GetClientForLanguage retrieves or creates a language server client for a specific language
+func (b *MCPLSPBridge) GetClientForLanguage(language string) (lsp.LanguageClientInterface, error) {
 	// Check if client already exists
 	if existingClient, exists := b.clients[language]; exists {
 		// Check if client context is still valid (not cancelled)
@@ -174,15 +192,15 @@ func (b *MCPLSPBridge) GetClientForLanguage(language string) (*lsp.LanguageClien
 	}
 
 	// Attempt to connect with default configuration
-	lc, err := b.validateAndConnectClient(language, serverConfig, DefaultConnectionConfig())
+	client, err := b.validateAndConnectClient(language, serverConfig, DefaultConnectionConfig())
 	if err != nil {
 		return nil, err
 	}
 
 	// Store the new client
-	b.clients[language] = lc
+	b.clients[language] = client
 
-	return lc, nil
+	return client, nil
 }
 
 // CloseAllClients closes all active language server clients
@@ -190,7 +208,7 @@ func (b *MCPLSPBridge) CloseAllClients() {
 	for _, client := range b.clients {
 		client.Close()
 	}
-	b.clients = make(map[string]*lsp.LanguageClient)
+	b.clients = make(map[string]lsp.LanguageClientInterface)
 }
 
 // InferLanguage infers the programming language from a file path
@@ -302,8 +320,8 @@ func (b *MCPLSPBridge) SearchTextInWorkspace(language, query string) ([]any, err
 }
 
 // GetMultiLanguageClients gets language clients for multiple languages with fallback
-func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[string]any, error) {
-	clients := make(map[string]any)
+func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[string]lsp.LanguageClientInterface, error) {
+	clients := make(map[string]lsp.LanguageClientInterface)
 	var lastErr error
 
 	for _, language := range languages {
@@ -407,7 +425,7 @@ func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character int32) (a
 
 // ensureDocumentOpen sends a textDocument/didOpen notification to the language server
 // This is often required before other document operations can be performed
-func (b *MCPLSPBridge) ensureDocumentOpen(client *lsp.LanguageClient, uri, language string) error {
+func (b *MCPLSPBridge) ensureDocumentOpen(client lsp.LanguageClientInterface, uri, language string) error {
 	// Read the file content
 	// Remove file:// prefix to get the actual file path
 	filePath := strings.TrimPrefix(uri, "file://")
@@ -419,9 +437,10 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client *lsp.LanguageClient, uri, langu
 
 	// Determine the language ID based on the language parameter
 	languageId := language
-	if language == "typescript" {
+	switch language {
+	case "typescript":
 		languageId = "typescript"
-	} else if language == "javascript" {
+	case "javascript":
 		languageId = "javascript"
 	}
 
@@ -787,19 +806,19 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(edit any) error {
 	if workspaceEdit.DocumentChanges != nil {
 		for _, docChange := range workspaceEdit.DocumentChanges {
 			logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Processing document change of type: %T", docChange.Value))
-			
+
 			// DocumentChanges is []Or4[TextDocumentEdit, CreateFile, RenameFile, DeleteFile]
 			// We only handle TextDocumentEdit for now
 			if textDocEdit, ok := docChange.Value.(protocol.TextDocumentEdit); ok {
 				logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Found TextDocumentEdit for URI: %s", textDocEdit.TextDocument.Uri))
-				
+
 				// Convert protocol.TextEdit to []any for ApplyTextEdits
 				textEdits := make([]any, len(textDocEdit.Edits))
 				for i, edit := range textDocEdit.Edits {
 					// Edits might also be a union type, extract the actual TextEdit
 					if actualEdit, ok := edit.Value.(protocol.TextEdit); ok {
 						textEdits[i] = actualEdit
-						logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Edit %d - Line %d:%d-%d:%d, NewText: '%s'", 
+						logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Edit %d - Line %d:%d-%d:%d, NewText: '%s'",
 							i+1, actualEdit.Range.Start.Line, actualEdit.Range.Start.Character,
 							actualEdit.Range.End.Line, actualEdit.Range.End.Character, actualEdit.NewText))
 					} else {
@@ -807,7 +826,7 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(edit any) error {
 						continue
 					}
 				}
-				
+
 				// Apply the edits
 				if len(textEdits) > 0 {
 					logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Applying %d text edits to %s", len(textEdits), textDocEdit.TextDocument.Uri))
@@ -831,7 +850,7 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(edit any) error {
 			for i, edit := range edits {
 				anyEdits[i] = edit
 			}
-			
+
 			err := b.ApplyTextEdits(string(uri), anyEdits)
 			if err != nil {
 				return fmt.Errorf("failed to apply edits to %s: %w", uri, err)
@@ -958,13 +977,8 @@ func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier s
 	// 3. Execute workspace diagnostic requests
 	var allReports []any
 	for language, clientInterface := range clients {
-		client, ok := clientInterface.(*lsp.LanguageClient)
-		if !ok {
-			logger.Warn(fmt.Sprintf("Invalid client type for language %s", language))
-			continue
-		}
-
-		report, err := b.executeWorkspaceDiagnosticRequest(client, workspaceUri, identifier)
+		client := clientInterface
+		report, err := b.executeWorkspaceDiagnosticRequest(client, identifier)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("Workspace diagnostics failed for %s: %v", language, err))
 			continue
@@ -976,7 +990,7 @@ func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier s
 }
 
 // executeWorkspaceDiagnosticRequest executes LSP workspace/diagnostic request
-func (b *MCPLSPBridge) executeWorkspaceDiagnosticRequest(client *lsp.LanguageClient, workspaceUri, identifier string) (protocol.WorkspaceDiagnosticReport, error) {
+func (b *MCPLSPBridge) executeWorkspaceDiagnosticRequest(client lsp.LanguageClientInterface, identifier string) (protocol.WorkspaceDiagnosticReport, error) {
 	params := protocol.WorkspaceDiagnosticParams{
 		Identifier:        identifier,
 		PreviousResultIds: []protocol.PreviousResultId{}, // Empty for first request

@@ -10,7 +10,7 @@ import (
 // MCPLSPBridge combines MCP server capabilities with multiple LSP clients
 type MCPLSPBridge struct {
 	server  *server.MCPServer
-	clients map[string]*lsp.LanguageClient
+	clients map[string]lsp.LanguageClientInterface
 	config  *lsp.LSPServerConfig
 }
 

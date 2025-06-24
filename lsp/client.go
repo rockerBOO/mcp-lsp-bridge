@@ -14,15 +14,37 @@ import (
 )
 
 // NewLanguageClient creates a new Language Server Protocol client
-func NewLanguageClient(command string, args ...string) (*LanguageClient, error) {
+func NewLanguageClient(command string, args ...string) (LanguageClientInterface, error) {
+
+	client := LanguageClient{
+		command:            command,
+		args:               args,
+		clientCapabilities: protocol.ClientCapabilities{},
+		serverCapabilities: protocol.ServerCapabilities{},
+
+		// Default configuration
+		maxConnectionAttempts: 3,
+		connectionTimeout:     10 * time.Second,
+		idleTimeout:           30 * time.Minute,
+		restartDelay:          1 * time.Second,
+
+		status: StatusConnecting,
+	}
+
+	return &client, nil
+}
+
+func (lc *LanguageClient) Connect() (LanguageClientInterface, error) {
 	// Log the LSP server connection attempt
-	logger.Info(fmt.Sprintf("Connecting to LSP server: %s %v", command, args))
+	logger.Info(fmt.Sprintf("Connecting to LSP server: %s %v", lc.command, lc.args))
+
+	var conn LSPConnectionInterface
 
 	// Create cancellable context for the entire session
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Start the external process
-	cmd := exec.CommandContext(ctx, command, args...)
+	cmd := exec.CommandContext(ctx, lc.command, lc.args...)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -54,25 +76,6 @@ func NewLanguageClient(command string, args ...string) (*LanguageClient, error) 
 		return nil, fmt.Errorf("failed to start command: %w", err)
 	}
 
-	client := &LanguageClient{
-		ctx:                ctx,
-		cancel:             cancel,
-		cmd:                cmd,
-		command:            command,
-		args:               args,
-		processID:          int32(cmd.Process.Pid),
-		clientCapabilities: protocol.ClientCapabilities{},
-		serverCapabilities: protocol.ServerCapabilities{},
-
-		// Default configuration
-		maxConnectionAttempts: 3,
-		connectionTimeout:     10 * time.Second,
-		idleTimeout:           30 * time.Minute,
-		restartDelay:          1 * time.Second,
-
-		status: StatusConnecting,
-	}
-
 	// Create a ReadWriteCloser that combines stdin and stdout for LSP
 	readWriteCloser := &stdioReadWriteCloser{
 		stdin:  stdin,
@@ -80,18 +83,20 @@ func NewLanguageClient(command string, args ...string) (*LanguageClient, error) 
 	}
 
 	// Create handler
-	handler := &ClientHandler{client: client}
+	handler := &ClientHandler{client: lc}
 
 	// Create JSON-RPC connection using VSCode Object Codec for LSP headers
 	stream := jsonrpc2.NewBufferedStream(readWriteCloser, jsonrpc2.VSCodeObjectCodec{})
-	conn := jsonrpc2.NewConn(ctx, stream, handler)
+	conn = jsonrpc2.NewConn(ctx, stream, handler)
 
-	client.conn = conn
-	client.status = StatusConnected
-	client.lastInitialized = time.Now()
+	lc.conn = conn
+	lc.status = StatusConnected
+	lc.lastInitialized = time.Now()
+	lc.ctx = ctx
+	lc.cancel = cancel
 
 	// Log successful LSP server connection
-	logger.Info(fmt.Sprintf("Successfully connected to LSP server: %s %v", command, args))
+	logger.Info(fmt.Sprintf("Successfully connected to LSP server: %s %v", lc.command, lc.args))
 
 	// Handle stderr in background
 	go func() {
@@ -102,17 +107,21 @@ func NewLanguageClient(command string, args ...string) (*LanguageClient, error) 
 				break
 			}
 			if n > 0 {
-				logger.Debug(fmt.Sprintf("[%s SERVER STDERR]: %s", command, buf[:n]))
+				logger.Debug(fmt.Sprintf("[%s SERVER STDERR]: %s", lc.command, buf[:n]))
 			}
 		}
 		stderr.Close()
 	}()
 
-	return client, nil
+	return lc, nil
 }
 
 func (ls *LanguageClient) IsConnected() bool {
 	return ls.status == StatusConnected
+}
+
+func (ls *LanguageClient) Status() ClientStatus {
+	return ls.status
 }
 
 // Close closes the language client and cleans up resources
@@ -180,7 +189,7 @@ func (lc *LanguageClient) SendRequest(method string, params any, result any, tim
 	if lc.ctx.Err() != nil || lc.conn == nil {
 		return fmt.Errorf("language server connection is closed")
 	}
-	
+
 	// Reset status to connected if we have a valid connection
 	if lc.status == StatusError && lc.ctx.Err() == nil && lc.conn != nil {
 		lc.status = StatusConnected
@@ -228,20 +237,20 @@ func (lc *LanguageClient) Context() context.Context {
 }
 
 // GetMetrics returns the current metrics for the language client
-func (lc *LanguageClient) GetMetrics() map[string]any {
+func (lc *LanguageClient) GetMetrics() ClientMetrics {
 	lc.mu.RLock()
 	defer lc.mu.RUnlock()
 
-	return map[string]any{
-		"command":             lc.command,
-		"status":              lc.status,
-		"total_requests":      atomic.LoadInt64(&lc.totalRequests),
-		"successful_requests": atomic.LoadInt64(&lc.successfulRequests),
-		"failed_requests":     atomic.LoadInt64(&lc.failedRequests),
-		"last_initialized":    lc.lastInitialized,
-		"last_error_time":     lc.lastErrorTime,
-		"last_error":          lc.lastError,
-		"is_connected":        lc.IsConnected(),
-		"process_id":          lc.processID,
+	return ClientMetrics{
+		Command:            lc.command,
+		Status:             lc.status,
+		TotalRequests:      atomic.LoadInt64(&lc.totalRequests),
+		SuccessfulRequests: atomic.LoadInt64(&lc.successfulRequests),
+		FailedRequests:     atomic.LoadInt64(&lc.failedRequests),
+		LastInitialized:    lc.lastInitialized,
+		LastErrorTime:      lc.lastErrorTime,
+		LastError:          fmt.Sprintf("%v", lc.lastError),
+		IsConnected:        lc.IsConnected(),
+		ProcessID:          lc.processID,
 	}
 }
