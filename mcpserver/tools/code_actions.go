@@ -55,7 +55,7 @@ func CodeActionTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHan
 			}
 
 			// Execute bridge method
-			actions, err := bridge.GetCodeActions(uri, int32(line), int32(character), int32(endLine), int32(endCharacter))
+			actions, err := bridge.GetCodeActions(uri, uint32(line), uint32(character), uint32(endLine), uint32(endCharacter))
 			if err != nil {
 				logger.Error("code_actions: Request failed", err)
 				return mcp.NewToolResultError("Failed to get code actions"), nil

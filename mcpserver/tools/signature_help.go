@@ -44,10 +44,10 @@ func SignatureHelpTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 			}
 
 			// Execute bridge method
-			result, err := bridge.GetSignatureHelp(uri, int32(line), int32(character))
+			result, err := bridge.GetSignatureHelp(uri, uint32(line), uint32(character))
 			if err != nil {
 				logger.Error("signature_help: Request failed", err)
-				return mcp.NewToolResultError("Failed to get signature help"), nil
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to get signature help: %+v", err)), nil
 			}
 
 			// Format and return result

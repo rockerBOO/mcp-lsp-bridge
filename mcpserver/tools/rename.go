@@ -56,7 +56,7 @@ func RenameTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandler
 			}
 
 			// Execute bridge method to get rename edits
-			result, err := bridge.RenameSymbol(uri, int32(line), int32(character), newName, false) // Always get actual edits
+			result, err := bridge.RenameSymbol(uri, uint32(line), uint32(character), newName, false) // Always get actual edits
 			if err != nil {
 				logger.Error("rename: Request failed", err)
 				return mcp.NewToolResultError("Failed to rename symbol"), nil

@@ -16,8 +16,8 @@ func TestHoverTool(t *testing.T) {
 	testCases := []struct {
 		name         string
 		uri          string
-		line         int32
-		character    int32
+		line         uint32
+		character    uint32
 		mockResponse any
 		mockError    error
 		expectError  bool

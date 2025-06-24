@@ -40,12 +40,12 @@ func (m *MockBridge) DetectPrimaryProjectLanguage(projectPath string) (string, e
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockBridge) FindSymbolReferences(language, uri string, line, character int32, includeDeclaration bool) ([]protocol.Location, error) {
+func (m *MockBridge) FindSymbolReferences(language, uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error) {
 	args := m.Called(language, uri, line, character, includeDeclaration)
 	return args.Get(0).([]protocol.Location), args.Error(1)
 }
 
-func (m *MockBridge) FindSymbolDefinitions(language, uri string, line, character int32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error) {
+func (m *MockBridge) FindSymbolDefinitions(language, uri string, line, character uint32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error) {
 	args := m.Called(language, uri, line, character)
 	return args.Get(0).([]protocol.Or2[protocol.LocationLink, protocol.Location]), args.Error(1)
 }
@@ -60,7 +60,7 @@ func (m *MockBridge) GetMultiLanguageClients(languages []string) (map[string]lsp
 	return args.Get(0).(map[string]lsp.LanguageClientInterface), args.Error(1)
 }
 
-func (m *MockBridge) GetHoverInformation(uri string, line, character int32) (*protocol.Hover, error) {
+func (m *MockBridge) GetHoverInformation(uri string, line, character uint32) (*protocol.Hover, error) {
 	args := m.Called(uri, line, character)
 	return args.Get(0).(*protocol.Hover), args.Error(1)
 }
@@ -75,17 +75,17 @@ func (m *MockBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier str
 	return args.Get(0).([]protocol.WorkspaceDiagnosticReport), args.Error(1)
 }
 
-func (m *MockBridge) GetSignatureHelp(uri string, line, character int32) (*protocol.SignatureHelp, error) {
+func (m *MockBridge) GetSignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error) {
 	args := m.Called(uri, line, character)
 	return args.Get(0).(*protocol.SignatureHelp), args.Error(1)
 }
 
-func (m *MockBridge) GetCodeActions(uri string, line, character, endLine, endCharacter int32) ([]protocol.CodeAction, error) {
+func (m *MockBridge) GetCodeActions(uri string, line, character, endLine, endCharacter uint32) ([]protocol.CodeAction, error) {
 	args := m.Called(uri, line, character, endLine, endCharacter)
 	return args.Get(0).([]protocol.CodeAction), args.Error(1)
 }
 
-func (m *MockBridge) FormatDocument(uri string, tabSize int32, insertSpaces bool) ([]protocol.TextEdit, error) {
+func (m *MockBridge) FormatDocument(uri string, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error) {
 	args := m.Called(uri, tabSize, insertSpaces)
 	return args.Get(0).([]protocol.TextEdit), args.Error(1)
 }
@@ -95,7 +95,7 @@ func (m *MockBridge) ApplyTextEdits(uri string, edits []protocol.TextEdit) error
 	return args.Error(0)
 }
 
-func (m *MockBridge) RenameSymbol(uri string, line, character int32, newName string, preview bool) (*protocol.WorkspaceEdit, error) {
+func (m *MockBridge) RenameSymbol(uri string, line, character uint32, newName string, preview bool) (*protocol.WorkspaceEdit, error) {
 	args := m.Called(uri, line, character, newName, preview)
 	return args.Get(0).(*protocol.WorkspaceEdit), args.Error(1)
 }
@@ -105,12 +105,12 @@ func (m *MockBridge) ApplyWorkspaceEdit(edit *protocol.WorkspaceEdit) error {
 	return args.Error(0)
 }
 
-func (m *MockBridge) FindImplementations(uri string, line, character int32) ([]protocol.Location, error) {
+func (m *MockBridge) FindImplementations(uri string, line, character uint32) ([]protocol.Location, error) {
 	args := m.Called(uri, line, character)
 	return args.Get(0).([]protocol.Location), args.Error(1)
 }
 
-func (m *MockBridge) PrepareCallHierarchy(uri string, line, character int32) ([]protocol.CallHierarchyItem, error) {
+func (m *MockBridge) PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error) {
 	args := m.Called(uri, line, character)
 	return args.Get(0).([]protocol.CallHierarchyItem), args.Error(1)
 }

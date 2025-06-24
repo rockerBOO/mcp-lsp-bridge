@@ -52,7 +52,7 @@ func CallHierarchyTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 			}
 
 			// First, prepare call hierarchy
-			items, err := bridge.PrepareCallHierarchy(uri, int32(line), int32(character))
+			items, err := bridge.PrepareCallHierarchy(uri, uint32(line), uint32(character))
 			if err != nil {
 				logger.Error("call_hierarchy: Prepare failed", err)
 				return mcp.NewToolResultError("Failed to prepare call hierarchy"), nil

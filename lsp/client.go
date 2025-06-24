@@ -199,6 +199,8 @@ func (lc *LanguageClient) SendRequest(method string, params any, result any, tim
 	reqCtx, cancel := context.WithTimeout(lc.ctx, timeout)
 	defer cancel()
 
+	logger.Debug(fmt.Sprintf("LSP Request: method=%s params=%+v", method, params))
+
 	err := lc.conn.Call(reqCtx, method, params, result)
 	if err != nil {
 		// Increment failed requests

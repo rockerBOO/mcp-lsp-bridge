@@ -225,7 +225,7 @@ func TestFindSymbolReferences(t *testing.T) {
 		},
 	}
 
-	mockClient.On("References", "file:///test.go", int32(10), int32(5), true).Return(expectedRefs, nil)
+	mockClient.On("References", "file:///test.go", uint32(10), uint32(5), true).Return(expectedRefs, nil)
 
 	result, err := bridge.FindSymbolReferences("go", "file:///test.go", 10, 5, true)
 
@@ -256,7 +256,7 @@ func TestFindSymbolDefinitions(t *testing.T) {
 	},
 	}
 
-	mockClient.On("Definition", "file:///test.go", int32(10), int32(5)).Return(expectedDefs, nil)
+	mockClient.On("Definition", "file:///test.go", uint32(10), uint32(5)).Return(expectedDefs, nil)
 
 	result, err := bridge.FindSymbolDefinitions("go", "file:///test.go", 10, 5)
 
@@ -276,7 +276,7 @@ func TestFindSymbolDefinitionsWithError(t *testing.T) {
 
 	bridge.clients["go"] = mockClient
 
-	mockClient.On("Definition", "file:///test.go", int32(10), int32(5)).Return([]protocol.Or2[protocol.LocationLink, protocol.Location]{}, errors.New("definition failed"))
+	mockClient.On("Definition", "file:///test.go", uint32(10), uint32(5)).Return([]protocol.Or2[protocol.LocationLink, protocol.Location]{}, errors.New("definition failed"))
 
 	result, err := bridge.FindSymbolDefinitions("go", "file:///test.go", 10, 5)
 
@@ -387,7 +387,7 @@ func TestGetSignatureHelp(t *testing.T) {
 	}
 
 	mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
-	mockClient.On("SignatureHelp", testURI, int32(2), int32(10)).Return(expectedSigHelp, nil)
+	mockClient.On("SignatureHelp", testURI, uint32(2), uint32(10)).Return(expectedSigHelp, nil)
 
 	result, err := bridge.GetSignatureHelp(testFile, 2, 10)
 
@@ -554,7 +554,7 @@ func TestFindImplementations(t *testing.T) {
 	}
 
 	mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
-	mockClient.On("Implementation", testURI, int32(2), int32(7)).Return(expectedImpls, nil)
+	mockClient.On("Implementation", testURI, uint32(2), uint32(7)).Return(expectedImpls, nil)
 
 	result, err := bridge.FindImplementations(testFile, 2, 7)
 

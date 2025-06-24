@@ -43,7 +43,7 @@ func ImplementationTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Too
 			}
 
 			// Execute bridge method
-			implementations, err := bridge.FindImplementations(uri, int32(line), int32(character))
+			implementations, err := bridge.FindImplementations(uri, uint32(line), uint32(character))
 			if err != nil {
 				logger.Error("implementation: Request failed", err)
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to find implementations: %v", err)), nil

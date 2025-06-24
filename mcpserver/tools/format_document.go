@@ -2,9 +2,10 @@ package tools
 
 import (
 	"context"
+	"fmt"
 
-	"rockerboo/mcp-lsp-bridge/logger"
 	"rockerboo/mcp-lsp-bridge/interfaces"
+	"rockerboo/mcp-lsp-bridge/logger"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -39,10 +40,10 @@ func RegisterFormatDocumentTool(mcpServer ToolServer, bridge interfaces.BridgeIn
 		insertSpaces := true
 
 		// Execute bridge method to get formatting edits
-		edits, err := bridge.FormatDocument(uri, int32(tabSize), insertSpaces)
+		edits, err := bridge.FormatDocument(uri, uint32(tabSize), insertSpaces)
 		if err != nil {
 			logger.Error("format_document: Request failed", err)
-			return mcp.NewToolResultError("Failed to format document"), nil
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to format document: %+v", err)), nil
 		}
 
 		if applyChanges && len(edits) > 0 {
@@ -50,9 +51,9 @@ func RegisterFormatDocumentTool(mcpServer ToolServer, bridge interfaces.BridgeIn
 			err := bridge.ApplyTextEdits(uri, edits)
 			if err != nil {
 				logger.Error("format_document: Failed to apply edits", err)
-				return mcp.NewToolResultError("Failed to apply formatting changes"), nil
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to apply formatting changes: %+v", err)), nil
 			}
-			
+
 			// Return success message with applied changes
 			content := formatTextEdits(edits)
 			content += "\n✅ FORMATTING APPLIED ✅\nAll formatting changes have been applied to the file."

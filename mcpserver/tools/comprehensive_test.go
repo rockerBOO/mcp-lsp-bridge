@@ -113,7 +113,7 @@ func TestHoverToolHandler(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
 			// Set up mock expectation
-			bridge.On("GetHoverInformation", "file:///test.go", int32(10), int32(5)).Return(tc.mockResponse, tc.mockError)
+			bridge.On("GetHoverInformation", "file:///test.go", uint32(10), uint32(5)).Return(tc.mockResponse, tc.mockError)
 
 			// Test the actual hover functionality
 			result, err := bridge.GetHoverInformation("file:///test.go", 10, 5)
@@ -180,13 +180,13 @@ func TestDiagnosticsToolHandler(t *testing.T) {
 
 func TestLSPDisconnectToolHandler(t *testing.T) {
 	bridge := &mocks.MockBridge{}
-	
+
 	// Set up mock expectation - CloseAllClients should be called once and return nothing
 	bridge.On("CloseAllClients").Return().Once()
-	
+
 	// Test disconnect functionality
 	bridge.CloseAllClients()
-	
+
 	// Verify that the mock expectations were met
 	bridge.AssertExpectations(t)
 }

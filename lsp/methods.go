@@ -3,6 +3,7 @@ package lsp
 import (
 	"encoding/json"
 	"fmt"
+	"rockerboo/mcp-lsp-bridge/logger"
 	"time"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
@@ -97,7 +98,7 @@ func (lc *LanguageClient) WorkspaceSymbols(query string) ([]protocol.WorkspaceSy
 
 // Definition requests definition locations for a symbol at a given position
 // Returns LocationLink[] or converts Location[] to LocationLink[]
-func (lc *LanguageClient) Definition(uri string, line, character int32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error) {
+func (lc *LanguageClient) Definition(uri string, line, character uint32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error) {
 	// Use raw JSON response to handle both Location[] and LocationLink[] formats
 	var rawResult json.RawMessage
 	err := lc.SendRequest("textDocument/definition", protocol.DefinitionParams{
@@ -105,8 +106,8 @@ func (lc *LanguageClient) Definition(uri string, line, character int32) ([]proto
 			Uri: protocol.DocumentUri(uri),
 		},
 		Position: protocol.Position{
-			Line:      uint32(line),
-			Character: uint32(character),
+			Line:      line,
+			Character: character,
 		},
 	}, &rawResult, 5*time.Second)
 	if err != nil {
@@ -124,15 +125,15 @@ func (lc *LanguageClient) Definition(uri string, line, character int32) ([]proto
 }
 
 // References finds all references to a symbol at a given position
-func (lc *LanguageClient) References(uri string, line, character int32, includeDeclaration bool) ([]protocol.Location, error) {
+func (lc *LanguageClient) References(uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error) {
 	var result []protocol.Location
 	err := lc.SendRequest("textDocument/references", protocol.ReferenceParams{
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
 		},
 		Position: protocol.Position{
-			Line:      uint32(line),
-			Character: uint32(character),
+			Line:      line,
+			Character: character,
 		},
 		Context: protocol.ReferenceContext{
 			IncludeDeclaration: includeDeclaration,
@@ -145,15 +146,15 @@ func (lc *LanguageClient) References(uri string, line, character int32, includeD
 }
 
 // Hover provides hover information at a given position
-func (lc *LanguageClient) Hover(uri string, line, character int32) (*protocol.Hover, error) {
+func (lc *LanguageClient) Hover(uri string, line, character uint32) (*protocol.Hover, error) {
 	var result protocol.Hover
 	err := lc.SendRequest("textDocument/hover", protocol.HoverParams{
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
 		},
 		Position: protocol.Position{
-			Line:      uint32(line),
-			Character: uint32(character),
+			Line:      line,
+			Character: character,
 		},
 	}, &result, 5*time.Second)
 	if err != nil {
@@ -204,15 +205,15 @@ func (lc *LanguageClient) DocumentSymbols(uri string) ([]protocol.DocumentSymbol
 }
 
 // Implementation finds implementations of a symbol at a given position
-func (lc *LanguageClient) Implementation(uri string, line, character int32) ([]protocol.Location, error) {
+func (lc *LanguageClient) Implementation(uri string, line, character uint32) ([]protocol.Location, error) {
 	var result []protocol.Location
 	err := lc.SendRequest("textDocument/implementation", protocol.ImplementationParams{
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
 		},
 		Position: protocol.Position{
-			Line:      uint32(line),
-			Character: uint32(character),
+			Line:      line,
+			Character: character,
 		},
 	}, &result, 5*time.Second)
 	if err != nil {
@@ -222,17 +223,31 @@ func (lc *LanguageClient) Implementation(uri string, line, character int32) ([]p
 }
 
 // SignatureHelp provides signature help at a given position
-func (lc *LanguageClient) SignatureHelp(uri string, line, character int32) (*protocol.SignatureHelp, error) {
-	var result protocol.SignatureHelp
-	err := lc.SendRequest("textDocument/signatureHelp", protocol.SignatureHelpParams{
+func (lc *LanguageClient) SignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error) {
+	params := protocol.SignatureHelpParams{
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
 		},
 		Position: protocol.Position{
-			Line:      uint32(line),
-			Character: uint32(character),
+			Line:      line,
+			Character: character,
 		},
-	}, &result, 5*time.Second)
+	}
+	
+	var rawResponse json.RawMessage
+	err := lc.SendRequest("textDocument/signatureHelp", params, &rawResponse, 5*time.Second)
+	logger.Info(fmt.Sprintf("Raw response: %+v", rawResponse))
+	if err != nil {
+		return nil, err
+	}
+	
+	// Handle null response - server has no signature help available
+	if len(rawResponse) == 4 && string(rawResponse) == "null" {
+		return nil, nil
+	}
+	
+	var result protocol.SignatureHelp
+	err = json.Unmarshal(rawResponse, &result)
 	if err != nil {
 		return nil, err
 	}

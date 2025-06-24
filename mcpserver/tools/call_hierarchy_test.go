@@ -17,8 +17,8 @@ func TestCallHierarchyTool(t *testing.T) {
 	testCases := []struct {
 		name            string
 		uri             string
-		line            int32
-		character       int32
+		line            uint32
+		character       uint32
 		direction       string
 		mockItems       []protocol.CallHierarchyItem
 		mockIncoming    []protocol.CallHierarchyIncomingCall
@@ -362,7 +362,7 @@ func TestCallHierarchySymbolTypes(t *testing.T) {
 			}
 
 			// Setup mock expectations
-			bridge.On("PrepareCallHierarchy", "file:///test.go", int32(10), int32(5)).
+			bridge.On("PrepareCallHierarchy", "file:///test.go", uint32(10), uint32(5)).
 				Return([]protocol.CallHierarchyItem{mockItem}, nil)
 			bridge.On("GetIncomingCalls", mock.AnythingOfType("protocol.CallHierarchyItem")).
 				Return([]protocol.CallHierarchyIncomingCall{mockIncomingCall}, nil)
@@ -412,7 +412,7 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 		
 		// Mock the PrepareCallHierarchy call
 		expectedItems := []protocol.CallHierarchyItem{{/* your expected item structure */}}
-		bridge.On("PrepareCallHierarchy", "file:///recursive.go", int32(10), int32(5)).Return(expectedItems, nil)
+		bridge.On("PrepareCallHierarchy", "file:///recursive.go", uint32(10), uint32(5)).Return(expectedItems, nil)
 		
 		items, err := bridge.PrepareCallHierarchy("file:///recursive.go", 10, 5)
 		if err != nil {
@@ -430,7 +430,7 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 		
 		// Mock the PrepareCallHierarchy call
 		expectedItems := []protocol.CallHierarchyItem{{/* your expected item structure */}}
-		bridge.On("PrepareCallHierarchy", "file:///deep.go", int32(25), int32(10)).Return(expectedItems, nil)
+		bridge.On("PrepareCallHierarchy", "file:///deep.go", uint32(25), uint32(10)).Return(expectedItems, nil)
 		
 		// Mock incoming calls
 		expectedIncoming := []protocol.CallHierarchyIncomingCall{{}, {}, {}} // 3 items

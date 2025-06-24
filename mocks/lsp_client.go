@@ -118,17 +118,17 @@ func (m *MockLanguageClient) WorkspaceSymbols(query string) ([]protocol.Workspac
 	return args.Get(0).([]protocol.WorkspaceSymbol), args.Error(1)
 }
 
-func (m *MockLanguageClient) Definition(uri string, line, character int32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error) {
+func (m *MockLanguageClient) Definition(uri string, line, character uint32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error) {
 	args := m.Called(uri, line, character)
 	return args.Get(0).([]protocol.Or2[protocol.LocationLink, protocol.Location]), args.Error(1)
 }
 
-func (m *MockLanguageClient) References(uri string, line, character int32, includeDeclaration bool) ([]protocol.Location, error) {
+func (m *MockLanguageClient) References(uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error) {
 	args := m.Called(uri, line, character, includeDeclaration)
 	return args.Get(0).([]protocol.Location), args.Error(1)
 }
 
-func (m *MockLanguageClient) Hover(uri string, line, character int32) (*protocol.Hover, error) {
+func (m *MockLanguageClient) Hover(uri string, line, character uint32) (*protocol.Hover, error) {
 	args := m.Called(uri, line, character)
 	return args.Get(0).(*protocol.Hover), args.Error(1)
 }
@@ -138,12 +138,12 @@ func (m *MockLanguageClient) DocumentSymbols(uri string) ([]protocol.DocumentSym
 	return args.Get(0).([]protocol.DocumentSymbol), args.Error(1)
 }
 
-func (m *MockLanguageClient) Implementation(uri string, line, character int32) ([]protocol.Location, error) {
+func (m *MockLanguageClient) Implementation(uri string, line, character uint32) ([]protocol.Location, error) {
 	args := m.Called(uri, line, character)
 	return args.Get(0).([]protocol.Location), args.Error(1)
 }
 
-func (m *MockLanguageClient) SignatureHelp(uri string, line, character int32) (*protocol.SignatureHelp, error) {
+func (m *MockLanguageClient) SignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error) {
 	args := m.Called(uri, line, character)
 	return args.Get(0).(*protocol.SignatureHelp), args.Error(1)
 }

@@ -15,24 +15,24 @@ type BridgeInterface interface {
 	DetectProjectLanguages(projectPath string) ([]string, error)
 	DetectPrimaryProjectLanguage(projectPath string) (string, error)
 	// Enhanced project analysis methods
-	FindSymbolReferences(language, uri string, line, character int32, includeDeclaration bool) ([]protocol.Location, error)
-	FindSymbolDefinitions(language, uri string, line, character int32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error)
+	FindSymbolReferences(language, uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error)
+	FindSymbolDefinitions(language, uri string, line, character uint32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error)
 	SearchTextInWorkspace(language, query string) ([]protocol.WorkspaceSymbol, error)
 	GetMultiLanguageClients(languages []string) (map[string]lsp.LanguageClientInterface, error)
 	// Core information tools
-	GetHoverInformation(uri string, line, character int32) (*protocol.Hover, error)
+	GetHoverInformation(uri string, line, character uint32) (*protocol.Hover, error)
 	GetDiagnostics(uri string) ([]any, error)
 	GetWorkspaceDiagnostics(workspaceUri string, identifier string) ([]protocol.WorkspaceDiagnosticReport, error)
-	GetSignatureHelp(uri string, line, character int32) (*protocol.SignatureHelp, error)
+	GetSignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error)
 	// Code actions and formatting tools
-	GetCodeActions(uri string, line, character, endLine, endCharacter int32) ([]protocol.CodeAction, error)
-	FormatDocument(uri string, tabSize int32, insertSpaces bool) ([]protocol.TextEdit, error)
+	GetCodeActions(uri string, line, character, endLine, endCharacter uint32) ([]protocol.CodeAction, error)
+	FormatDocument(uri string, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error)
 	ApplyTextEdits(uri string, edits []protocol.TextEdit) error
 	// Advanced navigation tools
-	RenameSymbol(uri string, line, character int32, newName string, preview bool) (*protocol.WorkspaceEdit, error)
+	RenameSymbol(uri string, line, character uint32, newName string, preview bool) (*protocol.WorkspaceEdit, error)
 	ApplyWorkspaceEdit(edit *protocol.WorkspaceEdit) error
-	FindImplementations(uri string, line, character int32) ([]protocol.Location, error)
-	PrepareCallHierarchy(uri string, line, character int32) ([]protocol.CallHierarchyItem, error)
+	FindImplementations(uri string, line, character uint32) ([]protocol.Location, error)
+	PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error)
 	GetIncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error)
 	GetOutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error)
 

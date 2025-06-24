@@ -52,7 +52,7 @@ func HoverTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerF
 			}
 
 			// Execute bridge method with detailed error logging
-			result, err := bridge.GetHoverInformation(uri, int32(line), int32(character))
+			result, err := bridge.GetHoverInformation(uri, uint32(line), uint32(character))
 			if err != nil {
 				logger.Error("hover: Request failed", fmt.Sprintf("URI: %s, Line: %d, Character: %d, Error: %v", uri, line, character, err))
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to get hover information: %v", err)), nil

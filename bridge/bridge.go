@@ -95,7 +95,11 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 			},
 			RootUri:          &root_uri,
 			WorkspaceFolders: &workspaceFolders,
-			Capabilities:     lc.ClientCapabilities(),
+			Capabilities: protocol.ClientCapabilities{
+				TextDocument: &protocol.TextDocumentClientCapabilities{
+					SignatureHelp: &protocol.SignatureHelpClientCapabilities{},
+				},
+			},
 		}
 
 		// Apply any initialization options from the configuration
@@ -244,7 +248,7 @@ func (b *MCPLSPBridge) DetectPrimaryProjectLanguage(projectPath string) (string,
 }
 
 // FindSymbolReferences finds all references to a symbol at a given position
-func (b *MCPLSPBridge) FindSymbolReferences(language, uri string, line, character int32, includeDeclaration bool) ([]protocol.Location, error) {
+func (b *MCPLSPBridge) FindSymbolReferences(language, uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error) {
 	client, err := b.GetClientForLanguage(language)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
@@ -259,7 +263,7 @@ func (b *MCPLSPBridge) FindSymbolReferences(language, uri string, line, characte
 }
 
 // FindSymbolDefinitions finds all definitions for a symbol at a given position
-func (b *MCPLSPBridge) FindSymbolDefinitions(language, uri string, line, character int32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error) {
+func (b *MCPLSPBridge) FindSymbolDefinitions(language, uri string, line, character uint32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error) {
 	client, err := b.GetClientForLanguage(language)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
@@ -339,7 +343,7 @@ func normalizeURI(uri string) string {
 }
 
 // GetHoverInformation gets hover information for a symbol at a specific position
-func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character int32) (*protocol.Hover, error) {
+func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character uint32) (*protocol.Hover, error) {
 	// Extensive debug logging
 	logger.Info(fmt.Sprintf("GetHoverInformation: Starting hover request for URI: %s, Line: %d, Character: %d", uri, line, character))
 
@@ -373,8 +377,8 @@ func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character int32) (*
 	hoverParams := protocol.HoverParams{
 		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(normalizedURI)},
 		Position: protocol.Position{
-			Line:      uint32(line),
-			Character: uint32(character),
+			Line:      line,
+			Character: character,
 		},
 	}
 
@@ -473,7 +477,6 @@ func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol
 		return nil, fmt.Errorf("document symbols request failed: %w", err)
 	}
 
-
 	logger.Info(fmt.Sprintf("GetDocumentSymbols: Found %d symbols", len(symbols)))
 	return symbols, nil
 }
@@ -487,7 +490,7 @@ func (b *MCPLSPBridge) GetDiagnostics(uri string) ([]any, error) {
 }
 
 // GetSignatureHelp gets signature help for a function at a specific position
-func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character int32) (*protocol.SignatureHelp, error) {
+func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error) {
 	// Normalize URI
 	normalizedURI := normalizeURI(uri)
 
@@ -513,10 +516,18 @@ func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character int32) (*pro
 	}
 
 	// Execute signature help request using the LSP client method
-	signatureHelp, err := client.SignatureHelp(normalizedURI, line, character)
+	var signatureHelp *protocol.SignatureHelp
+	signatureHelp, err = client.SignatureHelp(normalizedURI, line, character)
 	if err != nil {
 		logger.Error("GetSignatureHelp: Request failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
 		return nil, fmt.Errorf("signature help request failed: %w", err)
+	}
+
+	// Check if the signatureHelp response is valid and contains signatures
+	if signatureHelp == nil || len(signatureHelp.Signatures) == 0 {
+		logger.Warn(fmt.Sprintf("GetSignatureHelp: No signatures found for position %d:%d in %s. Response was: %+v", line, character, normalizedURI, signatureHelp))
+		// Return an empty result or a specific error indicating no signatures were found
+		return nil, nil // Return empty, or you could return a specific error
 	}
 
 	logger.Info(fmt.Sprintf("GetSignatureHelp: Found signature help for position %d:%d", line, character))
@@ -524,7 +535,7 @@ func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character int32) (*pro
 }
 
 // GetCodeActions gets code actions for a specific range
-func (b *MCPLSPBridge) GetCodeActions(uri string, line, character, endLine, endCharacter int32) ([]protocol.CodeAction, error) {
+func (b *MCPLSPBridge) GetCodeActions(uri string, line, character, endLine, endCharacter uint32) ([]protocol.CodeAction, error) {
 	// Infer language from URI
 	language, err := b.InferLanguage(uri)
 	if err != nil {
@@ -541,8 +552,8 @@ func (b *MCPLSPBridge) GetCodeActions(uri string, line, character, endLine, endC
 	params := protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
 		Range: protocol.Range{
-			Start: protocol.Position{Line: uint32(line), Character: uint32(character)},
-			End:   protocol.Position{Line: uint32(endLine), Character: uint32(endCharacter)},
+			Start: protocol.Position{Line: line, Character: character},
+			End:   protocol.Position{Line: endLine, Character: endCharacter},
 		},
 		Context: protocol.CodeActionContext{
 			// Context can be empty for general code actions
@@ -559,7 +570,7 @@ func (b *MCPLSPBridge) GetCodeActions(uri string, line, character, endLine, endC
 }
 
 // FormatDocument formats a document
-func (b *MCPLSPBridge) FormatDocument(uri string, tabSize int32, insertSpaces bool) ([]protocol.TextEdit, error) {
+func (b *MCPLSPBridge) FormatDocument(uri string, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error) {
 	// Infer language from URI
 	language, err := b.InferLanguage(uri)
 	if err != nil {
@@ -576,7 +587,7 @@ func (b *MCPLSPBridge) FormatDocument(uri string, tabSize int32, insertSpaces bo
 	params := protocol.DocumentFormattingParams{
 		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
 		Options: protocol.FormattingOptions{
-			TabSize:      uint32(tabSize),
+			TabSize:      tabSize,
 			InsertSpaces: insertSpaces,
 		},
 	}
@@ -622,7 +633,7 @@ func applyTextEditsToContent(content string, edits []protocol.TextEdit) (string,
 		return content, nil
 	}
 
-	// Split content into lines for easier manipulation
+	// Split content into lines for easier manipulation. Use "\n" directly in the string
 	lines := strings.Split(content, "\n")
 
 	// Sort edits by position (reverse order to apply from end to beginning)
@@ -683,11 +694,12 @@ func applyTextEditsToContent(content string, edits []protocol.TextEdit) (string,
 		}
 	}
 
+	// Use "\n" directly in the string
 	return strings.Join(lines, "\n"), nil
 }
 
 // RenameSymbol renames a symbol with optional preview
-func (b *MCPLSPBridge) RenameSymbol(uri string, line, character int32, newName string, preview bool) (*protocol.WorkspaceEdit, error) {
+func (b *MCPLSPBridge) RenameSymbol(uri string, line, character uint32, newName string, preview bool) (*protocol.WorkspaceEdit, error) {
 	// Normalize URI to ensure proper file:// scheme
 	normalizedURI := normalizeURI(uri)
 	logger.Info(fmt.Sprintf("RenameSymbol: Starting rename request for URI: %s -> %s, Line: %d, Character: %d, NewName: %s", uri, normalizedURI, line, character, newName))
@@ -718,8 +730,8 @@ func (b *MCPLSPBridge) RenameSymbol(uri string, line, character int32, newName s
 	params := protocol.RenameParams{
 		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(normalizedURI)},
 		Position: protocol.Position{
-			Line:      uint32(line),
-			Character: uint32(character),
+			Line:      line,
+			Character: character,
 		},
 		NewName: newName,
 	}
@@ -798,7 +810,7 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit)
 }
 
 // FindImplementations finds implementations of a symbol
-func (b *MCPLSPBridge) FindImplementations(uri string, line, character int32) ([]protocol.Location, error) {
+func (b *MCPLSPBridge) FindImplementations(uri string, line, character uint32) ([]protocol.Location, error) {
 	// Normalize URI
 	normalizedURI := normalizeURI(uri)
 
@@ -835,7 +847,7 @@ func (b *MCPLSPBridge) FindImplementations(uri string, line, character int32) ([
 }
 
 // PrepareCallHierarchy prepares call hierarchy items
-func (b *MCPLSPBridge) PrepareCallHierarchy(uri string, line, character int32) ([]protocol.CallHierarchyItem, error) {
+func (b *MCPLSPBridge) PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error) {
 	// Infer language from URI
 	language, err := b.InferLanguage(uri)
 	if err != nil {
@@ -852,8 +864,8 @@ func (b *MCPLSPBridge) PrepareCallHierarchy(uri string, line, character int32) (
 	params := protocol.CallHierarchyPrepareParams{
 		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
 		Position: protocol.Position{
-			Line:      uint32(line),
-			Character: uint32(character),
+			Line:      line,
+			Character: character,
 		},
 	}
 

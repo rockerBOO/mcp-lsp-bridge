@@ -34,7 +34,7 @@ func (h *ClientHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *js
 		// Handle log message
 		var params any
 		if err := json.Unmarshal(*req.Params, &params); err == nil {
-			logger.Debug(fmt.Sprintf("Server log: %+v\n", params))
+			logger.Info(fmt.Sprintf("Server log: %+v\n", params))
 		}
 
 	case "client/registerCapability":

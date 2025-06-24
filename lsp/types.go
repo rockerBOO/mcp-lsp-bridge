@@ -93,12 +93,12 @@ type LanguageClientInterface interface {
 
 	// Language features
 	WorkspaceSymbols(query string) ([]protocol.WorkspaceSymbol, error)
-	Definition(uri string, line, character int32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error)
-	References(uri string, line, character int32, includeDeclaration bool) ([]protocol.Location, error)
-	Hover(uri string, line, character int32) (*protocol.Hover, error)
+	Definition(uri string, line, character uint32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error)
+	References(uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error)
+	Hover(uri string, line, character uint32) (*protocol.Hover, error)
 	DocumentSymbols(uri string) ([]protocol.DocumentSymbol, error)
-	Implementation(uri string, line, character int32) ([]protocol.Location, error)
-	SignatureHelp(uri string, line, character int32) (*protocol.SignatureHelp, error)
+	Implementation(uri string, line, character uint32) ([]protocol.Location, error)
+	SignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error)
 }
 
 type LSPConnectionInterface interface {
