@@ -8,7 +8,7 @@ import (
 
 // createTestConfig creates a minimal test configuration
 func createTestConfig() *lsp.LSPServerConfig {
-	config, err := lsp.LoadLSPConfig("lsp_config.json")
+	config, err := lsp.LoadLSPConfig("lsp_config.example.json")
 	if err != nil {
 		// Fallback to a minimal config if file doesn't exist
 		return &lsp.LSPServerConfig{
