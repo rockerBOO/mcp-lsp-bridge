@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/user"
 	"path/filepath"
 
 	"rockerboo/mcp-lsp-bridge/bridge"
@@ -26,9 +25,9 @@ func tryLoadConfig(primaryPath, configDir string) (*lsp.LSPServerConfig, error) 
 
 	// If primary path fails and it's not the same as the fallback, try fallback locations
 	fallbackPaths := []string{
-		"lsp_config.json",                                    // Current directory
-		filepath.Join(configDir, "config.json"),             // Alternative name in config dir
-		"example.lsp_config.json",                           // Example config in current dir
+		"lsp_config.json",                       // Current directory
+		filepath.Join(configDir, "config.json"), // Alternative name in config dir
+		"example.lsp_config.json",               // Example config in current dir
 	}
 
 	for _, fallbackPath := range fallbackPaths {
@@ -44,14 +43,8 @@ func tryLoadConfig(primaryPath, configDir string) (*lsp.LSPServerConfig, error) 
 }
 
 func main() {
-	// Get current user for directory resolution
-	currentUser, err := user.Current()
-	if err != nil {
-		log.Fatalf("Failed to get current user: %v", err)
-	}
-
 	// Initialize directory resolver
-	dirResolver := directories.NewDirectoryResolver("mcp-lsp-bridge", currentUser, true)
+	dirResolver := directories.NewDirectoryResolver("mcp-lsp-bridge", directories.DefaultUserProvider{}, directories.DefaultEnvProvider{}, true)
 
 	// Get default directories
 	configDir, err := dirResolver.GetConfigDirectory()
@@ -89,7 +82,7 @@ func main() {
 		fullErrMsg := fmt.Sprintf("CRITICAL: Failed to load LSP config from '%s': %v", confPath, err)
 		fmt.Fprintln(os.Stderr, fullErrMsg)
 		log.Println(fullErrMsg)
-		
+
 		// Set default config when config load fails
 		logConfig = logger.LoggerConfig{
 			LogPath:     defaultLogPath,
