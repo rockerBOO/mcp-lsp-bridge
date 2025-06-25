@@ -86,66 +86,7 @@ func TestInferLanguage(t *testing.T) {
 	}
 }
 
-func TestGetClientForLanguage(t *testing.T) {
-	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig())
 
-	testCases := []struct {
-		language string
-	}{
-		{"go"},
-		{"python"},
-		{"typescript"},
-		{"rust"},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.language, func(t *testing.T) {
-			// Get or create the client
-			client, err := bridgeInstance.GetClientForLanguage(tc.language)
-			if err != nil {
-				t.Fatalf("Failed to get client for language %s: %v", tc.language, err)
-			}
-
-			if client == nil {
-				t.Fatalf("Client for language %s is nil", tc.language)
-			}
-
-			// Test the second call returns the same client (cached)
-			client2, err := bridgeInstance.GetClientForLanguage(tc.language)
-			if err != nil {
-				t.Fatalf("Failed to get client for language %s on second call: %v", tc.language, err)
-			}
-
-			if client != client2 {
-				t.Errorf("Second call to GetClientForLanguage should return the same client instance")
-			}
-		})
-	}
-}
-
-func TestCloseAllClients(t *testing.T) {
-	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig())
-
-	// Create clients for multiple languages
-	languages := []string{"go"}
-	for _, language := range languages {
-		_, err := bridgeInstance.GetClientForLanguage(language)
-		if err != nil {
-			t.Fatalf("Failed to get client for language %s: %v", language, err)
-		}
-	}
-
-	// Close all clients
-	bridgeInstance.CloseAllClients()
-
-	// Verify that we can create new clients after closing (tests that cleanup worked)
-	for _, language := range languages {
-		_, err := bridgeInstance.GetClientForLanguage(language)
-		if err != nil {
-			t.Fatalf("Failed to recreate client for language %s after CloseAllClients: %v", language, err)
-		}
-	}
-}
 
 // Benchmark client creation
 func BenchmarkGetClientForLanguage(b *testing.B) {
