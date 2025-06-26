@@ -140,13 +140,41 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 
 		// Set server capabilities
 		lc.SetServerCapabilities(result.Capabilities)
-		err = lc.SetupSemanticTokens()
-		if err != nil {
-			lastErr = fmt.Errorf("failed to setup semantic tokens on attempt %d: %w", attempt+1, err)
-			logger.Error(lastErr)
-			lc.Close()
-			time.Sleep(config.RetryDelay)
-			continue
+
+		semanticTokensProvider := lc.ServerCapabilities().SemanticTokensProvider
+
+		var supportsSemanticTokens bool
+
+		if semanticTokensProvider == nil {
+			logger.Warn("No semantic tokens provider found")
+			supportsSemanticTokens = false
+		} else {
+
+			switch semanticTokensProvider.Value.(type) {
+			case bool:
+				logger.Warn("Semantic tokens not supported")
+				supportsSemanticTokens = false
+			case protocol.SemanticTokensOptions:
+				logger.Info("Semantic tokens supported")
+				supportsSemanticTokens = true
+			case protocol.SemanticTokensRegistrationOptions:
+				logger.Info("Semantic tokens supported")
+				supportsSemanticTokens = true
+			default:
+				logger.Warn("Unknown semantic tokens provider")
+				supportsSemanticTokens = false
+			}
+
+			if supportsSemanticTokens {
+				err = lc.SetupSemanticTokens()
+				if err != nil {
+					lastErr = fmt.Errorf("failed to setup semantic tokens on attempt %d: %w", attempt+1, err)
+					logger.Error(lastErr)
+					lc.Close()
+					time.Sleep(config.RetryDelay)
+					continue
+				}
+			}
 		}
 
 		// Log server info and capabilities

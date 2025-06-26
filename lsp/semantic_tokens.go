@@ -3,6 +3,8 @@ package lsp
 import (
 	"fmt"
 
+	"rockerboo/mcp-lsp-bridge/logger"
+
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
@@ -143,8 +145,10 @@ func GetTokenTypeFromServerCapabilities(capabilities *protocol.ServerCapabilitie
 
 	// Handle different ways the server might provide semantic token info
 	switch provider := capabilities.SemanticTokensProvider.Value.(type) {
-	case *protocol.SemanticTokensOptions:
-	case *protocol.SemanticTokensRegistrationOptions:
+	case protocol.SemanticTokensOptions:
+		tokenTypes = provider.Legend.TokenTypes
+		tokenModifiers = provider.Legend.TokenModifiers
+	case protocol.SemanticTokensRegistrationOptions:
 		tokenTypes = provider.Legend.TokenTypes
 		tokenModifiers = provider.Legend.TokenModifiers
 	default:
