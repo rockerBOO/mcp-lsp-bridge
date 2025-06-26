@@ -3,8 +3,6 @@ package lsp
 import (
 	"fmt"
 
-	"rockerboo/mcp-lsp-bridge/logger"
-
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
