@@ -1202,5 +1202,9 @@ func (b *MCPLSPBridge) executeWorkspaceDiagnosticRequest(client lsp.LanguageClie
 
 func isWithinAllowedDirectory(path, baseDir string) bool {
 	absBase, _ := filepath.Abs(baseDir)
+	absPath, _ := filepath.Abs(path)
+	if absPath == absBase {
+		return true
+	}
 	return strings.HasPrefix(path, absBase+string(filepath.Separator))
 }
