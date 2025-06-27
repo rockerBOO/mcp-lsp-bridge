@@ -11,7 +11,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcptest"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/myleshyson/lsprotocol-go/protocol"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
@@ -419,7 +419,7 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 				Tool:    tool,
 				Handler: handler,
 			})
-			assert.NoError(t, err, "Could not start server")
+			require.NoError(t, err, "Could not start server")
 			defer mcpServer.Close()
 
 			// Variable to hold the actual error encountered during the operations

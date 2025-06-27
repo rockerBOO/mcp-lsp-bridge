@@ -30,7 +30,7 @@ type TestResult struct {
 	Success  bool
 	Error    string
 	Duration time.Duration
-	Response interface{}
+	Response any
 }
 
 // NewMCPTestClient creates a new external MCP test client
@@ -75,7 +75,10 @@ func NewMCPTestClient() (*MCPTestClient, error) {
 
 	// Initialize the client
 	if err := client.initialize(); err != nil {
-		client.Close()
+		closeErr := client.Close()
+		if closeErr != nil {
+			log.Printf("failed to close client: %v", closeErr)
+		}
 		return nil, fmt.Errorf("failed to initialize client: %v", err)
 	}
 
@@ -85,13 +88,22 @@ func NewMCPTestClient() (*MCPTestClient, error) {
 // Close closes the MCP client and terminates the server process
 func (c *MCPTestClient) Close() error {
 	if c.stdin != nil {
-		c.stdin.Close()
+		err := c.stdin.Close()
+		if err != nil {
+			return fmt.Errorf("failed to close stdin: %v", err)
+		}
 	}
 	if c.stdout != nil {
-		c.stdout.Close()
+		err := c.stdout.Close()
+		if err != nil {
+			return fmt.Errorf("failed to close stdout: %v", err)
+		}
 	}
 	if c.stderr != nil {
-		c.stderr.Close()
+		err := c.stderr.Close()
+		if err != nil {
+			return fmt.Errorf("failed to close stderr: %v", err)
+		}
 	}
 	if c.cmd != nil && c.cmd.Process != nil {
 		return c.cmd.Process.Kill()
@@ -100,8 +112,8 @@ func (c *MCPTestClient) Close() error {
 }
 
 // sendRequest sends a JSON-RPC request to the MCP server
-func (c *MCPTestClient) sendRequest(method string, params interface{}) (map[string]interface{}, error) {
-	request := map[string]interface{}{
+func (c *MCPTestClient) sendRequest(method string, params any) (map[string]any, error) {
+	request := map[string]any{
 		"jsonrpc": "2.0",
 		"id":      c.requestID,
 		"method":  method,
@@ -126,7 +138,7 @@ func (c *MCPTestClient) sendRequest(method string, params interface{}) (map[stri
 		return nil, fmt.Errorf("failed to read response: %v", err)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(response[:n], &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %v", err)
 	}
@@ -140,12 +152,12 @@ func (c *MCPTestClient) sendRequest(method string, params interface{}) (map[stri
 
 // initialize initializes the MCP client
 func (c *MCPTestClient) initialize() error {
-	initParams := map[string]interface{}{
+	initParams := map[string]any{
 		"protocolVersion": "2024-11-05",
-		"capabilities": map[string]interface{}{
-			"tools": map[string]interface{}{},
+		"capabilities": map[string]any{
+			"tools": map[string]any{},
 		},
-		"clientInfo": map[string]interface{}{
+		"clientInfo": map[string]any{
 			"name":    "mcp-test-client",
 			"version": "1.0.0",
 		},
@@ -341,7 +353,7 @@ func generateReport(results []*TestResult) {
 func saveDetailedReport(results []*TestResult) {
 	reportData := map[string]interface{}{
 		"timestamp": time.Now().Format(time.RFC3339),
-		"summary": map[string]interface{}{
+		"summary": map[string]any{
 			"total": len(results),
 			"successful": func() int {
 				count := 0
@@ -393,7 +405,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create MCP test client: %v", err)
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			log.Printf("failed to close client: %v", err)
+		}
+	}()
 
 	fmt.Println("🔗 MCP Client connected successfully")
 

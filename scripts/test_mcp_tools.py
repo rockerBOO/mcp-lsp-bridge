@@ -108,15 +108,25 @@ class MCPToolRunner:
             
             # Adjusted regex: Try to be more forgiving with spacing around quotes and keys.
             # This regex specifically tries to capture double-quoted strings OR single-quoted strings.
-            param_regex = r'(\w+)\s*=\s*(?:"([^"]*)"|\'([^\']*)\')'
+            param_regex = r'(\w+)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([\w.-]+))'
             param_matches = re.findall(param_regex, params_str)
 
             if not param_matches and params_str.strip():
                  logger.warning(f"Could not parse any parameters from: '{params_str}' for command: {command_str}")
             
-            for key, double_quoted_value, single_quoted_value in param_matches:
-                # Prefer the value from the matched quotes. If one group is empty, use the other.
-                params[key] = double_quoted_value if double_quoted_value else single_quoted_value
+            for key, double_quoted_value, single_quoted_value, unquoted_value in param_matches:
+                # Prioritize: double-quoted, then single-quoted, then unquoted
+                value = double_quoted_value or single_quoted_value or unquoted_value
+
+                # Attempt to convert known integer parameters
+                if key in ["line", "character", "start_line", "start_character", "end_line", "end_character", "tab_size"]:
+                    try:
+                        params[key] = int(value)
+                    except ValueError:
+                        logger.warning(f"Could not convert parameter '{key}' value '{value}' to int. Keeping as string.")
+                        params[key] = value
+                else:
+                    params[key] = value
 
         logger.info(f"Parsed command: Tool='{tool_name}', Params={params}") # Log parsed params
         return tool_name, params

@@ -1,22 +1,22 @@
 package lsp
 
 import (
-	"slices"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
 // Helper function to create a temporary project directory with specific files
 func createTempProjectWithFiles(t *testing.T, files map[string]string) string {
 	t.Helper()
-	
+
 	// Create a temporary directory
 	tempDir, err := os.MkdirTemp("", "project-language-detection-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	
+
 	// Create files in the temp directory
 	for filename, content := range files {
 		filePath := filepath.Join(tempDir, filename)
@@ -25,7 +25,7 @@ func createTempProjectWithFiles(t *testing.T, files map[string]string) string {
 			t.Fatalf("Failed to create file %s: %v", filename, err)
 		}
 	}
-	
+
 	return tempDir
 }
 
@@ -53,14 +53,14 @@ func TestDetectProjectLanguages(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name           string
-		projectFiles   map[string]string
-		expectedLangs  []string
+		name          string
+		projectFiles  map[string]string
+		expectedLangs []string
 	}{
 		{
 			name: "Go Project",
 			projectFiles: map[string]string{
-				"go.mod": "module example.com/myproject\n",
+				"go.mod":  "module example.com/myproject\n",
 				"main.go": "package main\n\nfunc main() {}\n",
 			},
 			expectedLangs: []string{"go"},
@@ -69,16 +69,16 @@ func TestDetectProjectLanguages(t *testing.T) {
 			name: "Python Project",
 			projectFiles: map[string]string{
 				"pyproject.toml": "[tool.poetry]\nname = \"myproject\"\n",
-				"main.py": "def main():\n    pass\n",
+				"main.py":        "def main():\n    pass\n",
 			},
 			expectedLangs: []string{"python"},
 		},
 		{
 			name: "Mixed Project",
 			projectFiles: map[string]string{
-				"go.mod": "module example.com/myproject\n",
-				"main.go": "package main\n\nfunc main() {}\n",
-				"index.ts": "const x = 42;\n",
+				"go.mod":    "module example.com/myproject\n",
+				"main.go":   "package main\n\nfunc main() {}\n",
+				"index.ts":  "const x = 42;\n",
 				"script.py": "def hello():\n    print('world')\n",
 			},
 			expectedLangs: []string{"go", "typescript", "python"},
@@ -86,7 +86,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 		{
 			name: "No Recognized Languages",
 			projectFiles: map[string]string{
-				"README.md": "# My Project\n",
+				"README.md":   "# My Project\n",
 				"config.json": "{\"key\": \"value\"}\n",
 			},
 			expectedLangs: []string{},
@@ -97,7 +97,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a temporary project with the specified files
 			tempDir := createTempProjectWithFiles(t, tc.projectFiles)
-			defer os.RemoveAll(tempDir)
+			defer cleanupDir(t, tempDir)
 
 			// Detect project languages
 			languages, err := config.DetectProjectLanguages(tempDir)
@@ -153,14 +153,14 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name           string
-		projectFiles   map[string]string
+		name            string
+		projectFiles    map[string]string
 		expectedPrimary string
 	}{
 		{
 			name: "Go Project",
 			projectFiles: map[string]string{
-				"go.mod": "module example.com/myproject\n",
+				"go.mod":  "module example.com/myproject\n",
 				"main.go": "package main\n\nfunc main() {}\n",
 			},
 			expectedPrimary: "go",
@@ -168,9 +168,9 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 		{
 			name: "Mixed Project with Precedence",
 			projectFiles: map[string]string{
-				"go.mod": "module example.com/myproject\n",
-				"main.go": "package main\n\nfunc main() {}\n",
-				"index.ts": "const x = 42;\n",
+				"go.mod":    "module example.com/myproject\n",
+				"main.go":   "package main\n\nfunc main() {}\n",
+				"index.ts":  "const x = 42;\n",
 				"script.py": "def hello():\n    print('world')\n",
 			},
 			expectedPrimary: "go",
@@ -181,7 +181,7 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a temporary project with the specified files
 			tempDir := createTempProjectWithFiles(t, tc.projectFiles)
-			defer os.RemoveAll(tempDir)
+			defer cleanupDir(t, tempDir)
 
 			// Detect primary project language
 			primaryLang, err := config.DetectPrimaryProjectLanguage(tempDir)
@@ -196,4 +196,12 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 			}
 		})
 	}
+}
+
+func cleanupDir(t *testing.T, dir string) func() {
+    return func() {
+        if err := os.RemoveAll(dir); err != nil {
+            t.Logf("Failed to remove temp dir: %v", err)
+        }
+    }
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"rockerboo/mcp-lsp-bridge/logger"
@@ -70,7 +71,10 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 		dir, err := os.Getwd()
 		if err != nil {
 			lastErr = fmt.Errorf("failed to get current directory: %w", err)
-			lc.Close()
+			err = lc.Close()
+			if err != nil {
+				return nil, err
+			}
 			time.Sleep(config.RetryDelay)
 			continue
 		}
@@ -133,7 +137,11 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 		if err != nil {
 			lastErr = fmt.Errorf("initialize request failed on attempt %d: %w", attempt+1, err)
 			logger.Error(lastErr)
-			lc.Close()
+			err = lc.Close()
+			if err != nil {
+				return nil, err
+			}
+
 			time.Sleep(config.RetryDelay)
 			continue
 		}
@@ -170,7 +178,10 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 				if err != nil {
 					lastErr = fmt.Errorf("failed to setup semantic tokens on attempt %d: %w", attempt+1, err)
 					logger.Error(lastErr)
-					lc.Close()
+					err = lc.Close()
+					if err != nil {
+						return nil, err
+					}
 					time.Sleep(config.RetryDelay)
 					continue
 				}
@@ -202,7 +213,10 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 		err = lc.SendNotification("initialized", map[string]any{})
 		if err != nil {
 			lastErr = fmt.Errorf("failed to send initialized notification on attempt %d: %w", attempt+1, err)
-			lc.Close()
+			err = lc.Close()
+			if err != nil {
+				return nil, err
+			}
 			time.Sleep(config.RetryDelay)
 			continue
 		}
@@ -228,7 +242,10 @@ func (b *MCPLSPBridge) GetClientForLanguage(language string) (lsp.LanguageClient
 		}
 		// Client context is cancelled, remove it and create a new one
 		logger.Warn(fmt.Sprintf("Removing client with cancelled context for language %s", language))
-		existingClient.Close()
+		err := existingClient.Close()
+		if err != nil {
+			return nil, err
+		}
 		delete(b.clients, lsp.Language(language))
 	}
 
@@ -253,7 +270,10 @@ func (b *MCPLSPBridge) GetClientForLanguage(language string) (lsp.LanguageClient
 // CloseAllClients closes all active language server clients
 func (b *MCPLSPBridge) CloseAllClients() {
 	for _, client := range b.clients {
-		client.Close()
+		err := client.Close()
+		if err != nil {
+			logger.Error(fmt.Errorf("failed to close client: %w", err))
+		}
 	}
 	b.clients = make(map[lsp.Language]lsp.LanguageClientInterface)
 }
@@ -354,22 +374,36 @@ func (b *MCPLSPBridge) SearchTextInWorkspace(language, query string) ([]protocol
 // GetMultiLanguageClients gets language clients for multiple languages with fallback
 func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[string]lsp.LanguageClientInterface, error) {
 	clients := make(map[string]lsp.LanguageClientInterface)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 	var lastErr error
+	var errMu sync.Mutex
 
 	for _, language := range languages {
-		client, err := b.GetClientForLanguage(language)
-		if err != nil {
-			logger.Error(fmt.Sprintf("Failed to get client for language %s: %v", language, err))
-			lastErr = err
-			continue
-		}
-		clients[language] = client
+		wg.Add(1)
+		go func(lang string) {
+			defer wg.Done()
+
+			client, err := b.GetClientForLanguage(lang)
+			if err != nil {
+				logger.Error(fmt.Sprintf("Failed to get client for language %s: %v", lang, err))
+				errMu.Lock()
+				lastErr = err
+				errMu.Unlock()
+				return
+			}
+
+			mu.Lock()
+			clients[lang] = client
+			mu.Unlock()
+		}(language)
 	}
+
+	wg.Wait()
 
 	if len(clients) == 0 && lastErr != nil {
 		return nil, fmt.Errorf("failed to get any language clients: %w", lastErr)
 	}
-
 	return clients, nil
 }
 
@@ -897,10 +931,18 @@ func (b *MCPLSPBridge) SemanticTokens(uri string, targetTypes []string, startLin
 		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
 	}
 
+	err = b.ensureDocumentOpen(client, uri, string(language))
+	if err != nil {
+		logger.Error("SemanticTokens: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", uri, err))
+		// Continue anyway, as some servers might still work without explicit didOpen
+	}
+
 	tokens, err := client.SemanticTokensRange(uri, startLine, startCharacter, endLine, endCharacter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+		logger.Error(fmt.Sprintf("SemanticTokens: Failed to get raw semantic tokens from client: %v", err))
+		return nil, fmt.Errorf("failed to get semantic tokens from client: %w", err)
 	}
+	logger.Debug(fmt.Sprintf("SemanticTokens: Raw tokens from LSP client: %+v", tokens))
 
 	parser := client.TokenParser()
 

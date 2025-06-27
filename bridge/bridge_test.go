@@ -116,7 +116,7 @@ func TestInferLanguage(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
 			}
 		})
@@ -229,7 +229,7 @@ func TestFindSymbolReferences(t *testing.T) {
 
 	result, err := bridge.FindSymbolReferences("go", "file:///test.go", 10, 5, true)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, result, 1)
 	mockClient.AssertExpectations(t)
 }
@@ -260,7 +260,7 @@ func TestFindSymbolDefinitions(t *testing.T) {
 
 	result, err := bridge.FindSymbolDefinitions("go", "file:///test.go", 10, 5)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, result, 1)
 	mockClient.AssertExpectations(t)
 }
@@ -280,7 +280,7 @@ func TestFindSymbolDefinitionsWithError(t *testing.T) {
 
 	result, err := bridge.FindSymbolDefinitions("go", "file:///test.go", 10, 5)
 
-	assert.NoError(t, err) // Should not error, just return empty
+	require.NoError(t, err) // Should not error, just return empty
 	assert.Empty(t, result)
 	mockClient.AssertExpectations(t)
 }
@@ -314,7 +314,7 @@ func TestSearchTextInWorkspace(t *testing.T) {
 
 	result, err := bridge.SearchTextInWorkspace("go", "TestFunction")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, result, 1)
 	mockClient.AssertExpectations(t)
 }
@@ -354,7 +354,7 @@ func TestGetDocumentSymbols(t *testing.T) {
 
 	result, err := bridge.GetDocumentSymbols(testFile)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, result, 1)
 	mockClient.AssertExpectations(t)
 }
@@ -391,7 +391,7 @@ func TestGetSignatureHelp(t *testing.T) {
 
 	result, err := bridge.GetSignatureHelp(testFile, 2, 10)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedSigHelp, result)
 	mockClient.AssertExpectations(t)
 }
@@ -431,7 +431,7 @@ func TestGetHoverInformation(t *testing.T) {
 
 	result, err := bridge.GetHoverInformation(testFile, 2, 7)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedHover, result)
 	mockClient.AssertExpectations(t)
 }
@@ -452,7 +452,7 @@ func TestApplyTextEditsToContent(t *testing.T) {
 
 	result, err := applyTextEditsToContent(content, edits)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	expected := "line 1\nmodified line 2\nline 3"
 	assert.Equal(t, expected, result)
 }
@@ -473,7 +473,7 @@ func TestApplyTextEditsToContentMultiLine(t *testing.T) {
 
 	result, err := applyTextEditsToContent(content, edits)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	expected := "line 1\nreplaced content\nline 4"
 	assert.Equal(t, expected, result)
 }
@@ -514,7 +514,7 @@ func TestRenameSymbol(t *testing.T) {
 
 	result, err := bridge.RenameSymbol(testFile, 2, 7, "newMain", false)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, &expectedWorkspaceEdit, result)
 	mockClient.AssertExpectations(t)
 }
@@ -525,7 +525,7 @@ func TestGetDiagnostics(t *testing.T) {
 
 	result, err := bridge.GetDiagnostics("file:///test.go")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, result) // Currently returns empty
 }
 
@@ -558,7 +558,7 @@ func TestFindImplementations(t *testing.T) {
 
 	result, err := bridge.FindImplementations(testFile, 2, 7)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, result, 1)
 	mockClient.AssertExpectations(t)
 }
@@ -600,7 +600,7 @@ func TestPrepareCallHierarchy(t *testing.T) {
 
 	result, err := bridge.PrepareCallHierarchy(testURI, 2, 7)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, result, 1)
 	mockClient.AssertExpectations(t)
 }
@@ -610,11 +610,11 @@ func TestGetIncomingOutgoingCalls(t *testing.T) {
 	bridge := createTestBridge()
 
 	incoming, err := bridge.GetIncomingCalls(protocol.CallHierarchyItem{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, incoming)
 
 	outgoing, err := bridge.GetOutgoingCalls(protocol.CallHierarchyItem{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, outgoing)
 }
 
@@ -631,7 +631,7 @@ func TestGetClientForLanguageInterface(t *testing.T) {
 
 	result, err := bridge.GetClientForLanguageInterface("go")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, mockClient, result)
 }
 
@@ -642,7 +642,7 @@ func TestFindSymbolReferencesError(t *testing.T) {
 	// Test with unknown language
 	result, err := bridge.FindSymbolReferences("unknown", "file:///test.unknown", 10, 5, true)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "no server configuration found")
 }
@@ -652,7 +652,7 @@ func TestGetHoverInformationInvalidLanguage(t *testing.T) {
 
 	result, err := bridge.GetHoverInformation("test.unknown", 10, 5)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "failed to infer language")
 }

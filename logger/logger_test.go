@@ -42,7 +42,7 @@ func TestLogLevels(t *testing.T) {
 	testCases := []struct {
 		name       string
 		logLevel   string
-		logFunc    func(...interface{})
+		logFunc    func(...any)
 		logMessage string
 		shouldLog  bool
 	}{

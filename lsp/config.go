@@ -9,14 +9,17 @@ import (
 )
 
 // LoadLSPConfig loads the LSP configuration from a JSON file
-func LoadLSPConfig(path string) (*LSPServerConfig, error) {
+func LoadLSPConfig(path string) (config *LSPServerConfig, err error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open config file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
-	var config LSPServerConfig
 	decoder := json.NewDecoder(file)
 	if err := decoder.Decode(&config); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
@@ -40,7 +43,7 @@ func LoadLSPConfig(path string) (*LSPServerConfig, error) {
 		}
 	}
 
-	return &config, nil
+	return config, nil
 }
 
 func (c LSPServerConfig) FindServerConfig(language string) (*LanguageServerConfig, error) {

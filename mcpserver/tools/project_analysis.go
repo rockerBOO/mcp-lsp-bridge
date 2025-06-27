@@ -22,104 +22,104 @@ func RegisterProjectAnalysisTool(mcpServer ToolServer, bridge interfaces.BridgeI
 
 func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool(
-		"project_analysis",
-		mcp.WithDescription("Multi-purpose code analysis tool. Use 'definitions' for precise symbol targeting, 'references' for usage locations, 'workspace_symbols' for symbol discovery, 'document_symbols' for file exploration, 'text_search' for content search."),
-		mcp.WithString("workspace_uri", mcp.Description("URI to the workspace/project root")),
-		mcp.WithString("query", mcp.Description("Symbol name (for definitions/references/workspace_symbols) or file path (for document_symbols) or text pattern (for text_search)")),
-		mcp.WithString("analysis_type", mcp.Description("Analysis type: 'definitions' (exact symbol location), 'references' (all usages), 'workspace_symbols' (symbol search), 'document_symbols' (file contents), 'text_search' (content search)")),
-		mcp.WithNumber("offset", mcp.Description("Result offset for pagination (default: 0)")),
-		mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default: 20, max: 100)")),
-	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		workspaceUri, err := request.RequireString("workspace_uri")
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		query, err := request.RequireString("query")
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		analysisType, err := request.RequireString("analysis_type")
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		// Parse pagination parameters with defaults
-		offset := 0
-		if offsetVal, err := request.RequireInt("offset"); err == nil {
-			offset = offsetVal
-		}
-
-		limit := 20
-		if limitVal, err := request.RequireInt("limit"); err == nil {
-			if limitVal > 0 && limitVal <= 100 {
-				limit = limitVal
+			"project_analysis",
+			mcp.WithDescription("Multi-purpose code analysis tool. Use 'definitions' for precise symbol targeting, 'references' for usage locations, 'workspace_symbols' for symbol discovery, 'document_symbols' for file exploration, 'text_search' for content search."),
+			mcp.WithString("workspace_uri", mcp.Description("URI to the workspace/project root")),
+			mcp.WithString("query", mcp.Description("Symbol name (for definitions/references/workspace_symbols) or file path (for document_symbols) or text pattern (for text_search)")),
+			mcp.WithString("analysis_type", mcp.Description("Analysis type: 'definitions' (exact symbol location), 'references' (all usages), 'workspace_symbols' (symbol search), 'document_symbols' (file contents), 'text_search' (content search)")),
+			mcp.WithNumber("offset", mcp.Description("Result offset for pagination (default: 0)")),
+			mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default: 20, max: 100)")),
+		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			workspaceUri, err := request.RequireString("workspace_uri")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
 			}
-		}
 
-		// Convert URI to local file path
-		projectPath := strings.TrimPrefix(workspaceUri, "file://")
+			query, err := request.RequireString("query")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
 
-		// Use the project language detection method instead of single file inference
-		languages, err := bridge.DetectProjectLanguages(projectPath)
+			analysisType, err := request.RequireString("analysis_type")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
 
-		if err != nil {
-			logger.Error("Project language detection failed", fmt.Sprintf("Workspace URI: %s, Error: %v", workspaceUri, err))
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to detect project languages: %v", err)), nil
-		}
+			// Parse pagination parameters with defaults
+			offset := 0
+			if offsetVal, err := request.RequireInt("offset"); err == nil {
+				offset = offsetVal
+			}
 
-		// Use the first detected language
-		if len(languages) == 0 {
-			logger.Warn("No programming languages detected in project", fmt.Sprintf("Workspace URI: %s", workspaceUri))
-			return mcp.NewToolResultError("No languages detected in project"), nil
-		}
-
-		// Try to get clients for multiple languages with fallback
-		clients, err := bridge.GetMultiLanguageClients(languages)
-		if err != nil || len(clients) == 0 {
-			return mcp.NewToolResultError("No LSP clients available for detected languages"), nil
-		}
-
-		// Use the first available client in priority order
-		var lspClient *lsp.LanguageClient
-		var activeLanguage string
-		for _, lang := range languages {
-			if client, exists := clients[lang]; exists {
-				if typedClient, ok := client.(*lsp.LanguageClient); ok {
-					lspClient = typedClient
-					activeLanguage = lang
-					break
+			limit := 20
+			if limitVal, err := request.RequireInt("limit"); err == nil {
+				if limitVal > 0 && limitVal <= 100 {
+					limit = limitVal
 				}
 			}
-		}
 
-		if lspClient == nil {
-			return mcp.NewToolResultError("Invalid LSP client type"), nil
-		}
+			// Convert URI to local file path
+			projectPath := strings.TrimPrefix(workspaceUri, "file://")
 
-		var response strings.Builder
-		fmt.Fprintf(&response, "Project Analysis: %s\n", analysisType)
-		fmt.Fprintf(&response, "Query: %s\n", query)
-		fmt.Fprintf(&response, "Workspace: %s\n", workspaceUri)
-		fmt.Fprintf(&response, "Detected Languages: %v\n", languages)
-		fmt.Fprintf(&response, "Active Language: %s\n\n", activeLanguage)
+			// Use the project language detection method instead of single file inference
+			languages, err := bridge.DetectProjectLanguages(projectPath)
 
-		switch analysisType {
-		case "workspace_symbols":
-			return handleWorkspaceSymbols(lspClient, query, offset, limit, workspaceUri, languages, activeLanguage, &response)
-		case "document_symbols":
-			return handleDocumentSymbols(bridge, query, offset, limit, &response)
-		case "references":
-			return handleReferences(bridge, lspClient, query, offset, limit, activeLanguage, &response)
-		case "definitions":
-			return handleDefinitions(bridge, lspClient, query, offset, limit, activeLanguage, &response)
-		case "text_search":
-			return handleTextSearch(bridge, query, offset, limit, activeLanguage, &response)
-		default:
-			return mcp.NewToolResultError(fmt.Sprintf("Unknown analysis type: %s", analysisType)), nil
+			if err != nil {
+				logger.Error("Project language detection failed", fmt.Sprintf("Workspace URI: %s, Error: %v", workspaceUri, err))
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to detect project languages: %v", err)), nil
+			}
+
+			// Use the first detected language
+			if len(languages) == 0 {
+				logger.Warn("No programming languages detected in project", fmt.Sprintf("Workspace URI: %s", workspaceUri))
+				return mcp.NewToolResultError("No languages detected in project"), nil
+			}
+
+			// Try to get clients for multiple languages with fallback
+			clients, err := bridge.GetMultiLanguageClients(languages)
+			if err != nil || len(clients) == 0 {
+				return mcp.NewToolResultError("No LSP clients available for detected languages"), nil
+			}
+
+			// Use the first available client in priority order
+			var lspClient *lsp.LanguageClient
+			var activeLanguage string
+			for _, lang := range languages {
+				if client, exists := clients[lang]; exists {
+					if typedClient, ok := client.(*lsp.LanguageClient); ok {
+						lspClient = typedClient
+						activeLanguage = lang
+						break
+					}
+				}
+			}
+
+			if lspClient == nil {
+				return mcp.NewToolResultError("Invalid LSP client type"), nil
+			}
+
+			var response strings.Builder
+			fmt.Fprintf(&response, "Project Analysis: %s\n", analysisType)
+			fmt.Fprintf(&response, "Query: %s\n", query)
+			fmt.Fprintf(&response, "Workspace: %s\n", workspaceUri)
+			fmt.Fprintf(&response, "Detected Languages: %v\n", languages)
+			fmt.Fprintf(&response, "Active Language: %s\n\n", activeLanguage)
+
+			switch analysisType {
+			case "workspace_symbols":
+				return handleWorkspaceSymbols(lspClient, query, offset, limit, workspaceUri, languages, activeLanguage, &response)
+			case "document_symbols":
+				return handleDocumentSymbols(bridge, query, offset, limit, &response)
+			case "references":
+				return handleReferences(bridge, lspClient, query, offset, limit, activeLanguage, &response)
+			case "definitions":
+				return handleDefinitions(bridge, lspClient, query, offset, limit, activeLanguage, &response)
+			case "text_search":
+				return handleTextSearch(bridge, query, offset, limit, activeLanguage, &response)
+			default:
+				return mcp.NewToolResultError(fmt.Sprintf("Unknown analysis type: %s", analysisType)), nil
+			}
 		}
-	}
 }
 
 // normalizeURI ensures the URI has the proper file:// scheme
@@ -164,7 +164,7 @@ func formatDocumentSymbolWithTargeting(response *strings.Builder, symbol protoco
 	targetChar := symbol.SelectionRange.Start.Character
 
 	// Check if SelectionRange is actually different from Range
-	selectionRangeUseful := !(targetLine == startLine && targetChar == startChar)
+	selectionRangeUseful := targetLine != startLine || targetChar != startChar
 
 	if depth == 0 {
 		fmt.Fprintf(response, "%s%d. %s (%s)\n",

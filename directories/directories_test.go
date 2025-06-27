@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -210,7 +211,7 @@ func TestDirectoryResolver_DirectoryEnsuring(t *testing.T) {
 				assert.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// Check directory existence and path correctness
 			if tt.shouldEnsureDir && tt.wantDirExists {
@@ -360,9 +361,9 @@ func TestDirectoryResolver_isRoot(t *testing.T) {
 			got, err := dr.isRoot()
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
 			}
 
@@ -409,7 +410,7 @@ func TestDirectoryResolver_maybeEnsureDir(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, testDir, got)
 
 				if tt.shouldEnsureDir {
@@ -495,9 +496,9 @@ func TestDirectoryResolver_GetLogDirectory(t *testing.T) {
 			got, err := dr.GetLogDirectory()
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
 			}
 
@@ -580,9 +581,9 @@ func TestDirectoryResolver_GetDataDirectory(t *testing.T) {
 			got, err := dr.GetDataDirectory()
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
 			}
 
@@ -665,9 +666,9 @@ func TestDirectoryResolver_GetCacheDirectory(t *testing.T) {
 			got, err := dr.GetCacheDirectory()
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
 			}
 
@@ -750,9 +751,9 @@ func TestDirectoryResolver_GetConfigDirectory_Comprehensive(t *testing.T) {
 			got, err := dr.GetConfigDirectory()
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
 			}
 

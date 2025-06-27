@@ -10,6 +10,7 @@ import (
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/mcptest"
@@ -86,7 +87,7 @@ func TestMCPToolIntegration_HoverTool(t *testing.T) {
 		Tool:    tool,
 		Handler: handler,
 	})
-	assert.NoError(t, err, "Could not start server")
+	require.NoError(t, err, "Could not start server")
 	defer mcpServer.Close()
 
 	ctx := context.Background()
@@ -102,7 +103,7 @@ func TestMCPToolIntegration_HoverTool(t *testing.T) {
 		},
 	})
 
-	assert.NoError(t, err, "Unexpected error from CallTool")
+	require.NoError(t, err, "Unexpected error from CallTool")
 	assert.NotNil(t, result, "Expected result but got nil")
 	assert.False(t, result.IsError, "Expected successful result, got error")
 
@@ -141,7 +142,7 @@ func TestMCPToolIntegration_DiagnosticsTool(t *testing.T) {
 		Tool:    tool,
 		Handler: handler,
 	})
-	assert.NoError(t, err, "Could not start server")
+	require.NoError(t, err, "Could not start server")
 	defer mcpServer.Close()
 
 	ctx := context.Background()
@@ -155,7 +156,7 @@ func TestMCPToolIntegration_DiagnosticsTool(t *testing.T) {
 		},
 	})
 
-	assert.NoError(t, err, "Unexpected error from CallTool")
+	require.NoError(t, err, "Unexpected error from CallTool")
 	assert.NotNil(t, result, "Expected result but got nil")
 	assert.False(t, result.IsError, "Expected successful result, got error")
 
@@ -181,7 +182,7 @@ func TestMCPToolIntegration_InferLanguageTool(t *testing.T) {
 		Tool:    tool,
 		Handler: handler,
 	})
-	assert.NoError(t, err, "Could not start server")
+	require.NoError(t, err, "Could not start server")
 	defer mcpServer.Close()
 
 	ctx := context.Background()
@@ -195,7 +196,7 @@ func TestMCPToolIntegration_InferLanguageTool(t *testing.T) {
 		},
 	})
 
-	assert.NoError(t, err, "Unexpected error from CallTool")
+	require.NoError(t, err, "Unexpected error from CallTool")
 	assert.NotNil(t, result, "Expected result but got nil")
 	assert.False(t, result.IsError, "Expected successful result, got error")
 
@@ -241,7 +242,7 @@ func TestMCPToolIntegration_LSPConnectTool(t *testing.T) {
 		Tool:    tool,
 		Handler: handler,
 	})
-	assert.NoError(t, err, "Could not start server")
+	require.NoError(t, err, "Could not start server")
 	defer mcpServer.Close()
 
 	ctx := context.Background()
@@ -255,7 +256,7 @@ func TestMCPToolIntegration_LSPConnectTool(t *testing.T) {
 		},
 	})
 
-	assert.NoError(t, err, "Unexpected error from CallTool")
+	require.NoError(t, err, "Unexpected error from CallTool")
 	assert.NotNil(t, result, "Expected result but got nil")
 	assert.False(t, result.IsError, "Expected successful connection, got error")
 	mockBridge.AssertExpectations(t)
@@ -273,7 +274,7 @@ func TestMCPToolIntegration_LSPDisconnectTool(t *testing.T) {
 		Tool:    tool,
 		Handler: handler,
 	})
-	assert.NoError(t, err, "Could not start server")
+	require.NoError(t, err, "Could not start server")
 	defer mcpServer.Close()
 
 	client := mcpServer.Client()
@@ -286,7 +287,7 @@ func TestMCPToolIntegration_LSPDisconnectTool(t *testing.T) {
 		},
 	})
 
-	assert.NoError(t, err, "Unexpected error from CallTool")
+	require.NoError(t, err, "Unexpected error from CallTool")
 	assert.NotNil(t, result, "Expected result but got nil")
 	assert.False(t, result.IsError, "Expected successful disconnection, got error")
 	mockBridge.AssertExpectations(t) // Verify that CloseAllClients was called
@@ -304,7 +305,7 @@ func TestMCPToolIntegration_ErrorHandling(t *testing.T) {
 		Tool:    tool,
 		Handler: handler,
 	})
-	assert.NoError(t, err, "Could not start server")
+	require.NoError(t, err, "Could not start server")
 	defer mcpServer.Close()
 
 	ctx := context.Background()
@@ -320,7 +321,7 @@ func TestMCPToolIntegration_ErrorHandling(t *testing.T) {
 		},
 	})
 
-	assert.NoError(t, err, "Unexpected error from CallTool (RPC level)")
+	require.NoError(t, err, "Unexpected error from CallTool (RPC level)")
 	assert.NotNil(t, result, "Expected result but got nil")
 	assert.True(t, result.IsError, "Expected error result, but got success")
 

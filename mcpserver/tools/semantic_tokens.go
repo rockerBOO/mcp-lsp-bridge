@@ -54,9 +54,15 @@ func SemanticTokensTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Too
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			targetTypes := []string{"function"}
+			targetTypes := []string{
+				"namespace", "type", "class", "enum", "interface", "struct",
+				"typeParameter", "parameter", "variable", "property", "enumMember",
+				"event", "function", "method", "macro", "keyword", "modifier",
+				"comment", "string", "number", "regexp", "operator",
+			}
 
 			positions, err := bridge.SemanticTokens(uri, targetTypes, uint32(startLine), uint32(startCharacter), uint32(endLine), uint32(endCharacter))
+			logger.Debug(fmt.Sprintf("SemanticTokensTool: Processed positions: %+v", positions))
 
 			if err != nil {
 				logger.Error("semantic_tokens: failed to get token positions", err)

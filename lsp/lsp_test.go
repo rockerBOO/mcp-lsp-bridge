@@ -16,7 +16,7 @@ func TestNewLanguageClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to language client: %v", err)
 	}
-	defer client.Close()
+	defer closeClient(t, client)
 
 	// Check basic initialization
 	if client == nil {
@@ -37,7 +37,7 @@ func TestLanguageClientMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to language client: %v", err)
 	}
-	defer client.Close()
+	defer closeClient(t, client)
 
 	// Perform some requests to generate metrics
 	for range 5 {
@@ -107,7 +107,7 @@ func TestSendRequestErrorHandling(t *testing.T) {
 	}
 	if connected_client != nil {
 		t.Error("Expected nil client when creation fails")
-		client.Close() // Clean up if somehow not nil
+		closeClient(t, client) // Clean up if somehow not nil
 	}
 }
 
@@ -120,7 +120,7 @@ func TestClientCapabilitiesAndServerCapabilities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to language client: %v", err)
 	}
-	defer client.Close()
+	defer closeClient(t, client)
 
 	// Test client capabilities
 	clientCaps := client.ClientCapabilities()
@@ -149,7 +149,9 @@ func BenchmarkLanguageClientCreation(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Failed to create language client: %v", err)
 		}
-		client.Close()
+		if err := client.Close(); err != nil {
+			b.Logf("failed to close client: %v", err)
+		}
 	}
 }
 
@@ -158,7 +160,11 @@ func BenchmarkSendRequest(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create language client: %v", err)
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			b.Logf("failed to close client: %v", err)
+		}
+	}()
 
 	for b.Loop() {
 		err := client.SendRequest(
@@ -169,5 +175,13 @@ func BenchmarkSendRequest(b *testing.B) {
 		)
 		// Ignore errors since echo doesn't understand LSP protocol
 		_ = err
+	}
+}
+
+func closeClient(t *testing.T, client LanguageClientInterface) func() {
+	return func() {
+		if err := client.Close(); err != nil {
+			t.Logf("failed to close client: %v", err)
+		}
 	}
 }

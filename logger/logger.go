@@ -90,13 +90,16 @@ func rotateLogFiles(cfg LoggerConfig) {
 
 		// Remove oldest log files
 		for _, oldFile := range files[:len(files)-cfg.MaxLogFiles+1] {
-			os.Remove(oldFile)
+			err := os.Remove(oldFile)
+			if err != nil {
+				Error(fmt.Errorf("failed to remove old log file: %v", err))
+			}
 		}
 	}
 }
 
 // Info logs an informational message with caller context
-func Info(v ...interface{}) {
+func Info(v ...any) {
 	if config.LogLevel == "info" || config.LogLevel == "debug" {
 		if infoLogger != nil {
 			_ = infoLogger.Output(2, fmt.Sprintln(v...))
@@ -105,7 +108,7 @@ func Info(v ...interface{}) {
 }
 
 // Warn logs an informational message with caller context
-func Warn(v ...interface{}) {
+func Warn(v ...any) {
 	if config.LogLevel == "info" || config.LogLevel == "warn" {
 		if infoLogger != nil {
 			_ = infoLogger.Output(2, fmt.Sprintln(v...))
@@ -114,14 +117,14 @@ func Warn(v ...interface{}) {
 }
 
 // Error logs an error message with caller context
-func Error(v ...interface{}) {
+func Error(v ...any) {
 	if errorLogger != nil {
 		_ = errorLogger.Output(2, fmt.Sprintln(v...))
 	}
 }
 
 // Debug logs a debug message with caller context
-func Debug(v ...interface{}) {
+func Debug(v ...any) {
 	if config.LogLevel == "debug" {
 		if debugLogger != nil {
 			_ = debugLogger.Output(2, fmt.Sprintln(v...))
@@ -134,6 +137,9 @@ func Close() {
 	logMutex.Lock()
 	defer logMutex.Unlock()
 	if logFile != nil {
-		logFile.Close()
+		err := logFile.Close()
+		if err != nil {
+			log.Printf("failed to close log file: %v", err)
+		}
 	}
 }

@@ -54,24 +54,47 @@ func (lc *LanguageClient) Connect() (LanguageClientInterface, error) {
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		stdin.Close()
+		closeErr := stdin.Close()
 		cancel()
+		if closeErr != nil {
+			return nil, fmt.Errorf("failed to close stdin pipe: %w", closeErr)
+		}
 		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		stdin.Close()
-		stdout.Close()
+		stdCloseErr := stdin.Close()
+		if stdCloseErr != nil {
+			cancel()
+			return nil, fmt.Errorf("failed to close stdin pipe: %w", stdCloseErr)
+		}
+		stdOutClose := stdout.Close()
+		if stdOutClose != nil {
+			cancel()
+			return nil, fmt.Errorf("failed to close stdout pipe: %w", stdOutClose)
+		}
 		cancel()
 		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
 	}
 
 	// Start the process
 	if err := cmd.Start(); err != nil {
-		stdin.Close()
-		stdout.Close()
-		stderr.Close()
+		stdinCloseErr := stdin.Close()
+		if stdinCloseErr != nil {
+			cancel()
+			return nil, fmt.Errorf("failed to close stdin pipe: %w", stdinCloseErr)
+		}
+		stdoutCloseErr := stdout.Close()
+		if stdoutCloseErr != nil {
+			cancel()
+			return nil, fmt.Errorf("failed to close stdout pipe: %w", stdoutCloseErr)
+		}
+		stderrCloseErr := stderr.Close()
+		if stderrCloseErr != nil {
+			cancel()
+			return nil, fmt.Errorf("failed to close stderr pipe: %w", stderrCloseErr)
+		}
 		cancel()
 		return nil, fmt.Errorf("failed to start command: %w", err)
 	}
@@ -110,7 +133,10 @@ func (lc *LanguageClient) Connect() (LanguageClientInterface, error) {
 				logger.Debug(fmt.Sprintf("[%s SERVER STDERR]: %s", lc.command, buf[:n]))
 			}
 		}
-		stderr.Close()
+		stderrCloseErr := stderr.Close()
+		if stderrCloseErr != nil {
+			logger.Warn(fmt.Errorf("failed to close stderr pipe: %w", stderrCloseErr))
+		}
 	}()
 
 	return lc, nil
@@ -131,7 +157,10 @@ func (lc *LanguageClient) Close() error {
 
 	// Close JSON-RPC connection
 	if lc.conn != nil {
-		lc.conn.Close()
+		err := lc.conn.Close()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Cancel context
@@ -227,7 +256,7 @@ func (lc *LanguageClient) SendRequestNoTimeout(method string, params any, result
 // SendNotification sends a notification
 func (lc *LanguageClient) SendNotification(method string, params any) error {
 	if len(method) == 0 {
-		return fmt.Errorf("Empty notification method.")
+		return fmt.Errorf("empty notification method")
 	}
 
 	return lc.conn.Notify(lc.ctx, method, params)
@@ -260,8 +289,11 @@ func (lc *LanguageClient) GetMetrics() ClientMetrics {
 func (lc *LanguageClient) SetupSemanticTokens() error {
 	tokenTypes, tokenModifiers, err := GetTokenTypeFromServerCapabilities(&lc.serverCapabilities)
 	if err != nil {
+		logger.Warn(fmt.Sprintf("SetupSemanticTokens: Failed to get token types from server capabilities: %v", err))
 		return err
 	}
+
+	logger.Debug(fmt.Sprintf("SetupSemanticTokens: Token Types: %+v, Token Modifiers: %+v", tokenTypes, tokenModifiers))
 
 	lc.tokenParser = NewSemanticTokenParser(tokenTypes, tokenModifiers)
 	return nil
