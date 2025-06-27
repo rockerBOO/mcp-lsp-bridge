@@ -36,4 +36,7 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 
 	// Workspace analysis
 	tools.RegisterWorkspaceDiagnosticsTool(mcpServer, bridge)
+
+	// Diagnostic tools
+	tools.RegisterMCPLSPBridgeDiagnosticsTool(mcpServer, bridge)
 }

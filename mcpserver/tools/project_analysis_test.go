@@ -506,21 +506,3 @@ func TestProjectAnalysisUtilityFunctions(t *testing.T) {
 	})
 }
 
-func Test_formatDocumentSymbolWithTargeting(t *testing.T) {
-	tests := []struct {
-		name string // description of this test case
-		// Named input parameters for target function.
-		response *strings.Builder
-		symbol   protocol.DocumentSymbol
-		depth    int
-		number   int
-		docUri   string
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			formatDocumentSymbolWithTargeting(tt.response, tt.symbol, tt.depth, tt.number, tt.docUri)
-		})
-	}
-}

@@ -153,81 +153,6 @@ func normalizeURI(uri string) string {
 	return "file://" + uri
 }
 
-// formatDocumentSymbolWithTargeting formats a document symbol with precise targeting coordinates
-func formatDocumentSymbolWithTargeting(response *strings.Builder, symbol protocol.DocumentSymbol, depth int, number int, docUri string) {
-	indent := strings.Repeat("  ", depth)
-	kindStr := symbolKindToString(symbol.Kind)
-
-	// Extract full range coordinates
-	startLine := symbol.Range.Start.Line
-	startChar := symbol.Range.Start.Character
-	endLine := symbol.Range.End.Line
-	endChar := symbol.Range.End.Character
-
-	// Use SelectionRange for precise targeting (this should point to the symbol name itself)
-	targetLine := symbol.SelectionRange.Start.Line
-	targetChar := symbol.SelectionRange.Start.Character
-
-	// Check if SelectionRange is actually different from Range
-	selectionRangeUseful := targetLine != startLine || targetChar != startChar
-
-	if depth == 0 {
-		fmt.Fprintf(response, "%s%d. %s (%s)\n",
-			indent, number, symbol.Name, kindStr)
-
-		if docUri != "" {
-			fmt.Fprintf(response, "%s    URI: %s\n", indent, docUri)
-		}
-
-		fmt.Fprintf(response, "%s    Range: line=%d, character=%d to line=%d, character=%d\n",
-			indent, startLine, startChar, endLine, endChar)
-
-		if selectionRangeUseful {
-			fmt.Fprintf(response, "%s    Target coordinates: line=%d, character=%d (precise symbol location)\n", indent, targetLine, targetChar)
-			fmt.Fprintf(response, "%s    Recommended hover coordinate: uri=\"%s\", line=%d, character=%d\n", indent, docUri, targetLine, targetChar)
-		} else {
-			fmt.Fprintf(response, "%s    Target coordinates: line=%d, character=%d\n", indent, targetLine, targetChar)
-
-			// Suggest appropriate tools based on symbol type and agent needs
-			fmt.Fprintf(response, "%s    Recommended tools for this symbol:\n", indent)
-
-			switch symbol.Kind {
-			case protocol.SymbolKindFunction, protocol.SymbolKindMethod:
-				fmt.Fprintf(response, "%s      - definitions: Get exact function declaration location\n", indent)
-				fmt.Fprintf(response, "%s      - references: Find all usage locations of this function\n", indent)
-				fmt.Fprintf(response, "%s      - hover: Get function signature and documentation (position-sensitive)\n", indent)
-
-			case protocol.SymbolKindClass, protocol.SymbolKindInterface:
-				fmt.Fprintf(response, "%s      - definitions: Get exact class/interface declaration\n", indent)
-				fmt.Fprintf(response, "%s      - implementation: Find concrete implementations\n", indent)
-				fmt.Fprintf(response, "%s      - references: Find all usage locations\n", indent)
-
-			case protocol.SymbolKindVariable, protocol.SymbolKindConstant:
-				fmt.Fprintf(response, "%s      - definitions: Get exact declaration location\n", indent)
-				fmt.Fprintf(response, "%s      - references: Find all usage locations\n", indent)
-				fmt.Fprintf(response, "%s      - hover: Get type information and value\n", indent)
-
-			default:
-				fmt.Fprintf(response, "%s      - definitions: Get exact declaration location\n", indent)
-				fmt.Fprintf(response, "%s      - references: Find all usage locations\n", indent)
-			}
-
-			fmt.Fprintf(response, "%s    Example: project_analysis with analysis_type='definitions', query='%s'\n", indent, symbol.Name)
-		}
-	} else {
-		fmt.Fprintf(response, "%s%s (%s)\n",
-			indent, symbol.Name, kindStr)
-		fmt.Fprintf(response, "%s    Range: line=%d, character=%d to line=%d, character=%d\n",
-			indent, startLine, startChar, endLine, endChar)
-		fmt.Fprintf(response, "%s    Target: line=%d, character=%d\n", indent, targetLine, targetChar)
-	}
-
-	// Recursively format children
-	for _, child := range symbol.Children {
-		formatDocumentSymbolWithTargeting(response, child, depth+1, 0, "")
-	}
-}
-
 // handleWorkspaceSymbols handles the 'workspace_symbols' analysis type
 func handleWorkspaceSymbols(lspClient *lsp.LanguageClient, query string, offset, limit int, workspaceUri string, languages []string, activeLanguage string, response *strings.Builder) (*mcp.CallToolResult, error) {
 	symbols, err := lspClient.WorkspaceSymbols(query)
@@ -376,11 +301,11 @@ func formatCompactSymbol(response *strings.Builder, sym *protocol.DocumentSymbol
 	startChar := sym.Range.Start.Character
 	endLine := sym.Range.End.Line
 	endChar := sym.Range.End.Character
-	
+
 	fmt.Fprintf(response, "%d|%s|%s|%d:%d|%d:%d\n",
-	index, sym.Name, symbolKindToString(sym.Kind),
-	startLine, startChar, endLine, endChar)
-	
+		index, sym.Name, symbolKindToString(sym.Kind),
+		startLine, startChar, endLine, endChar)
+
 	// Format children with indentation
 	for _, child := range sym.Children {
 		formatCompactSymbolChild(response, &child, index, 1)
@@ -391,31 +316,28 @@ func formatCompactSymbolChild(response *strings.Builder, sym *protocol.DocumentS
 	indent := strings.Repeat("  ", depth)
 	startLine := sym.Range.Start.Line
 	startChar := sym.Range.Start.Character
-	
+
 	fmt.Fprintf(response, "%s%d.%d|%s|%s|%d:%d\n",
-	indent, parentIndex, depth, sym.Name, symbolKindToString(sym.Kind),
-	startLine, startChar)
-	
+		indent, parentIndex, depth, sym.Name, symbolKindToString(sym.Kind),
+		startLine, startChar)
+
 	// Recursively format children
 	for _, child := range sym.Children {
 		formatCompactSymbolChild(response, &child, parentIndex, depth+1)
 	}
 }
+
 // handleReferences handles the 'references' analysis type
 func handleReferences(bridge interfaces.BridgeInterface, lspClient *lsp.LanguageClient, query string, offset, limit int, activeLanguage string, response *strings.Builder) (*mcp.CallToolResult, error) {
-	// For references, search for the symbol first
+	// Search for the symbol first
 	symbols, err := lspClient.WorkspaceSymbols(query)
 	if err != nil {
-		response.WriteString("=== REFERENCES ===\n")
-		fmt.Fprintf(response, "Error: Cannot find references - workspace symbols search failed: %v\n", err)
-
+		fmt.Fprintf(response, "ERROR: %v\n", err)
 		return mcp.NewToolResultText(response.String()), nil
 	}
 
-	response.WriteString("=== REFERENCES ===\n")
-
 	if len(symbols) == 0 {
-		fmt.Fprintf(response, "No symbols found matching the query '%s'.\n", query)
+		fmt.Fprintf(response, "NO_SYMBOL: %s\n", query)
 		return mcp.NewToolResultText(response.String()), nil
 	}
 
@@ -429,25 +351,64 @@ func handleReferences(bridge interfaces.BridgeInterface, lspClient *lsp.Language
 
 		references, err := bridge.FindSymbolReferences(activeLanguage, uri, uint32(line), uint32(character), true)
 		if err != nil {
-			fmt.Fprintf(response, "Failed to find references: %v\n", err)
+			fmt.Fprintf(response, "ERROR: %v\n", err)
 			return mcp.NewToolResultText(response.String()), nil
 		}
 
 		if len(references) == 0 {
-			fmt.Fprintf(response, "No references found for symbol '%s'.\n", symbol.Name)
+			fmt.Fprintf(response, "NO_REFS: %s\n", symbol.Name)
 			return mcp.NewToolResultText(response.String()), nil
 		}
 
-		fmt.Fprintf(response, "Found %d references for symbol '%s':\n", len(references), symbol.Name)
-
-		for i, ref := range references {
-			fmt.Fprintf(response, "%d. %v\n", i+1, ref)
+		// Apply pagination
+		totalCount := len(references)
+		if offset >= totalCount {
+			fmt.Fprintf(response, "OFFSET_EXCEEDED: %d >= %d\n", offset, totalCount)
+			return mcp.NewToolResultText(response.String()), nil
 		}
+
+		end := min(offset+limit, totalCount)
+		paginatedRefs := references[offset:end]
+
+		// Structured header: REFS|symbol|offset|count|total
+		fmt.Fprintf(response, "REFS|%s|%d|%d|%d\n", symbol.Name, offset, len(paginatedRefs), totalCount)
+
+		// Compact reference format
+		for i, ref := range paginatedRefs {
+			formatCompactReference(response, ref, offset+i+1)
+		}
+
+		// Pagination indicator
+		if end < totalCount {
+			fmt.Fprintf(response, "MORE|%d\n", totalCount-end)
+		}
+
 	default:
-		return mcp.NewToolResultError(fmt.Sprintf("Unsupported reference format: %s", v)), nil
+		fmt.Fprintf(response, "UNSUPPORTED_FORMAT: %T\n", v)
+		return mcp.NewToolResultText(response.String()), nil
 	}
 
 	return mcp.NewToolResultText(response.String()), nil
+}
+
+func formatCompactReference(response *strings.Builder, ref any, index int) {
+	// Parse the reference format from your example
+	// Assuming ref is a Location with Range and URI
+	refStr := fmt.Sprintf("%v", ref)
+
+	// Extract line, character, and file from the reference string
+	// This is a simplified parser - you may need to adjust based on actual ref type
+	if location, ok := ref.(protocol.Location); ok {
+		line := location.Range.Start.Line
+		char := location.Range.Start.Character
+		uri := string(location.Uri)
+
+		// Format: INDEX|LINE:CHAR|FILE
+		fmt.Fprintf(response, "%d|%d:%d|%s\n", index, line, char, uri)
+	} else {
+		// Fallback for unknown reference types
+		fmt.Fprintf(response, "%d|%s\n", index, refStr)
+	}
 }
 
 // handleDefinitions handles the 'definitions' analysis type

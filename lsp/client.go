@@ -41,6 +41,25 @@ func NewLanguageClient(command string, args ...string) (*LanguageClient, error) 
 	return &client, nil
 }
 
+func (cs ClientStatus) String() string {
+	switch cs {
+	case StatusUninitialized:
+		return "uninitialized"
+	case StatusConnecting:
+		return "connecting"
+	case StatusConnected:
+		return "connected"
+	case StatusError:
+		return "error"
+	case StatusRestarting:
+		return "restarting"
+	case StatusDisconnected:
+		return "disconnected"
+	default:
+		return "unknown"
+	}
+}
+
 func sanitizeArgs(args []string) error {
 	for _, arg := range args {
 		// Block shell metacharacters that could be dangerous if LSP server processes them

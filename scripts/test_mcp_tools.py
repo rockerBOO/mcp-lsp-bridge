@@ -68,12 +68,13 @@ class MCPToolRunner:
         Example input:
         ●? lsp:signature_help (MCP)(uri="file:///path/to/project", line="10", character='5')
         lsp:hover(uri="file:///path/to/file.go", line=10, character=5)
+        mcp__lsp__diagnostics (MCP)(report_type="all")
         """
         command_str = command_str.strip()
         
-        # Regex to capture the tool name and the raw parameter string.
+        # Updated regex to capture both lsp: and mcp__lsp__ formats
         match = re.match(
-            r'^(?:●\s*)?lsp:(\w+)\s*(?:\(MCP\))?\s*\((.*)\)$',
+            r'^(?:●\s*)?(?:lsp:(\w+)|mcp__lsp__(\w+))\s*(?:\(MCP\))?\s*\((.*)\)$',
             command_str
         )
         
@@ -81,9 +82,9 @@ class MCPToolRunner:
             logger.error(f"Failed to match command structure: '{command_str}'")
             raise ValueError(f"Invalid MCP command format: {command_str}")
         
-        tool_name = match.group(1)
-        params_str = match.group(2)
-
+        # tool_name is in either group 1 (lsp:) or group 2 (mcp__lsp__)
+        tool_name = match.group(1) or match.group(2)
+        params_str = match.group(3)
         logger.info(f"params string: {params_str}")
         
         params = {}
@@ -92,14 +93,12 @@ class MCPToolRunner:
             # This pattern matches quoted strings (single or double) OR unquoted values up to comma/end
             param_regex = r'(\w+)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^,\s)]+))'
             param_matches = re.findall(param_regex, params_str)
-
             if not param_matches and params_str.strip():
                  logger.warning(f"Could not parse any parameters from: '{params_str}' for command: {command_str}")
             
             for key, double_quoted_value, single_quoted_value, unquoted_value in param_matches:
                 # Prioritize: double-quoted, then single-quoted, then unquoted
                 value = double_quoted_value or single_quoted_value or unquoted_value
-
                 # Attempt to convert known integer parameters
                 if key in ["line", "character", "start_line", "start_character", "end_line", "end_character", "tab_size"]:
                     try:
@@ -109,10 +108,8 @@ class MCPToolRunner:
                         params[key] = value
                 else:
                     params[key] = value
-
         logger.info(f"Parsed command: Tool='{tool_name}', Params={params}")
         return tool_name, params
-
     def run_mcp_tool(self, tool_name, params):
         """
         Run MCP tool by sending JSON-RPC request via stdio

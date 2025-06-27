@@ -19,6 +19,7 @@ const (
 	StatusConnected
 	StatusError
 	StatusRestarting
+	StatusDisconnected
 )
 
 // LanguageClient wraps a Language Server Protocol client connection
