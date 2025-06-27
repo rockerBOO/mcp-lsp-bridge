@@ -1,0 +1,40 @@
+---
+version: '2'
+linters:
+  enable:
+    - testifylint
+  settings:
+    testifylint:
+      # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
+      # Default: false
+      enable-all: true
+      # Disable checkers by name
+      # (in addition to default
+      #   suite-thelper
+      # ).
+      disable:
+        - blank-import
+        - bool-compare
+        - compares
+        - contains
+        - empty
+        - encoded-compare
+        - equal-values
+        # - error-is-as
+        - error-nil
+        # - expected-actual
+        # - float-compare
+        - formatter
+        - go-require
+        - len
+        - negative-positive
+        - nil-compare
+        - regexp
+        # - require-error
+        - suite-broken-parallel
+        - suite-dont-use-pkg
+        - suite-extra-assert-call
+        - suite-method-signature
+        - suite-subtest-run
+        - suite-thelper
+        - useless-assert

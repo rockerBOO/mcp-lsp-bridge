@@ -15,6 +15,7 @@
 !Dockerfile
 
 !lsp_config.example.json
+!.golangci.yml
 
 !*.py
 !*.sh
