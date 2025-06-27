@@ -44,13 +44,9 @@ func DefaultConnectionConfig() ConnectionAttemptConfig {
 }
 
 func (b *MCPLSPBridge) IsAllowedDirectory(path string) (string, error) {
-	// Clean the path to resolve .. and . elements
-	cleanPath := filepath.Clean(path)
-
-	// Convert to absolute path
-	absPath, err := filepath.Abs(cleanPath)
+	absPath, err := getCleanAbsPath(path)
 	if err != nil {
-		return "", fmt.Errorf("invalid file path: %w", err)
+		return "", err
 	}
 
 	isAllowedDirectory := false
@@ -766,34 +762,13 @@ func (b *MCPLSPBridge) FormatDocument(uri string, tabSize uint32, insertSpaces b
 	return result, nil
 }
 
-func (b *MCPLSPBridge) IsPathAllowed(filePath string) bool {
-	// Clean the path to resolve .. and . elements
-	cleanPath := filepath.Clean(filePath)
-
-	// Convert to absolute path
-	absPath, err := filepath.Abs(cleanPath)
-	if err != nil {
-		return false
-	}
-
-	isAllowedDirectory := false
-	for _, allowedDirectory := range b.allowedDirectories {
-		if isWithinAllowedDirectory(absPath, allowedDirectory) {
-			isAllowedDirectory = true
-			break
-		}
-	}
-
-	return isAllowedDirectory
-}
-
 // ApplyTextEdits applies text edits to a file
 func (b *MCPLSPBridge) ApplyTextEdits(uri string, edits []protocol.TextEdit) error {
 	// Convert URI to file path
 	filePath := strings.TrimPrefix(uri, "file://")
-
+	filePath, err := b.IsAllowedDirectory(filePath)
 	// Check if file path is allowed
-	if !b.IsPathAllowed(filePath) {
+	if err != nil {
 		return fmt.Errorf("file path is not allowed: %s", filePath)
 	}
 
@@ -1207,4 +1182,17 @@ func isWithinAllowedDirectory(path, baseDir string) bool {
 		return true
 	}
 	return strings.HasPrefix(path, absBase+string(filepath.Separator))
+}
+
+func getCleanAbsPath(path string) (string, error) {
+	if path == "" || path == "." {
+		return "", errors.New("path cannot be empty or current directory")
+	}
+
+	cleanPath := filepath.Clean(path)
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return "", fmt.Errorf("invalid file path: %w", err)
+	}
+	return absPath, nil
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -666,4 +667,277 @@ func TestGetHoverInformationInvalidLanguage(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "failed to infer language")
+}
+func createTestPaths() (projectRoots []string, testCases []struct {
+	name    string
+	dir     string
+	allowed bool
+}) {
+	if runtime.GOOS == "windows" {
+		projectRoots = []string{
+			`C:\Users\rockerboo\code\mcp-lsp-bridge`,
+			`C:\other\allowed\directory`,
+		}
+		testCases = []struct {
+			name    string
+			dir     string
+			allowed bool
+		}{
+			{"exact match", `C:\Users\rockerboo\code\mcp-lsp-bridge`, true},
+			{"subdirectory", `C:\Users\rockerboo\code\mcp-lsp-bridge\lsp`, true},
+			{"not allowed", `C:\not\allowed\directory`, false},
+			{"parent with ..", `C:\Users\rockerboo\code\mcp-lsp-bridge\lsp\..`, true},
+			{"parent .. attempt", `C:\Users\rockerboo\code\mcp-lsp-bridge\lsp\..\..`, false}, // Should go outside allowed dir
+			{"other exact match", `C:\other\allowed\directory`, true},
+			{"other subdirectory", `C:\other\allowed\directory\lsp`, true},
+			{"root", `C:\`, false},
+		}
+	} else {
+		projectRoots = []string{
+			"/home/rockerboo/code/mcp-lsp-bridge",
+			"/other/allowed/directory",
+		}
+		testCases = []struct {
+			name    string
+			dir     string
+			allowed bool
+		}{
+			{"exact match", "/home/rockerboo/code/mcp-lsp-bridge", true},
+			{"subdirectory", "/home/rockerboo/code/mcp-lsp-bridge/lsp", true},
+			{"not allowed", "/not/allowed/directory", false},
+			{"parent with ..", "/home/rockerboo/code/mcp-lsp-bridge/lsp/..", true},
+			{"parent .. attempt", "/home/rockerboo/code/mcp-lsp-bridge/lsp/../..", true}, // Should go outside allowed dir
+			{"other exact match", "/other/allowed/directory", true},
+			{"other subdirectory", "/other/allowed/directory/lsp", true},
+			{"root", "/", false},
+		}
+	}
+	return projectRoots, testCases
+}
+
+func TestIsWithinAllowedDirectory(t *testing.T) {
+	projectRoots, tests := createTestPaths()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isAllowed := false
+			for _, projectRoot := range projectRoots {
+				if isWithinAllowedDirectory(tt.dir, projectRoot) {
+					isAllowed = true
+					break
+				}
+			}
+
+			if tt.allowed != isAllowed {
+				t.Errorf("isWithinAllowedDirectory(%s, %v) = %v, want %v", tt.dir, projectRoots, isAllowed, tt.allowed)
+			}
+		})
+	}
+}
+
+// Cross-platform test using relative paths
+func TestIsWithinAllowedDirectoryRelative(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+
+	// Create subdirectories
+	allowedDir := filepath.Join(tempDir, "allowed")
+	subDir := filepath.Join(allowedDir, "subdir")
+
+	tests := []struct {
+		name    string
+		dir     string
+		base    string
+		allowed bool
+	}{
+		{"exact match", allowedDir, allowedDir, true},
+		{"subdirectory", subDir, allowedDir, true},
+		{"parent directory", tempDir, allowedDir, false},
+		{"unrelated directory", filepath.Join(tempDir, "other"), allowedDir, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isWithinAllowedDirectory(tt.dir, tt.base)
+			if result != tt.allowed {
+				t.Errorf("isWithinAllowedDirectory(%s, %s) = %v, want %v", tt.dir, tt.base, result, tt.allowed)
+			}
+		})
+	}
+}
+
+func Test_getCleanAbsPath(t *testing.T) {
+	// Get current working directory for relative path tests
+	cwd, err := filepath.Abs(".")
+	if err != nil {
+		t.Fatal("Failed to get current working directory:", err)
+	}
+
+	var tests []struct {
+		name    string
+		path    string
+		want    string
+		wantErr bool
+	}
+
+	if runtime.GOOS == "windows" {
+		tests = []struct {
+			name    string
+			path    string
+			want    string
+			wantErr bool
+		}{
+			{
+				name:    "valid absolute path",
+				path:    `C:\Users\rockerboo\code\mcp-lsp-bridge\lsp`,
+				want:    `C:\Users\rockerboo\code\mcp-lsp-bridge\lsp`,
+				wantErr: false,
+			},
+			{
+				name:    "empty path",
+				path:    "",
+				want:    "",
+				wantErr: true,
+			},
+			{
+				name:    "current directory",
+				path:    ".",
+				want:    "",
+				wantErr: true,
+			},
+			{
+				name:    "relative path",
+				path:    "lsp",
+				want:    filepath.Join(cwd, "lsp"),
+				wantErr: false,
+			},
+			{
+				name:    "absolute path with ..",
+				path:    `C:\Users\rockerboo\code\mcp-lsp-bridge\..\lsp`,
+				want:    `C:\Users\rockerboo\code\lsp`,
+				wantErr: false,
+			},
+			{
+				name:    "absolute path with ./",
+				path:    `C:\Users\rockerboo\code\mcp-lsp-bridge\.\lsp`,
+				want:    `C:\Users\rockerboo\code\mcp-lsp-bridge\lsp`,
+				wantErr: false,
+			},
+			{
+				name:    "UNC path",
+				path:    `\\server\share\path`,
+				want:    `\\server\share\path`,
+				wantErr: false,
+			},
+		}
+	} else {
+		tests = []struct {
+			name    string
+			path    string
+			want    string
+			wantErr bool
+		}{
+			{
+				name:    "valid absolute path",
+				path:    "/home/rockerboo/code/mcp-lsp-bridge/lsp",
+				want:    "/home/rockerboo/code/mcp-lsp-bridge/lsp",
+				wantErr: false,
+			},
+			{
+				name:    "empty path",
+				path:    "",
+				want:    "",
+				wantErr: true,
+			},
+			{
+				name:    "current directory",
+				path:    ".",
+				want:    "",
+				wantErr: true,
+			},
+			{
+				name:    "relative path",
+				path:    "lsp",
+				want:    filepath.Join(cwd, "lsp"),
+				wantErr: false,
+			},
+			{
+				name:    "absolute path with ..",
+				path:    "/home/rockerboo/code/mcp-lsp-bridge/../lsp",
+				want:    "/home/rockerboo/code/lsp",
+				wantErr: false,
+			},
+			{
+				name:    "absolute path with ./",
+				path:    "/home/rockerboo/code/mcp-lsp-bridge/./lsp",
+				want:    "/home/rockerboo/code/mcp-lsp-bridge/lsp",
+				wantErr: false,
+			},
+		}
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := getCleanAbsPath(tt.path)
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("getCleanAbsPath() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("getCleanAbsPath() succeeded unexpectedly")
+			}
+			if tt.want != got {
+				t.Errorf("getCleanAbsPath() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Cross-platform test using temporary directories
+func Test_getCleanAbsPathWithTempDir(t *testing.T) {
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{
+			name:    "temp directory path",
+			path:    tempDir,
+			wantErr: false,
+		},
+		{
+			name:    "temp subdirectory path",
+			path:    filepath.Join(tempDir, "subdir"),
+			wantErr: false,
+		},
+		{
+			name:    "temp path with ..",
+			path:    filepath.Join(tempDir, "subdir", ".."),
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getCleanAbsPath(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getCleanAbsPath() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				// Verify it's an absolute path
+				if !filepath.IsAbs(got) {
+					t.Errorf("getCleanAbsPath() returned non-absolute path: %v", got)
+				}
+				// Verify it's clean (no . or .. components)
+				if got != filepath.Clean(got) {
+					t.Errorf("getCleanAbsPath() returned unclean path: %v", got)
+				}
+			}
+		})
+	}
 }
