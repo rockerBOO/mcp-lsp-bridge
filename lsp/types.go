@@ -102,7 +102,12 @@ type LanguageClientInterface interface {
 
 	// Language features
 	WorkspaceSymbols(query string) ([]protocol.WorkspaceSymbol, error)
+	CodeActions(uri string, line, character, endLine, endCharacter uint32) ([]protocol.CodeAction, error)
+	Formatting(uri string, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error)
+	Rename(uri string, line, character uint32, newName string) (*protocol.WorkspaceEdit, error)
 	Definition(uri string, line, character uint32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error)
+	WorkspaceDiagnostic(identifier string) (*protocol.WorkspaceDiagnosticReport, error)
+	PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error)
 	References(uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error)
 	Hover(uri string, line, character uint32) (*protocol.Hover, error)
 	DocumentSymbols(uri string) ([]protocol.DocumentSymbol, error)

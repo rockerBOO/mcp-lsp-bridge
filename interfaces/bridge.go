@@ -22,7 +22,7 @@ type BridgeInterface interface {
 	// Core information tools
 	GetHoverInformation(uri string, line, character uint32) (*protocol.Hover, error)
 	GetDiagnostics(uri string) ([]any, error)
-	GetWorkspaceDiagnostics(workspaceUri string, identifier string) ([]protocol.WorkspaceDiagnosticReport, error)
+	GetWorkspaceDiagnostics(workspaceUri string, identifier string) ([]*protocol.WorkspaceDiagnosticReport, error)
 	GetSignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error)
 	SemanticTokens(uri string, targetTypes []string, startLine, startCharacter, endLine, endCharacter uint32) ([]lsp.TokenPosition, error)
 	// Code actions and formatting tools

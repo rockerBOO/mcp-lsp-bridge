@@ -99,9 +99,9 @@ func (m *MockBridge) GetDiagnostics(uri string) ([]any, error) {
 	return args.Get(0).([]any), args.Error(1)
 }
 
-func (m *MockBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier string) ([]protocol.WorkspaceDiagnosticReport, error) {
+func (m *MockBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier string) ([]*protocol.WorkspaceDiagnosticReport, error) {
 	args := m.Called(workspaceUri, identifier)
-	return args.Get(0).([]protocol.WorkspaceDiagnosticReport), args.Error(1)
+	return args.Get(0).([]*protocol.WorkspaceDiagnosticReport), args.Error(1)
 }
 
 func (m *MockBridge) GetSignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error) {

@@ -271,6 +271,103 @@ func (lc *LanguageClient) SignatureHelp(uri string, line, character uint32) (*pr
 	return &result, nil
 }
 
+func (lc *LanguageClient) CodeActions(uri string, line, character, endLine, endCharacter uint32) ([]protocol.CodeAction, error) {
+
+	params := protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Range: protocol.Range{
+			Start: protocol.Position{Line: line, Character: character},
+			End:   protocol.Position{Line: endLine, Character: endCharacter},
+		},
+		Context: protocol.CodeActionContext{
+			// Context can be empty for general code actions
+		},
+	}
+
+	var result []protocol.CodeAction
+
+	err := lc.SendRequest("textDocument/codeAction", params, &result, 5*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("code action request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+func (lc *LanguageClient) Rename(uri string, line, character uint32, newName string) (*protocol.WorkspaceEdit, error) {
+	params := protocol.RenameParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Position: protocol.Position{
+			Line:      line,
+			Character: character,
+		},
+		NewName: newName,
+	}
+
+	var result protocol.WorkspaceEdit
+
+	err := lc.SendRequest("textDocument/rename", params, &result, 10*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("rename request failed: %w", err)
+	}
+
+	return &result, nil
+}
+
+func (lc *LanguageClient) WorkspaceDiagnostic(identifier string) (*protocol.WorkspaceDiagnosticReport, error) {
+	params := protocol.WorkspaceDiagnosticParams{
+		Identifier:        identifier,
+		PreviousResultIds: []protocol.PreviousResultId{}, // Empty for first request
+	}
+
+	var result protocol.WorkspaceDiagnosticReport
+
+	err := lc.SendRequest("workspace/diagnostic", params, &result, 30*time.Second) // Longer timeout for workspace operations
+	if err != nil {
+		return nil, fmt.Errorf("workspace diagnostic request failed: %w", err)
+	}
+
+	return &result, nil
+}
+
+func (lc *LanguageClient) Formatting(uri string, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error) {
+	params := protocol.DocumentFormattingParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Options: protocol.FormattingOptions{
+			TabSize:      tabSize,
+			InsertSpaces: insertSpaces,
+		},
+	}
+
+	var result []protocol.TextEdit
+
+	err := lc.SendRequest("textDocument/formatting", params, &result, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("workspace diagnostic request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+func (lc *LanguageClient) PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error) {
+	params := protocol.CallHierarchyPrepareParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Position: protocol.Position{
+			Line:      line,
+			Character: character,
+		},
+	}
+
+	var result []protocol.CallHierarchyItem
+
+	err := lc.SendRequest("textDocument/prepareCallHierarchy", params, &result, 5*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("prepare call hierarchy request failed: %w", err)
+	}
+
+	return result, nil
+}
+
 func (lc *LanguageClient) SemanticTokens(uri string) (*protocol.SemanticTokens, error) {
 	var result protocol.SemanticTokens
 

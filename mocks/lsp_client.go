@@ -163,6 +163,31 @@ func (m *MockLanguageClient) Implementation(uri string, line, character uint32) 
 	return args.Get(0).([]protocol.Location), args.Error(1)
 }
 
+func (m *MockLanguageClient) Formatting(uri string, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error) {
+	args := m.Called(uri, tabSize, insertSpaces)
+	return args.Get(0).([]protocol.TextEdit), args.Error(1)
+}
+
+func (m *MockLanguageClient) Rename(uri string, line, character uint32, newName string) (*protocol.WorkspaceEdit, error) {
+	args := m.Called(uri, line, character, newName)
+	return args.Get(0).(*protocol.WorkspaceEdit), args.Error(1)
+}
+
+func (m *MockLanguageClient) CodeActions(uri string, line, character, endLine, endCharacter uint32) ([]protocol.CodeAction, error) {
+	args := m.Called(uri, line, character, endLine, endCharacter)
+	return args.Get(0).([]protocol.CodeAction), args.Error(1)
+}
+
+func (m *MockLanguageClient) WorkspaceDiagnostic(identifier string) (*protocol.WorkspaceDiagnosticReport, error) {
+	args := m.Called(identifier)
+	return args.Get(0).(*protocol.WorkspaceDiagnosticReport), args.Error(1)
+}
+
+func (m *MockLanguageClient) PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error) {
+	args := m.Called(uri, line, character)
+	return args.Get(0).([]protocol.CallHierarchyItem), args.Error(1)
+}
+
 func (m *MockLanguageClient) SignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error) {
 	args := m.Called(uri, line, character)
 	return args.Get(0).(*protocol.SignatureHelp), args.Error(1)
