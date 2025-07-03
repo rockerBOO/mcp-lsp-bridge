@@ -25,6 +25,8 @@
 
 !.github/workflows/*
 
+!docs/DOCKER_DEVELOPMENT.md
+
 # ...even if they are in subdirectories
 !*/
 
