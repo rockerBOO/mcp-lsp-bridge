@@ -353,7 +353,7 @@ func TestGetTokenTypeFromServerCapabilities_NoSemanticTokens(t *testing.T) {
 	}
 
 	resultTypes, resultModifiers, err := GetTokenTypeFromServerCapabilities(capabilities)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, "server does not support semantic tokens", err.Error())
 	assert.Nil(t, resultTypes)
 	assert.Nil(t, resultModifiers)
@@ -372,7 +372,7 @@ func TestGetTokenTypeFromServerCapabilities_EmptyTokenTypes(t *testing.T) {
 	}
 
 	resultTypes, resultModifiers, err := GetTokenTypeFromServerCapabilities(capabilities)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, "no token types provided by server", err.Error())
 	assert.Nil(t, resultTypes)
 	assert.Nil(t, resultModifiers)
@@ -386,7 +386,7 @@ func TestGetTokenTypeFromServerCapabilities_UnsupportedType(t *testing.T) {
 	}
 
 	resultTypes, resultModifiers, err := GetTokenTypeFromServerCapabilities(capabilities)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, "unsupported semantic tokens provider type", err.Error())
 	assert.Nil(t, resultTypes)
 	assert.Nil(t, resultModifiers)

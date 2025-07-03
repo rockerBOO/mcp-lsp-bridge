@@ -1783,12 +1783,12 @@ func TestIsAllowedDirectory(t *testing.T) {
 			result, err := bridge.IsAllowedDirectory(tt.testPath)
 			
 			if tt.expectAllowed {
-				assert.NoError(t, err, "Expected path to be allowed")
+				require.NoError(t, err, "Expected path to be allowed")
 				assert.NotEmpty(t, result, "Expected non-empty absolute path")
 				// Result should be an absolute path
 				assert.True(t, filepath.IsAbs(result), "Result should be absolute path")
 			} else {
-				assert.Error(t, err, "Expected path to be disallowed")
+				require.Error(t, err, "Expected path to be disallowed")
 				if tt.expectError != "" {
 					assert.Contains(t, err.Error(), tt.expectError)
 				}
@@ -1875,13 +1875,13 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create subdirectory for this test
 			testDir := filepath.Join(tempDir, tt.name)
-			err := os.MkdirAll(testDir, 0755)
+			err := os.MkdirAll(testDir, 0750)
 			require.NoError(t, err)
 
 			// Create test files
 			for _, file := range tt.files {
 				filePath := filepath.Join(testDir, file)
-				err := os.WriteFile(filePath, []byte("test content"), 0644)
+				err := os.WriteFile(filePath, []byte("test content"), 0600)
 				require.NoError(t, err)
 			}
 
@@ -1890,7 +1890,7 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 			result, err := bridge.DetectPrimaryProjectLanguage(testDir)
 			
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, result)
 			} else {
 				assert.NoError(t, err)

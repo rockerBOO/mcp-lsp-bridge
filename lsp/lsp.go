@@ -2,7 +2,6 @@ package lsp
 
 import (
 	"fmt"
-	"math"
 	"time"
 
 	"rockerboo/mcp-lsp-bridge/logger"
@@ -35,16 +34,6 @@ func safeUint32FromInt32(val int32) (uint32, error) {
 	return uint32(val), nil
 }
 
-// safeUint32 safely converts an int to uint32, checking for overflow  
-func safeUint32(val int) (uint32, error) {
-	if val < 0 {
-		return 0, fmt.Errorf("value cannot be negative: %d", val)
-	}
-	if val > math.MaxUint32 {
-		return 0, fmt.Errorf("value exceeds uint32 maximum: %d", val)
-	}
-	return uint32(val), nil
-}
 
 // AnalyzeCode provides comprehensive code analysis for a given file and position
 func AnalyzeCode(client *LanguageClient, opts AnalyzeCodeOptions) (*AnalyzeCodeResult, error) {

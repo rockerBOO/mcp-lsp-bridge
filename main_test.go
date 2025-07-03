@@ -186,7 +186,9 @@ func TestTryLoadConfig(t *testing.T) {
 				require.NoError(t, err)
 				
 				return primaryPath, configDir, func() {
-					os.Chdir(originalWd)
+					if err := os.Chdir(originalWd); err != nil {
+						t.Errorf("Failed to restore working directory: %v", err)
+					}
 				}
 			},
 			expectSuccess: true,
@@ -199,7 +201,7 @@ func TestTryLoadConfig(t *testing.T) {
 				configDir := filepath.Join(tempDir, "config")
 				
 				// Create config directory
-				err := os.MkdirAll(configDir, 0755)
+				err := os.MkdirAll(configDir, 0750)
 				require.NoError(t, err)
 				
 				// Create fallback config in config directory
@@ -259,7 +261,9 @@ func TestTryLoadConfig(t *testing.T) {
 				require.NoError(t, err)
 				
 				return primaryPath, configDir, func() {
-					os.Chdir(originalWd)
+					if err := os.Chdir(originalWd); err != nil {
+						t.Errorf("Failed to restore working directory: %v", err)
+					}
 				}
 			},
 			expectSuccess: true,
@@ -279,7 +283,9 @@ func TestTryLoadConfig(t *testing.T) {
 				
 				// Don't create any config files
 				return primaryPath, configDir, func() {
-					os.Chdir(originalWd)
+					if err := os.Chdir(originalWd); err != nil {
+						t.Errorf("Failed to restore working directory: %v", err)
+					}
 				}
 			},
 			expectSuccess: false,
@@ -319,7 +325,9 @@ func TestTryLoadConfig(t *testing.T) {
 				require.NoError(t, err)
 				
 				return primaryPath, configDir, func() {
-					os.Chdir(originalWd)
+					if err := os.Chdir(originalWd); err != nil {
+						t.Errorf("Failed to restore working directory: %v", err)
+					}
 				}
 			},
 			expectSuccess: true,
@@ -334,13 +342,13 @@ func TestTryLoadConfig(t *testing.T) {
 			config, err := tryLoadConfig(primaryPath, configDir)
 
 			if tt.expectSuccess {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, config)
 				if config != nil {
 					assert.NotEmpty(t, config.LanguageServers)
 				}
 			} else {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, config)
 				if tt.expectError != "" && err != nil {
 					assert.Contains(t, err.Error(), tt.expectError)

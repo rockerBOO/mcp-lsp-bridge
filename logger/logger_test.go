@@ -339,7 +339,7 @@ func TestWarnFunction(t *testing.T) {
 			Warn(testMessage)
 
 			// Read log file and check contents
-			content, err := os.ReadFile(logPath)
+			content, err := os.ReadFile(logPath) // #nosec G304 - Test file path controlled by test
 			if err != nil {
 				t.Fatalf("Failed to read log file: %v", err)
 			}
@@ -369,11 +369,13 @@ func TestRotateLogFilesCoverage(t *testing.T) {
 		// Create some files first
 		for i := 0; i < 3; i++ {
 			filename := fmt.Sprintf("%s.%d", baseLogPath, i)
-			file, err := os.Create(filename)
+			file, err := os.Create(filename) // #nosec G304 - Test file path controlled by test
 			if err != nil {
 				t.Fatalf("Failed to create test log file: %v", err)
 			}
-			file.Close()
+			if err := file.Close(); err != nil {
+				t.Fatalf("Failed to close test log file: %v", err)
+			}
 		}
 
 		filesBefore, _ := filepath.Glob(baseLogPath + "*")

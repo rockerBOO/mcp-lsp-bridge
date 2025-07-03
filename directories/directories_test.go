@@ -65,7 +65,7 @@ func TestDefaultUserProvider_Current(t *testing.T) {
 	user, err := provider.Current()
 	
 	// This should work on most systems
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, user)
 	assert.NotEmpty(t, user.Username)
 }
