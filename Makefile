@@ -11,6 +11,11 @@ GO_VERSION=1.24
 .PHONY: all
 all: clean test lint build
 
+# CI pipeline (matches CI environment exactly)
+.PHONY: ci
+ci: clean test lint security-scan build
+	@echo "CI pipeline completed successfully"
+
 # Build the application
 .PHONY: build
 build:

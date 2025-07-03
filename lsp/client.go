@@ -23,11 +23,16 @@ func NewLanguageClient(command string, args ...string) (*LanguageClient, error) 
 		return nil, err
 	}
 
+	// Create a background context that will be replaced when connecting
+	ctx, cancel := context.WithCancel(context.Background())
+
 	client := LanguageClient{
 		command:            command,
 		args:               args,
 		clientCapabilities: protocol.ClientCapabilities{},
 		serverCapabilities: protocol.ServerCapabilities{},
+		ctx:                ctx,
+		cancel:             cancel,
 
 		// Default configuration
 		maxConnectionAttempts: 3,
@@ -80,7 +85,10 @@ func (lc *LanguageClient) Connect() (LanguageClientInterface, error) {
 
 	var conn LSPConnectionInterface
 
-	// Create cancellable context for the entire session
+	// Cancel the existing context and create a new one for the connection session
+	if lc.cancel != nil {
+		lc.cancel()
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Start the external process
@@ -126,28 +134,27 @@ func (lc *LanguageClient) Connect() (LanguageClientInterface, error) {
 
 	// Start the process
 	if err := cmd.Start(); err != nil {
-		stdinCloseErr := stdin.Close()
-		if stdinCloseErr != nil {
-			cancel()
-			return nil, fmt.Errorf("failed to close stdin pipe: %w", stdinCloseErr)
+		// Close all pipes and cancel context on startup failure
+		var closeErrors []error
+		if stdinErr := stdin.Close(); stdinErr != nil {
+			closeErrors = append(closeErrors, fmt.Errorf("failed to close stdin: %w", stdinErr))
 		}
-
-		stdoutCloseErr := stdout.Close()
-		if stdoutCloseErr != nil {
-			cancel()
-			return nil, fmt.Errorf("failed to close stdout pipe: %w", stdoutCloseErr)
+		if stdoutErr := stdout.Close(); stdoutErr != nil {
+			closeErrors = append(closeErrors, fmt.Errorf("failed to close stdout: %w", stdoutErr))
 		}
-
-		stderrCloseErr := stderr.Close()
-		if stderrCloseErr != nil {
-			cancel()
-			return nil, fmt.Errorf("failed to close stderr pipe: %w", stderrCloseErr)
+		if stderrErr := stderr.Close(); stderrErr != nil {
+			closeErrors = append(closeErrors, fmt.Errorf("failed to close stderr: %w", stderrErr))
 		}
-
 		cancel()
-
+		
+		if len(closeErrors) > 0 {
+			return nil, fmt.Errorf("failed to start command: %w, cleanup errors: %v", err, closeErrors)
+		}
 		return nil, fmt.Errorf("failed to start command: %w", err)
 	}
+
+	// Store the command for cleanup
+	lc.cmd = cmd
 
 	// Create a ReadWriteCloser that combines stdin and stdout for LSP
 	readWriteCloser := &stdioReadWriteCloser{
@@ -215,18 +222,23 @@ func (lc *LanguageClient) Close() error {
 	lc.mu.Lock()
 	defer lc.mu.Unlock()
 
-	// Close JSON-RPC connection
+	var errors []error
+
+	// Cancel context first to signal shutdown
+	if lc.cancel != nil {
+		lc.cancel()
+	}
+
+	// Close JSON-RPC connection (this will close the stdin/stdout pipes)
 	if lc.conn != nil {
 		err := lc.conn.Close()
 		if err != nil {
-			return err
+			errors = append(errors, fmt.Errorf("failed to close JSON-RPC connection: %w", err))
 		}
+		lc.conn = nil
 	}
 
-	// Cancel context
-	lc.cancel()
-
-	// Attempt graceful shutdown of language server
+	// Attempt graceful shutdown of language server process
 	if lc.cmd != nil && lc.cmd.Process != nil {
 		// Wait for process to exit or kill it
 		done := make(chan error, 1)
@@ -235,19 +247,35 @@ func (lc *LanguageClient) Close() error {
 		}()
 
 		select {
-		case <-done:
-			// Process exited gracefully
+		case waitErr := <-done:
+			// Process exited, check if there was an error
+			if waitErr != nil {
+				errors = append(errors, fmt.Errorf("process wait failed: %w", waitErr))
+			}
 		case <-time.After(2 * time.Second):
 			// Force kill if it doesn't exit
-			_ = lc.cmd.Process.Kill()
-
-			<-done // Wait for it to actually exit
+			if lc.cmd.Process != nil {
+				if killErr := lc.cmd.Process.Kill(); killErr != nil {
+					errors = append(errors, fmt.Errorf("failed to kill process: %w", killErr))
+				}
+				// Wait for it to actually exit after kill
+				waitErr := <-done
+				if waitErr != nil {
+					errors = append(errors, fmt.Errorf("process wait after kill failed: %w", waitErr))
+				}
+			}
 		}
+		lc.cmd = nil
 	}
 
 	// Reset connection state
 	lc.status = StatusUninitialized
 	lc.lastError = nil
+
+	// Return combined errors if any
+	if len(errors) > 0 {
+		return fmt.Errorf("cleanup errors: %v", errors)
+	}
 
 	return nil
 }
@@ -276,12 +304,12 @@ func (lc *LanguageClient) SendRequest(method string, params any, result any, tim
 	atomic.AddInt64(&lc.totalRequests, 1)
 
 	// Ensure connection is still valid by checking context and connection
-	if lc.ctx.Err() != nil || lc.conn == nil {
+	if lc.ctx == nil || lc.ctx.Err() != nil || lc.conn == nil {
 		return errors.New("language server connection is closed")
 	}
 
 	// Reset status to connected if we have a valid connection
-	if lc.status == StatusError && lc.ctx.Err() == nil && lc.conn != nil {
+	if lc.status == StatusError && lc.ctx != nil && lc.ctx.Err() == nil && lc.conn != nil {
 		lc.status = StatusConnected
 
 		logger.Info("LSP client status reset from error to connected")

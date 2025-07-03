@@ -1,0 +1,68 @@
+# Development and CI Testing Docker Container
+FROM golang:1.24-alpine AS base
+
+# Install necessary tools
+RUN apk add --no-cache \
+    git \
+    make \
+    curl \
+    docker \
+    bash
+
+# Install golangci-lint
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+
+# Install nancy for dependency scanning
+RUN go install github.com/sonatype-nexus-community/nancy@v1.0.51
+
+# Install glibc compatibility for mock-lsp-server (which is built with glibc)
+RUN apk add --no-cache gcompat
+
+# Install mock-lsp-server for testing
+RUN curl -L https://github.com/rockerBOO/mock-lsp-server/releases/download/v0.1.0/mock-lsp-server-linux-amd64-v0.1.0.tar.gz -o mock-lsp-server.tar.gz && \
+    tar -xzf mock-lsp-server.tar.gz && \
+    mv mock-lsp-server-linux-amd64 /usr/local/bin/mock-lsp-server && \
+    chmod +x /usr/local/bin/mock-lsp-server && \
+    rm mock-lsp-server.tar.gz
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy go mod files first for better caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Development stage with all tools
+FROM base AS dev
+
+# Set up development environment
+ENV CGO_ENABLED=0
+ENV GOOS=linux
+
+# Expose common ports
+EXPOSE 8080 2345
+
+# Default command for development
+CMD ["bash"]
+
+# CI testing stage
+FROM base AS ci
+
+# Run the full CI pipeline
+CMD ["make", "ci"]
+
+# Production build stage
+FROM alpine:latest AS production
+
+# Install ca-certificates for HTTPS
+RUN apk --no-cache add ca-certificates
+WORKDIR /root/
+
+# Copy binary from build stage
+COPY --from=base /workspace/mcp-lsp-bridge .
+
+# Run the application
+CMD ["./mcp-lsp-bridge"]

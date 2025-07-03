@@ -13,6 +13,9 @@
 
 !Makefile
 !Dockerfile
+!Dockerfile.dev
+!docker-compose.dev.yml
+
 
 !lsp_config.example.json
 !.golangci.yml

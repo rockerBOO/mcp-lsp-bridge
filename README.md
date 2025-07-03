@@ -201,6 +201,53 @@ The logger can be configured through the `lsp_config.json` file under the `globa
   - `error`: Logs only error messages
 - `max_log_files`: Maximum number of log files to keep before rotation. Default is 5.
 
+## Development
+
+### Docker Development Environment
+
+For consistent development and testing, we provide a comprehensive Docker-based setup that exactly matches the CI environment:
+
+```bash
+# Run complete CI pipeline locally (matches CI exactly)
+./scripts/dev-container.sh ci
+
+# Start development environment with hot reload
+./scripts/dev-container.sh dev
+
+# Run just tests in CI-like environment  
+./scripts/dev-container.sh test
+
+# Open interactive shell for debugging
+./scripts/dev-container.sh shell
+```
+
+**Benefits:**
+- **Exact CI replication**: Eliminates "works locally but fails in CI" issues
+- **Consistent environment**: Same Go version, tools, and configuration across all developers
+- **Easy debugging**: Reproduce CI failures locally with identical environment
+- **Security validation**: Run same security scans as CI
+
+See [`docs/DOCKER_DEVELOPMENT.md`](docs/DOCKER_DEVELOPMENT.md) for complete setup and usage documentation.
+
+### Local Development
+
+```bash
+# Install dependencies
+go mod download
+
+# Run tests
+go test ./...
+
+# Run linter
+make lint
+
+# Run security scan
+make security-scan
+
+# Build
+make build
+```
+
 ## Docker
 
 Docker implementation is available but no LSP servers are installed. Ideally you'd make your own extended container which includes the LSP servers you want to support.

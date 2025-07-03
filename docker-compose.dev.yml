@@ -1,0 +1,85 @@
+services:
+  # Development environment with hot reload
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: dev
+    volumes:
+      - .:/workspace
+      - go-mod-cache:/go/pkg/mod
+    working_dir: /workspace
+    environment:
+      - CGO_ENABLED=0
+      - GOOS=linux
+    ports:
+      - "8080:8080"
+      - "2345:2345"  # Delve debugging port
+    stdin_open: true
+    tty: true
+
+  # CI testing environment (matches CI exactly)
+  ci:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: ci
+    volumes:
+      - .:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - /var/run/docker.sock:/var/run/docker.sock  # For security scanning
+    working_dir: /workspace
+    environment:
+      - CGO_ENABLED=0
+      - GOOS=linux
+    user: root  # Matches CI environment
+
+  # Test runner for specific tests
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: base
+    volumes:
+      - .:/workspace
+      - go-mod-cache:/go/pkg/mod
+    working_dir: /workspace
+    environment:
+      - CGO_ENABLED=0
+      - GOOS=linux
+    user: root
+    command: ["go", "test", "./..."]
+
+  # Lint runner
+  lint:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: base
+    volumes:
+      - .:/workspace
+      - go-mod-cache:/go/pkg/mod
+    working_dir: /workspace
+    environment:
+      - CGO_ENABLED=0
+      - GOOS=linux
+    command: ["make", "lint"]
+
+  # Security scan runner
+  security:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: base
+    volumes:
+      - .:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspace
+    environment:
+      - CGO_ENABLED=0
+      - GOOS=linux
+    command: ["make", "security-scan"]
+
+volumes:
+  go-mod-cache:

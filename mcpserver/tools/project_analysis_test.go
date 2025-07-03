@@ -13,7 +13,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcptest"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/myleshyson/lsprotocol-go/protocol"
-	"github.com/stretchr/testify/require"
 )
 
 func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
@@ -70,18 +69,19 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 
 			if len(tc.mockLanguages) > 0 {
 				mockClients := make(map[lsp.Language]lsp.LanguageClientInterface)
+				
 				for _, lang := range tc.mockLanguages {
-					client, err := lsp.NewLanguageClient("mock-lsp-server")
-					if err != nil {
-						t.Error(err)
-						return
+					// Use mocked LSP client instead of real connection
+					mockClient := &mocks.MockLanguageClient{}
+					
+					// Set up workspace symbols mock response
+					if tc.mockResults != nil {
+						mockClient.On("WorkspaceSymbols", tc.query).Return(tc.mockResults, nil)
+					} else {
+						mockClient.On("WorkspaceSymbols", tc.query).Return([]protocol.WorkspaceSymbol{}, nil)
 					}
-					_, err = client.Connect()
-					if err != nil {
-						t.Errorf("Could not connect %v", err)
-						return
-					}
-					mockClients[lang] = client
+					
+					mockClients[lang] = mockClient
 				}
 				var languageStrings []string
 				for _, lang := range tc.mockLanguages {
@@ -102,7 +102,7 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 				return
 			}
 
-			// defer mcpServer.Close()
+			defer mcpServer.Close()
 
 			ctx := context.Background()
 			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
@@ -178,16 +178,13 @@ func TestProjectAnalysisTool_SymbolReferences(t *testing.T) {
 			mockClients := make(map[lsp.Language]lsp.LanguageClientInterface)
 			if len(tc.mockLanguages) > 0 {
 				for _, lang := range tc.mockLanguages {
-					client, err := lsp.NewLanguageClient("mock-lsp-server")
-					if err != nil {
-						t.Error(err)
-						return
-					}
-					_, err = client.Connect()
-					if err != nil {
-						t.Error(err)
-					}
-					mockClients[lang] = client
+					// Use mocked LSP client instead of real connection
+					mockClient := &mocks.MockLanguageClient{}
+					
+					// Set up workspace symbols mock response for this test
+					mockClient.On("WorkspaceSymbols", tc.query).Return([]protocol.WorkspaceSymbol{}, nil)
+					
+					mockClients[lang] = mockClient
 				}
 				var languageStrings []string
 				for _, lang := range tc.mockLanguages {
@@ -207,7 +204,7 @@ func TestProjectAnalysisTool_SymbolReferences(t *testing.T) {
 				return
 			}
 
-			// defer mcpServer.Close()
+			defer mcpServer.Close()
 
 			ctx := context.Background()
 			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
@@ -287,17 +284,13 @@ func TestProjectAnalysisTool_SymbolDefinitions(t *testing.T) {
 			if len(tc.mockLanguages) > 0 {
 				mockClients := make(map[lsp.Language]lsp.LanguageClientInterface)
 				for _, lang := range tc.mockLanguages {
-
-					client, err := lsp.NewLanguageClient("mock-lsp-server")
-					if err != nil {
-						t.Error(err)
-						return
-					}
-					_, err = client.Connect()
-					if err != nil {
-						t.Error(err)
-					}
-					mockClients[lang] = client
+					// Use mocked LSP client instead of real connection
+					mockClient := &mocks.MockLanguageClient{}
+					
+					// Set up workspace symbols mock response for this test
+					mockClient.On("WorkspaceSymbols", tc.query).Return([]protocol.WorkspaceSymbol{}, nil)
+					
+					mockClients[lang] = mockClient
 				}
 
 				var languageStrings []string
@@ -319,7 +312,7 @@ func TestProjectAnalysisTool_SymbolDefinitions(t *testing.T) {
 				return
 			}
 
-			// defer mcpServer.Close()
+			defer mcpServer.Close()
 
 			ctx := context.Background()
 			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
@@ -405,18 +398,13 @@ func TestProjectAnalysisTool_TextSearch(t *testing.T) {
 			if len(tc.mockLanguages) > 0 {
 				mockClients := make(map[lsp.Language]lsp.LanguageClientInterface)
 				for _, lang := range tc.mockLanguages {
-
-					client, err := lsp.NewLanguageClient("mock-lsp-server")
-					if err != nil {
-						t.Error(err)
-						return
-					}
-					_, err = client.Connect()
-					if err != nil {
-						t.Errorf("Could not connect %v", err)
-						return
-					}
-					mockClients[lang] = client
+					// Use mocked LSP client instead of real connection
+					mockClient := &mocks.MockLanguageClient{}
+					
+					// Set up workspace symbols mock response for this test
+					mockClient.On("WorkspaceSymbols", tc.query).Return([]protocol.WorkspaceSymbol{}, nil)
+					
+					mockClients[lang] = mockClient
 				}
 				var languageStrings []string
 				for _, lang := range tc.mockLanguages {
@@ -437,7 +425,7 @@ func TestProjectAnalysisTool_TextSearch(t *testing.T) {
 				return
 			}
 
-			// defer mcpServer.Close()
+			defer mcpServer.Close()
 
 			ctx := context.Background()
 			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
@@ -518,7 +506,7 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 				return
 			}
 
-			// defer mcpServer.Close()
+			defer mcpServer.Close()
 
 			ctx := context.Background()
 			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
@@ -543,9 +531,6 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 			} else if toolResult.IsError && !tc.expectError {
 				t.Errorf("Unexpected error: %v", toolResult.Content)
 			}
-			require.NoError(t, err, "Could not start server")
-
-			defer mcpServer.Close()
 
 			// Ensure all mocked expectations were met
 			bridge.AssertExpectations(t)

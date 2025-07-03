@@ -47,7 +47,10 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 
 			if workspaceUri == "" {
 				dirs := bridge.AllowedDirectories()
-				workspaceUri = dirs[0] // Get the first allow dir
+				if len(dirs) == 0 {
+					return mcp.NewToolResultError("No allowed directories available for workspace analysis"), nil
+				}
+				workspaceUri = dirs[0] // Get the first allowed dir
 			}
 
 			// Convert URI to local file path
@@ -79,23 +82,20 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 			}
 
 			// Use the first available client in priority order
-			var lspClient *lsp.LanguageClient
+			var lspClient lsp.LanguageClientInterface
 
 			var activeLanguage lsp.Language
 
 			for _, lang := range languages {
 				if client, exists := clients[lang]; exists {
-					if typedClient, ok := client.(*lsp.LanguageClient); ok {
-						lspClient = typedClient
-						activeLanguage = lang
-
-						break
-					}
+					lspClient = client
+					activeLanguage = lang
+					break
 				}
 			}
 
 			if lspClient == nil {
-				return mcp.NewToolResultError("Invalid LSP client type"), nil
+				return mcp.NewToolResultError("No LSP client available"), nil
 			}
 
 			var response strings.Builder
@@ -150,7 +150,7 @@ func normalizeURI(uri string) string {
 }
 
 // handleWorkspaceSymbols handles the 'workspace_symbols' analysis type
-func handleWorkspaceSymbols(lspClient *lsp.LanguageClient, query string, offset, limit int, workspaceUri string, languages []lsp.Language, activeLanguage lsp.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
+func handleWorkspaceSymbols(lspClient lsp.LanguageClientInterface, query string, offset, limit int, workspaceUri string, languages []lsp.Language, activeLanguage lsp.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
 	symbols, err := lspClient.WorkspaceSymbols(query)
 	if err != nil {
 		logger.Error("Workspace symbols query failed", fmt.Sprintf("Language: %s, Query: %s, Error: %v", activeLanguage, query, err))
@@ -332,7 +332,7 @@ func formatCompactSymbolChild(response *strings.Builder, sym *protocol.DocumentS
 }
 
 // handleReferences handles the 'references' analysis type
-func handleReferences(bridge interfaces.BridgeInterface, lspClient *lsp.LanguageClient, query string, offset, limit int, activeLanguage lsp.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
+func handleReferences(bridge interfaces.BridgeInterface, lspClient lsp.LanguageClientInterface, query string, offset, limit int, activeLanguage lsp.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
 	// Search for the symbol first
 	symbols, err := lspClient.WorkspaceSymbols(query)
 	if err != nil {
@@ -416,7 +416,7 @@ func formatCompactReference(response *strings.Builder, ref any, index int) {
 }
 
 // handleDefinitions handles the 'definitions' analysis type
-func handleDefinitions(bridge interfaces.BridgeInterface, lspClient *lsp.LanguageClient, query string, offset, limit int, activeLanguage lsp.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
+func handleDefinitions(bridge interfaces.BridgeInterface, lspClient lsp.LanguageClientInterface, query string, offset, limit int, activeLanguage lsp.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
 	// For definitions, search for the symbol first
 	symbols, err := lspClient.WorkspaceSymbols(query)
 	if err != nil {
