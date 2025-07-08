@@ -8,7 +8,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// TestRegisterAllTools tests that all tools can be registered without errors
+// Tests that all tools can be registered without errors
 func TestRegisterAllTools(t *testing.T) {
 	// mockBridge := &mocks.MockBridge{}
 	//

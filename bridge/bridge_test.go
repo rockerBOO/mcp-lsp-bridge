@@ -11,6 +11,7 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/security"
 	"rockerboo/mcp-lsp-bridge/types"
+	"rockerboo/mcp-lsp-bridge/utils"
 	"testing"
 	"time"
 
@@ -209,7 +210,7 @@ func TestNormalizeURI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := normalizeURI(tt.uri)
+			got := utils.NormalizeURI(tt.uri)
 			assert.Equal(t, tt.want, got)
 		})
 	}

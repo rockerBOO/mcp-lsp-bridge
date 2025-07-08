@@ -6,10 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"rockerboo/mcp-lsp-bridge/async"
+	"rockerboo/mcp-lsp-bridge/collections"
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/types"
+	"rockerboo/mcp-lsp-bridge/utils"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -114,7 +117,7 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 			case "document_symbols":
 				return handleDocumentSymbols(bridge, query, offset, limit, &response)
 			case "references":
-				return handleReferences(bridge, lspClient, query, offset, limit, activeLanguage, &response)
+				return handleReferences(bridge, clients, query, offset, limit, activeLanguage, &response)
 			case "definitions":
 				return handleDefinitions(bridge, lspClient, query, offset, limit, activeLanguage, &response)
 			case "text_search":
@@ -260,7 +263,7 @@ func handleDocumentSymbols(bridge interfaces.BridgeInterface, query string, offs
 	docUri := query
 	if !strings.HasPrefix(query, "file://") {
 		// If query is not a URI, treat it as a file path and normalize it
-		docUri = normalizeURI(query)
+		docUri = utils.NormalizeURI(query)
 	}
 
 	symbols, err := bridge.GetDocumentSymbols(docUri)
@@ -333,22 +336,39 @@ func formatCompactSymbolChild(response *strings.Builder, sym *protocol.DocumentS
 	}
 }
 
-// handleReferences handles the 'references' analysis type
-func handleReferences(bridge interfaces.BridgeInterface, lspClient types.LanguageClientInterface, query string, offset, limit int, activeLanguage types.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
-	// Search for the symbol first
-	symbols, err := lspClient.WorkspaceSymbols(query)
+// Handles the 'references' analysis type
+func handleReferences(bridge interfaces.BridgeInterface, clients map[types.Language]types.LanguageClientInterface, query string, offset, limit int, activeLanguage types.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
+	// Convert clients to async operations
+	ops := collections.TransformMap(clients, func(client types.LanguageClientInterface) func() ([]protocol.WorkspaceSymbol, error) {
+		return func() ([]protocol.WorkspaceSymbol, error) {
+			return client.WorkspaceSymbols(query)
+		}
+	})
+
+	// Execute symbol search across all clients in parallel
+	ctx := context.Background() // TODO: Pass context from caller
+	results, err := async.MapWithKeys(ctx, ops)
 	if err != nil {
 		fmt.Fprintf(response, "ERROR: %v\n", err)
 		return mcp.NewToolResultText(response.String()), nil
 	}
 
-	if len(symbols) == 0 {
+	// Flatten results and collect errors
+	flattened := utils.FlattenKeyedResults(results)
+	allSymbols := flattened.Values
+
+	// Log any errors from individual clients
+	for _, err := range flattened.Errors {
+		logger.Warn(fmt.Sprintf("Workspace symbols search failed: %v", err))
+	}
+
+	if len(allSymbols) == 0 {
 		fmt.Fprintf(response, "NO_SYMBOL: %s\n", query)
 		return mcp.NewToolResultText(response.String()), nil
 	}
 
 	// Use the first symbol found
-	symbol := symbols[0]
+	symbol := allSymbols[0]
 	switch v := symbol.Location.Value.(type) {
 	case protocol.Location:
 		uri := string(v.Uri)

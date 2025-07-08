@@ -14,6 +14,7 @@ import (
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/security"
 	"rockerboo/mcp-lsp-bridge/types"
+	"rockerboo/mcp-lsp-bridge/utils"
 
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/myleshyson/lsprotocol-go/protocol"
@@ -328,7 +329,7 @@ func (b *MCPLSPBridge) SetServer(mcpServer *server.MCPServer) {
 	b.server = mcpServer
 }
 
-// DetectProjectLanguages detects all languages used in a project directory
+// Detects all languages used in a project directory
 func (b *MCPLSPBridge) DetectProjectLanguages(projectPath string) ([]types.Language, error) {
 	if b.config == nil {
 		return nil, errors.New("no LSP configuration available")
@@ -337,7 +338,7 @@ func (b *MCPLSPBridge) DetectProjectLanguages(projectPath string) ([]types.Langu
 	return b.GetConfig().DetectProjectLanguages(projectPath)
 }
 
-// DetectPrimaryProjectLanguage detects the primary language of a project
+// Detects the primary language of a project
 func (b *MCPLSPBridge) DetectPrimaryProjectLanguage(projectPath string) (*types.Language, error) {
 	if b.config == nil {
 		return nil, errors.New("no LSP configuration available")
@@ -346,7 +347,7 @@ func (b *MCPLSPBridge) DetectPrimaryProjectLanguage(projectPath string) (*types.
 	return b.GetConfig().DetectPrimaryProjectLanguage(projectPath)
 }
 
-// FindSymbolReferences finds all references to a symbol at a given position
+// Finds all references to a symbol at a given position
 func (b *MCPLSPBridge) FindSymbolReferences(language, uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error) {
 	client, err := b.GetClientForLanguage(language)
 	if err != nil {
@@ -436,31 +437,6 @@ func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[types.La
 	return clients, nil
 }
 
-// normalizeURI ensures the URI has the proper file:// scheme
-func normalizeURI(uri string) string {
-	// If it already has a file scheme, return as-is
-	if strings.HasPrefix(uri, "file://") {
-		return uri
-	}
-
-	// If it has any other scheme (http://, https://, etc.), return as-is
-	if strings.Contains(uri, "://") {
-		return uri
-	}
-
-	// If it's an absolute path, convert to file URI
-	if strings.HasPrefix(uri, "/") {
-		return "file://" + uri
-	}
-
-	// If it's a relative path, convert to absolute path first, then to file URI
-	if absPath, err := filepath.Abs(uri); err == nil {
-		return "file://" + absPath
-	}
-
-	// Fallback: assume it's a file path and add file:// prefix
-	return "file://" + uri
-}
 
 // GetHoverInformation gets hover information for a symbol at a specific position
 func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character uint32) (*protocol.Hover, error) {
@@ -468,7 +444,7 @@ func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character uint32) (
 	logger.Debug(fmt.Sprintf("GetHoverInformation: Starting hover request for URI: %s, Line: %d, Character: %d", uri, line, character))
 
 	// Normalize URI to ensure proper file:// scheme
-	normalizedURI := normalizeURI(uri)
+	normalizedURI := utils.NormalizeURI(uri)
 
 	// Infer language from URI (use original URI for file extension detection)
 	language, err := b.InferLanguage(uri)
@@ -554,7 +530,7 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client types.LanguageClientInterface, 
 // GetDocumentSymbols gets all symbols in a document
 func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol, error) {
 	// Normalize URI to ensure proper file:// scheme
-	normalizedURI := normalizeURI(uri)
+	normalizedURI := utils.NormalizeURI(uri)
 	logger.Debug(fmt.Sprintf("GetDocumentSymbols: Starting request for URI: %s -> %s", uri, normalizedURI))
 
 	// Infer language from URI
@@ -608,7 +584,7 @@ func (b *MCPLSPBridge) GetServerConfig(language string) (types.LanguageServerCon
 // GetSignatureHelp gets signature help for a function at a specific position
 func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error) {
 	// Normalize URI
-	normalizedURI := normalizeURI(uri)
+	normalizedURI := utils.NormalizeURI(uri)
 
 	// Infer language from URI
 	language, err := b.InferLanguage(normalizedURI)
@@ -819,7 +795,7 @@ func applyTextEditsToContent(content string, edits []protocol.TextEdit) (string,
 // RenameSymbol renames a symbol with optional preview
 func (b *MCPLSPBridge) RenameSymbol(uri string, line, character uint32, newName string, preview bool) (*protocol.WorkspaceEdit, error) {
 	// Normalize URI to ensure proper file:// scheme
-	normalizedURI := normalizeURI(uri)
+	normalizedURI := utils.NormalizeURI(uri)
 	logger.Debug(fmt.Sprintf("RenameSymbol: Starting rename request for URI: %s -> %s, Line: %d, Character: %d, NewName: %s", uri, normalizedURI, line, character, newName))
 
 	// Infer language from URI
@@ -957,7 +933,7 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit)
 // FindImplementations finds implementations of a symbol
 func (b *MCPLSPBridge) FindImplementations(uri string, line, character uint32) ([]protocol.Location, error) {
 	// Normalize URI
-	normalizedURI := normalizeURI(uri)
+	normalizedURI := utils.NormalizeURI(uri)
 
 	// Infer language from URI
 	language, err := b.InferLanguage(normalizedURI)
