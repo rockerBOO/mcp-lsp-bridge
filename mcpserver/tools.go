@@ -8,6 +8,9 @@ import (
 // Registers all MCP tools with the server
 func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterface) {
 	// Core analysis tools
+	
+	// New unified symbol exploration tool
+	tools.RegisterSymbolExploreTool(mcpServer, bridge)
 
 	// Disabling lesser used tools
 	// tools.RegisterAnalyzeCodeTool(mcpServer, bridge)

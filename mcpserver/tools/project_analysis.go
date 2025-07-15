@@ -356,6 +356,7 @@ func formatCompactSymbolChild(response *strings.Builder, sym *protocol.DocumentS
 	}
 }
 
+
 // Handles the 'references' analysis type
 func handleReferences(bridge interfaces.BridgeInterface, clients map[types.Language]types.LanguageClientInterface, query string, offset, limit int, activeLanguage types.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
 	// Convert clients to async operations
@@ -395,7 +396,10 @@ func handleReferences(bridge interfaces.BridgeInterface, clients map[types.Langu
 		line := v.Range.Start.Line
 		character := v.Range.Start.Character
 
-		references, err := bridge.FindSymbolReferences(string(activeLanguage), uri, uint32(line), uint32(character), true)
+		// Get precise coordinates using semantic tokens
+		preciseChar := FindPreciseCharacterPosition(bridge, uri, line, character, symbol.Name)
+
+		references, err := bridge.FindSymbolReferences(string(activeLanguage), uri, uint32(line), uint32(preciseChar), true)
 		if err != nil {
 			fmt.Fprintf(response, "ERROR: %v\n", err)
 			return mcp.NewToolResultText(response.String()), nil
@@ -512,7 +516,10 @@ func handleDefinitions(bridge interfaces.BridgeInterface, lspClient types.Langua
 		line := v.Range.Start.Line
 		character := v.Range.Start.Character
 
-		definitions, err := bridge.FindSymbolDefinitions(string(activeLanguage), uri, uint32(line), uint32(character))
+		// Get precise coordinates using semantic tokens
+		preciseChar := FindPreciseCharacterPosition(bridge, uri, line, character, symbol.Name)
+
+		definitions, err := bridge.FindSymbolDefinitions(string(activeLanguage), uri, uint32(line), uint32(preciseChar))
 		if err != nil {
 			fmt.Fprintf(response, "Failed to find definitions: %v\n", err)
 			return mcp.NewToolResultText(response.String()), nil

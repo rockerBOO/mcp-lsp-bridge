@@ -45,7 +45,7 @@ func SetupMCPServer(bridge interfaces.BridgeInterface) *server.MCPServer {
 	mcpServer := server.NewMCPServer(
 		"mcp-lsp-bridge",
 		"1.0.0",
-		server.WithToolCapabilities(false),
+		server.WithToolCapabilities(true),
 		server.WithLogging(),
 		server.WithHooks(hooks),
 		server.WithInstructions(`This MCP server provides comprehensive Language Server Protocol (LSP) integration for advanced code analysis and manipulation across multiple programming languages.
@@ -73,5 +73,20 @@ The bridge automatically detects file types and connects to appropriate language
 	// Register all MCP tools
 	RegisterAllTools(mcpServer, bridge)
 
+	// Set up default session for clients that don't explicitly create sessions
+	setupDefaultSession(mcpServer)
+
 	return mcpServer
+}
+
+// setupDefaultSession creates a default session for clients
+func setupDefaultSession(mcpServer *server.MCPServer) {
+	// Create a default session that clients can use
+	defaultSession := NewLSPBridgeSession("default")
+	
+	if err := mcpServer.RegisterSession(context.Background(), defaultSession); err != nil {
+		logger.Error("Failed to register default session", err)
+	} else {
+		logger.Info("Default session registered successfully")
+	}
 }

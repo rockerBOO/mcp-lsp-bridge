@@ -87,11 +87,13 @@ func WorkspaceDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, serv
 		// Process results and extract core Diagnostic items
 		var allDiagnostics []protocol.Diagnostic
 		var languageResults []LanguageDiagnosticResult
-		var errors []error
+		var errors []DiagnosticError
 
 		for _, result := range results {
 			if result.Error != nil {
-				errors = append(errors, fmt.Errorf("language %s: %w", result.Key, result.Error))
+				// Categorize the error for better user understanding
+			diagError := categorizeDiagnosticError(string(result.Key), result.Error)
+			errors = append(errors, diagError)
 				logger.Warn(fmt.Sprintf("Workspace diagnostics failed for %s: %v", result.Key, result.Error))
 			} else if result.Value != nil {
 				// Extract diagnostics from the workspace report
@@ -106,7 +108,7 @@ func WorkspaceDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, serv
 
 		// Log errors for debugging
 		for _, err := range errors {
-			logger.Error("workspace_diagnostics: language server error", err)
+			logger.Error("workspace_diagnostics: language server error", err.OriginalErr)
 		}
 
 		// Format results for user-friendly output
@@ -120,6 +122,14 @@ func WorkspaceDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, serv
 type LanguageDiagnosticResult struct {
 	Language    string
 	Diagnostics []protocol.Diagnostic
+}
+
+// DiagnosticError represents categorized diagnostic errors
+type DiagnosticError struct {
+	Language    string
+	OriginalErr error
+	Category    string
+	Explanation string
 }
 
 // extractDiagnosticsFromWorkspaceReport extracts core Diagnostic items from a WorkspaceDiagnosticReport
@@ -141,8 +151,38 @@ func extractDiagnosticsFromWorkspaceReport(report *protocol.WorkspaceDiagnosticR
 	return diagnostics
 }
 
+// categorizeDiagnosticError categorizes diagnostic errors for better user understanding
+func categorizeDiagnosticError(language string, err error) DiagnosticError {
+	errorStr := err.Error()
+
+	if strings.Contains(errorStr, "jsonrpc2: code -32601") && strings.Contains(errorStr, "workspace/diagnostic") {
+		return DiagnosticError{
+			Language:    language,
+			OriginalErr: err,
+			Category:    "UNSUPPORTED_METHOD",
+			Explanation: fmt.Sprintf("The %s language server does not support the workspace/diagnostic method (LSP 3.17+). This is a limitation of the language server, not the MCP-LSP bridge.", language),
+		}
+	}
+
+	if strings.Contains(errorStr, "connection") || strings.Contains(errorStr, "timeout") {
+		return DiagnosticError{
+			Language:    language,
+			OriginalErr: err,
+			Category:    "CONNECTION_ERROR",
+			Explanation: fmt.Sprintf("Failed to communicate with the %s language server. The server may not be running or may be unresponsive.", language),
+		}
+	}
+
+	return DiagnosticError{
+		Language:    language,
+		OriginalErr: err,
+		Category:    "UNKNOWN_ERROR",
+		Explanation: fmt.Sprintf("An unexpected error occurred with the %s language server: %v", language, err),
+	}
+}
+
 // formatWorkspaceDiagnosticsByLanguage formats workspace diagnostics organized by language
-func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticResult, allDiagnostics []protocol.Diagnostic, errors []error) string {
+func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticResult, allDiagnostics []protocol.Diagnostic, errors []DiagnosticError) string {
 	var result strings.Builder
 	
 	// Header with summary
@@ -154,13 +194,53 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 	}
 	fmt.Fprintf(&result, "\n")
 	
-	// Show errors if any
+	// Show errors if any with better categorization
 	if len(errors) > 0 {
 		fmt.Fprintf(&result, "=== ERRORS ===\n")
-		for i, err := range errors {
-			fmt.Fprintf(&result, "%d. %v\n", i+1, err)
+		
+		// Group errors by category for better presentation
+		unsupportedMethods := []DiagnosticError{}
+		connectionErrors := []DiagnosticError{}
+		otherErrors := []DiagnosticError{}
+		
+		for _, err := range errors {
+			switch err.Category {
+			case "UNSUPPORTED_METHOD":
+				unsupportedMethods = append(unsupportedMethods, err)
+			case "CONNECTION_ERROR":
+				connectionErrors = append(connectionErrors, err)
+			default:
+				otherErrors = append(otherErrors, err)
+			}
 		}
-		fmt.Fprintf(&result, "\n")
+		
+		// Show unsupported methods with explanation
+		if len(unsupportedMethods) > 0 {
+			fmt.Fprintf(&result, "🚫 Unsupported Methods:\n")
+			for i, err := range unsupportedMethods {
+				fmt.Fprintf(&result, "%d. %s\n", i+1, err.Explanation)
+			}
+			fmt.Fprintf(&result, "\n💡 Note: These language servers need to be updated to support LSP 3.17+ workspace diagnostics.\n")
+			fmt.Fprintf(&result, "   Consider using individual file diagnostics or updating to newer language server versions.\n\n")
+		}
+		
+		// Show connection errors
+		if len(connectionErrors) > 0 {
+			fmt.Fprintf(&result, "🔌 Connection Errors:\n")
+			for i, err := range connectionErrors {
+				fmt.Fprintf(&result, "%d. %s\n", i+1, err.Explanation)
+			}
+			fmt.Fprintf(&result, "\n")
+		}
+		
+		// Show other errors
+		if len(otherErrors) > 0 {
+			fmt.Fprintf(&result, "❌ Other Errors:\n")
+			for i, err := range otherErrors {
+				fmt.Fprintf(&result, "%d. %s\n", i+1, err.Explanation)
+			}
+			fmt.Fprintf(&result, "\n")
+		}
 	}
 	
 	// Group diagnostics by severity for summary

@@ -132,14 +132,14 @@ func TestFormatWorkspaceDiagnosticsByLanguage(t *testing.T) {
 		name            string
 		languageResults []LanguageDiagnosticResult
 		allDiagnostics  []protocol.Diagnostic
-		errors          []error
+		errors          []DiagnosticError
 		expectedContent []string
 	}{
 		{
 			name:            "no diagnostics or errors",
 			languageResults: []LanguageDiagnosticResult{},
 			allDiagnostics:  []protocol.Diagnostic{},
-			errors:          []error{},
+			errors:          []DiagnosticError{},
 			expectedContent: []string{
 				"WORKSPACE DIAGNOSTICS",
 				"Languages analyzed: 0",
@@ -179,7 +179,7 @@ func TestFormatWorkspaceDiagnosticsByLanguage(t *testing.T) {
 				{Message: "go error"},
 				{Message: "ts warning"},
 			},
-			errors: []error{},
+			errors: []DiagnosticError{},
 			expectedContent: []string{
 				"Languages analyzed: 2",
 				"Total diagnostics: 2",

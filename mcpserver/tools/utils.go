@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"rockerboo/mcp-lsp-bridge/interfaces"
+	"rockerboo/mcp-lsp-bridge/logger"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/myleshyson/lsprotocol-go/protocol"
@@ -13,6 +16,30 @@ import (
 
 type ToolServer interface {
 	AddTool(tool mcp.Tool, handler server.ToolHandlerFunc)
+}
+
+// findPreciseCharacterPosition uses semantic tokens to find the exact character position of a symbol
+func FindPreciseCharacterPosition(bridge interfaces.BridgeInterface, uri string, line, approxCharacter uint32, symbolName string) uint32 {
+	// Get semantic tokens for the line containing the symbol
+	tokens, err := bridge.SemanticTokens(uri, []string{"function", "variable", "type", "method"}, line, 0, line, 1000)
+	if err != nil {
+		logger.Warn(fmt.Sprintf("Failed to get semantic tokens for %s:%d: %v", uri, line, err))
+		return approxCharacter // Fall back to original position
+	}
+
+	// Look for our symbol name in the semantic tokens on this line
+	for _, token := range tokens {
+		if token.Range.Start.Line == line && strings.Contains(token.Text, symbolName) {
+			// Found a token containing our symbol name on the right line
+			// Use the start character of this token for more precise positioning
+			logger.Debug(fmt.Sprintf("Found precise position for %s: char %d -> %d", symbolName, approxCharacter, token.Range.Start.Character))
+			return token.Range.Start.Character
+		}
+	}
+
+	// If no semantic token found, try to find the symbol name in nearby positions
+	logger.Debug(fmt.Sprintf("No semantic token found for %s, using approximate position %d", symbolName, approxCharacter))
+	return approxCharacter
 }
 
 // safeUint32 safely converts an int to uint32, checking for overflow
