@@ -988,15 +988,49 @@ func (b *MCPLSPBridge) SemanticTokens(uri string, targetTypes []string, startLin
 	tokens, err := client.SemanticTokensRange(uri, startLine, startCharacter, endLine, endCharacter)
 	if err != nil {
 		logger.Error(fmt.Sprintf("SemanticTokens: Failed to get raw semantic tokens from client: %v", err))
-		return nil, fmt.Errorf("failed to get semantic tokens from client: %w", err)
+		serverCommand := client.GetMetrics().GetCommand()
+		return nil, fmt.Errorf("semantic tokens not supported by %s language server for %s files: %w", serverCommand, *language, err)
+	}
+
+	// Handle nil tokens response (server returned null)
+	if tokens == nil {
+		logger.Debug("SemanticTokens: Server returned null/no semantic tokens for this range")
+		return []types.TokenPosition{}, nil
 	}
 
 	logger.Debug(fmt.Sprintf("SemanticTokens: Raw tokens from LSP client: %+v", tokens))
 
+	logger.Debug("SemanticTokens: About to get token parser")
 	parser := client.TokenParser()
+	logger.Debug(fmt.Sprintf("SemanticTokens: Got token parser: %v", parser != nil))
 
 	if parser == nil {
-		return nil, errors.New("failed to get token parser")
+		// If no token parser exists but the LSP request succeeded, 
+		// the server supports semantic tokens but didn't advertise capabilities properly.
+		// This is common with some language servers like gopls.
+		serverCommand := client.GetMetrics().GetCommand()
+		logger.Debug(fmt.Sprintf("SemanticTokens: %s server for %s files supports semantic tokens but didn't advertise capabilities - creating fallback parser", serverCommand, *language))
+		
+		// Create a fallback parser with common token types
+		fallbackTokenTypes := []string{
+			"keyword", "class", "interface", "enum", "function", "method", "macro", "variable", 
+			"parameter", "property", "label", "comment", "string", "number", "regexp", 
+			"operator", "decorator", "type", "typeParameter", "namespace", "struct", 
+			"event", "operator", "modifier", "punctuation", "bracket", "delimiter",
+		}
+		fallbackTokenModifiers := []string{
+			"declaration", "definition", "readonly", "static", "deprecated", "abstract", 
+			"async", "modification", "documentation", "defaultLibrary",
+		}
+		
+		// Use the semantic token parser constructor directly
+		parser = lsp.NewSemanticTokenParser(fallbackTokenTypes, fallbackTokenModifiers)
+		
+		if parser == nil {
+			return nil, errors.New("failed to create fallback token parser")
+		}
+		
+		logger.Debug("SemanticTokens: Created fallback token parser successfully")
 	}
 
 	tokenRange := protocol.Range{

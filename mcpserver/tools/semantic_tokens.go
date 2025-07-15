@@ -88,6 +88,11 @@ func SemanticTokensTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Too
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
+			if len(positions) == 0 {
+				// Server supports semantic tokens but found none in this range
+				return mcp.NewToolResultText("No semantic tokens found in the specified range. Try expanding the range or checking a different file location."), nil
+			}
+
 			return mcp.NewToolResultText(formatTokensByType(positions)), nil
 		}
 }

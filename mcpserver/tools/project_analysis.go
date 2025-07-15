@@ -148,32 +148,6 @@ QUERY GUIDANCE:
 		}
 }
 
-// normalizeURI ensures the URI has the proper file:// scheme
-func normalizeURI(uri string) string {
-	// If it already has a file scheme, return as-is
-	if strings.HasPrefix(uri, "file://") {
-		return uri
-	}
-
-	// If it has any other scheme (http://, https://://, etc.), return as-is
-	if strings.Contains(uri, "://") {
-		return uri
-	}
-
-	// If it's an absolute path, convert to file URI
-	if strings.HasPrefix(uri, "/") {
-		return "file://" + uri
-	}
-
-	// If it's a relative path, convert to absolute path first, then to file URI
-	if absPath, err := filepath.Abs(uri); err == nil {
-		return "file://" + absPath
-	}
-
-	// Fallback: assume it's a file path and add file:// prefix
-	return "file://" + uri
-}
-
 // handleWorkspaceSymbols handles the 'workspace_symbols' analysis type
 func handleWorkspaceSymbols(lspClient types.LanguageClientInterface, query string, offset, limit int, workspaceUri string, languages []types.Language, activeLanguage types.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
 	symbols, err := lspClient.WorkspaceSymbols(query)

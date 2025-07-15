@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"rockerboo/mcp-lsp-bridge/mocks"
 
@@ -267,9 +268,9 @@ func TestHover(t *testing.T) {
 			mockConn := new(mocks.MockLSPConnectionInterface)
 
 			ctx := t.Context()
-			mockConn.On("Call", mock.Anything, "textDocument/hover", 
-				mock.AnythingOfType("protocol.HoverParams"), 
-				mock.AnythingOfType("*json.RawMessage"), 
+			mockConn.On("Call", mock.Anything, "textDocument/hover",
+				mock.AnythingOfType("protocol.HoverParams"),
+				mock.AnythingOfType("*json.RawMessage"),
 				mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil).Run(func(args mock.Arguments) {
 				rawMessage := args.Get(3).(*json.RawMessage)
 				*rawMessage = tc.mockResponse
@@ -282,7 +283,7 @@ func TestHover(t *testing.T) {
 			}
 
 			hoverInfo, err := client.Hover("file:///test.go", 10, 5)
-			
+
 			if tc.expectError {
 				require.Error(t, err, "Expected error but got none")
 			} else {
@@ -523,18 +524,27 @@ func TestPrepareCallHierarchy(t *testing.T) {
 
 func TestSemanticTokens(t *testing.T) {
 	mockConn := new(mocks.MockLSPConnectionInterface)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
 
-	// Prepare a context
-	ctx := t.Context()
+	// Valid server response (empty tokens + default legend)
+	resp := &protocol.SemanticTokens{Data: []uint32{}}
+	raw, _ := json.Marshal(resp)
 
-	// Successful semantic tokens request
-	mockConn.On("Call", mock.Anything, "textDocument/semanticTokens", mock.AnythingOfType("protocol.SemanticTokensParams"), mock.AnythingOfType("*protocol.SemanticTokens"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call",
+		mock.Anything, // context.Context
+		"textDocument/semanticTokens",
+		mock.AnythingOfType("protocol.SemanticTokensParams"),
+		mock.AnythingOfType("*json.RawMessage"), // result container
+		mock.AnythingOfType("[]jsonrpc2.CallOption"),
+	).Run(func(args mock.Arguments) {
+		// Copy the JSON into the *json.RawMessage that the client gave us.
+		*(args.Get(3).(*json.RawMessage)) = raw
+	}).Return(nil)
+
 	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
-	client := &LanguageClient{
-		conn: mockConn,
-		ctx:  ctx,
-	}
+	client := &LanguageClient{conn: mockConn, ctx: ctx}
 
 	semanticTokens, err := client.SemanticTokens("file:///test.go")
 	require.NoError(t, err)
@@ -545,20 +555,30 @@ func TestSemanticTokens(t *testing.T) {
 
 func TestSemanticTokensRange(t *testing.T) {
 	mockConn := new(mocks.MockLSPConnectionInterface)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
 
-	// Prepare a context
-	ctx := t.Context()
+	resp := &protocol.SemanticTokens{Data: []uint32{}}
+	raw, _ := json.Marshal(resp)
 
-	// Successful semantic tokens range request
-	mockConn.On("Call", mock.Anything, "textDocument/semanticTokens/range", mock.AnythingOfType("protocol.SemanticTokensRangeParams"), mock.AnythingOfType("*protocol.SemanticTokens"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call",
+		mock.Anything,
+		"textDocument/semanticTokens/range",
+		mock.AnythingOfType("protocol.SemanticTokensRangeParams"),
+		mock.AnythingOfType("*json.RawMessage"),
+		mock.AnythingOfType("[]jsonrpc2.CallOption"),
+	).Run(func(args mock.Arguments) {
+		*(args.Get(3).(*json.RawMessage)) = raw
+	}).Return(nil)
+
 	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
-	client := &LanguageClient{
-		conn: mockConn,
-		ctx:  ctx,
-	}
+	client := &LanguageClient{conn: mockConn, ctx: ctx}
 
-	semanticTokens, err := client.SemanticTokensRange("file:///test.go", 0, 0, 10, 100)
+	semanticTokens, err := client.SemanticTokensRange(
+		"file:///test.go",
+		0, 0, 10, 100,
+	)
 	require.NoError(t, err)
 	assert.NotNil(t, semanticTokens)
 

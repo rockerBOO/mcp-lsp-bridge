@@ -395,22 +395,33 @@ func (lc *LanguageClient) PrepareCallHierarchy(uri string, line, character uint3
 }
 
 func (lc *LanguageClient) SemanticTokens(uri string) (*protocol.SemanticTokens, error) {
-	var result protocol.SemanticTokens
+	var rawResponse json.RawMessage
 
 	err := lc.SendRequest("textDocument/semanticTokens", protocol.SemanticTokensParams{
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
 		},
-	}, &result, 5*time.Second)
+	}, &rawResponse, 5*time.Second)
 	if err != nil {
 		return nil, err
+	}
+
+	// Handle null response - server has no semantic tokens for this document
+	if len(rawResponse) == 4 && string(rawResponse) == "null" {
+		return nil, nil
+	}
+
+	var result protocol.SemanticTokens
+	err = json.Unmarshal(rawResponse, &result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal semantic tokens response: %w", err)
 	}
 
 	return &result, nil
 }
 
 func (lc *LanguageClient) SemanticTokensRange(uri string, startLine, startCharacter, endLine, endCharacter uint32) (*protocol.SemanticTokens, error) {
-	var result protocol.SemanticTokens
+	var rawResponse json.RawMessage
 
 	err := lc.SendRequest("textDocument/semanticTokens/range", protocol.SemanticTokensRangeParams{
 		TextDocument: protocol.TextDocumentIdentifier{
@@ -426,10 +437,26 @@ func (lc *LanguageClient) SemanticTokensRange(uri string, startLine, startCharac
 				Character: endCharacter,
 			},
 		},
-	}, &result, 5*time.Second)
+	}, &rawResponse, 5*time.Second)
 	if err != nil {
 		return nil, err
 	}
 
+	// Handle null response - server has no semantic tokens for this range
+	if len(rawResponse) == 4 && string(rawResponse) == "null" {
+		logger.Debug("SemanticTokensRange: Server returned null response")
+		return nil, nil
+	}
+
+	logger.Debug("SemanticTokensRange: Raw response: " + string(rawResponse))
+
+	var result protocol.SemanticTokens
+	err = json.Unmarshal(rawResponse, &result)
+	if err != nil {
+		logger.Error(fmt.Sprintf("SemanticTokensRange: Failed to unmarshal response: %v", err))
+		return nil, fmt.Errorf("failed to unmarshal semantic tokens response: %w", err)
+	}
+
+	logger.Debug(fmt.Sprintf("SemanticTokensRange: Parsed result: %+v", result))
 	return &result, nil
 }

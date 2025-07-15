@@ -3,6 +3,8 @@ package mcpserver
 import (
 	"context"
 	"fmt"
+	"encoding/json"
+	"bytes"
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
@@ -28,8 +30,24 @@ func SetupMCPServer(bridge interfaces.BridgeInterface) *server.MCPServer {
 		logger.Debug("beforeInitialize:", id, message)
 	})
 	hooks.AddOnRequestInitialization(func(ctx context.Context, id any, message any) error {
-		logger.Debug(fmt.Sprintf("AddOnRequestInitialization: %s %+v", id, message))
-		// authorization verification and other preprocessing tasks are performed.
+		idStr := fmt.Sprintf("%v", id)
+
+		var prettyJSON bytes.Buffer
+		switch v := message.(type) {
+		case []byte:
+			if err := json.Indent(&prettyJSON, v, "", "  "); err != nil {
+				prettyJSON.Write(v) // fallback if not valid JSON
+			}
+		case string:
+			if err := json.Indent(&prettyJSON, []byte(v), "", "  "); err != nil {
+				prettyJSON.WriteString(v) // fallback
+			}
+		default:
+			jsonData, _ := json.MarshalIndent(v, "", "  ")
+			prettyJSON.Write(jsonData)
+		}
+
+		logger.Debug(fmt.Sprintf("AddOnRequestInitialization: id=%s, message=%s", idStr, prettyJSON.String()))
 		return nil
 	})
 	hooks.AddAfterInitialize(func(ctx context.Context, id any, message *mcp.InitializeRequest, result *mcp.InitializeResult) {
@@ -83,7 +101,7 @@ The bridge automatically detects file types and connects to appropriate language
 func setupDefaultSession(mcpServer *server.MCPServer) {
 	// Create a default session that clients can use
 	defaultSession := NewLSPBridgeSession("default")
-	
+
 	if err := mcpServer.RegisterSession(context.Background(), defaultSession); err != nil {
 		logger.Error("Failed to register default session", err)
 	} else {

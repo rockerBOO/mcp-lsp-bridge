@@ -3,6 +3,7 @@ package tools
 import (
 	"fmt"
 	"math"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -154,7 +155,7 @@ func formatHoverContent(contents protocol.Or3[protocol.MarkupContent, protocol.M
 			if i > 0 {
 				result.WriteString("\n---\n")
 			}
-			
+
 			// Comprehensive type handling with fallback
 			switch typed := item.(type) {
 			case string:
@@ -577,4 +578,126 @@ func getSeverityIcon(severity string) string {
 	default:
 		return "❓"
 	}
+}
+
+// getRangeContent returns the text that falls between the given
+// (zero-based) line/character positions.  The strict flag controls
+// whether out-of-bounds character indices are an error (strict=true)
+// or silently clamped to the nearest legal value (strict=false).
+// When strict=false the function behaves exactly like the original
+// getSymbolContent.
+func getRangeContent(
+	bridge interfaces.BridgeInterface,
+	uri string,
+	startLine, startChar, endLine, endChar uint32,
+	strict bool,
+) (string, error) {
+
+	// 1. Turn the URI into a clean absolute path.
+	filePath := strings.TrimPrefix(uri, "file://")
+	filePath = strings.TrimPrefix(filePath, "file://")
+
+	absPath, err := bridge.IsAllowedDirectory(filePath)
+	if err != nil {
+		return "", fmt.Errorf("invalid file path: %w", err)
+	}
+
+	// 2. Read the file.
+	content, err := os.ReadFile(absPath) // #nosec G304
+	if err != nil {
+		return "", fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+
+	// 3. Split into lines.
+	lines := strings.Split(string(content), "\n")
+	linesLen := uint32(len(lines))
+
+	// 4. Basic line-range validation.
+	if startLine >= linesLen || endLine >= linesLen {
+		return "", fmt.Errorf("line range %d-%d out of bounds (file has %d lines)",
+			startLine, endLine, linesLen)
+	}
+	if startLine > endLine ||
+		(startLine == endLine && startChar > endChar) {
+		return "", fmt.Errorf("invalid range order: %d:%d - %d:%d",
+			startLine, startChar, endLine, endChar)
+	}
+
+	// 5. Helper: clamp or reject out-of-bounds character indices.
+	clamp := func(line string, pos uint32, lineNo int, which string) (uint32, error) {
+		lineLen := uint32(len(line))
+		if pos > lineLen {
+			if strict {
+				return 0, fmt.Errorf("invalid %s character on line %d: %d (line length: %d)",
+					which, lineNo, pos, lineLen)
+			}
+			return lineLen, nil // clamp to line end
+		}
+		return pos, nil
+	}
+
+	// 6. Extract the requested text.
+	var result []string
+
+	if startLine == endLine {
+		// Single-line slice.
+		line := lines[startLine]
+		start, err := clamp(line, startChar, int(startLine), "start")
+		if err != nil {
+			return "", err
+		}
+		end, err := clamp(line, endChar, int(startLine), "end")
+		if err != nil {
+			return "", err
+		}
+		if start > end {
+			return "", fmt.Errorf("invalid character range on line %d: start %d > end %d",
+				startLine, start, end)
+		}
+		if start >= uint32(len(line)) {
+			result = append(result, "")
+		} else {
+			result = append(result, line[start:end])
+		}
+	} else {
+		// Multi-line slice.
+		// First line: from startChar to line end.
+		first := lines[startLine]
+		start, err := clamp(first, startChar, int(startLine), "start")
+		if err != nil {
+			return "", err
+		}
+		if start >= uint32(len(first)) {
+			result = append(result, "")
+		} else {
+			result = append(result, first[start:])
+		}
+
+		// Full middle lines.
+		for i := startLine + 1; i < endLine; i++ {
+			result = append(result, lines[i])
+		}
+
+		// Last line: treat endChar as exclusive, but allow clamping/clipping
+		last := lines[endLine]
+		lineLen := uint32(len(last))
+
+		if endChar > lineLen {
+			if strict {
+				return "", fmt.Errorf("invalid end character on line %d: %d (line length: %d)",
+					endLine, endChar, lineLen)
+			}
+			// non-strict: take the entire last line
+			result = append(result, last)
+		} else {
+			// exclusive index
+			endIdx := endChar
+			if endIdx > 0 {
+				endIdx--
+			}
+			result = append(result, last[:endIdx])
+		}
+	}
+
+	return strings.Join(result, "\n"), nil
 }
