@@ -16,6 +16,7 @@
 
 !lsp_config.example.json
 !.golangci.yml
+!.goreleaser.yaml
 
 !*.py
 !*.sh
