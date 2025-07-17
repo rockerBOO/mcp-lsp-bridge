@@ -2,8 +2,18 @@ name: Go Tests
 on:
   push:
     branches: [ main ]
+    paths:
+      - '*.go'
+      - 'Makefile'
+      - 'go.sum'
+      - 'go.mod'
   pull_request:
     branches: [ main ]
+    paths:
+      - '*.go'
+      - 'Makefile'
+      - 'go.sum'
+      - 'go.mod'
 
 jobs:
   build:
