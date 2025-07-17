@@ -7,6 +7,7 @@ on:
       - 'Makefile'
       - 'go.sum'
       - 'go.mod'
+      - '.github/workflows/go.yml'
   pull_request:
     branches: [ main ]
     paths:
@@ -14,6 +15,7 @@ on:
       - 'Makefile'
       - 'go.sum'
       - 'go.mod'
+      - '.github/workflows/go.yml'
 
 jobs:
   build:
