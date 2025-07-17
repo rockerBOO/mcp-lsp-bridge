@@ -156,7 +156,7 @@ release:
   # changelog, but won't upload anything to it.
   #
   # Templates: allowed.
-  skip_upload: true
+  # skip_upload: true
 
   # You can add extra pre-existing files to the release.
   # The filename on the release will be the last part of the path (base).
