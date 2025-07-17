@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"rockerboo/mcp-lsp-bridge/logger"
@@ -86,11 +85,8 @@ func (lc *LanguageClient) Connect() (types.LanguageClientInterface, error) {
 	)
 
 	// IMPORTANT: Put language server in its own process group so it doesn't get killed
-	// when the parent receives SIGINT
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true, // Create new process group
-		Pgid:    0,    // 0 means use the PID as PGID
-	}
+	// when the parent receives SIGINT (Unix only)
+	setProcAttributes(cmd)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

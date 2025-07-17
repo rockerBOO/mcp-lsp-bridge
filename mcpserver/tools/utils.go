@@ -48,7 +48,9 @@ func safeUint32(val int) (uint32, error) {
 	if val < 0 {
 		return 0, fmt.Errorf("value cannot be negative: %d", val)
 	}
-	if val > math.MaxUint32 {
+	// On 32-bit systems, int and uint32 have the same max value
+	// On 64-bit systems, we need to check for overflow
+	if uint64(val) > math.MaxUint32 {
 		return 0, fmt.Errorf("value exceeds uint32 maximum: %d", val)
 	}
 	return uint32(val), nil

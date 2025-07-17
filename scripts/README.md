@@ -4,33 +4,21 @@ This directory contains scripts for testing the MCP-LSP Bridge server externally
 
 ## Available Scripts
 
-### 1. Python Test Script (Recommended)
-- **File**: `test_mcp_external.py`
-- **Description**: Comprehensive Python-based external MCP testing
-- **Usage**: `python3 test_mcp_external.py` or `make test-mcp-external`
-
-**Features:**
-- JSON-RPC communication with MCP server
-- Comprehensive test coverage for all MCP tools
-- Detailed error handling and reporting
-- Colored terminal output
-- JSON report generation
-- Automatic cleanup
-
-### 2. MCP Tools Test
+### 1. MCP Tools Test (Primary Development Tool)
 - **File**: `test_mcp_tools.py`
-- **Description**: Individual MCP tools functionality test
-- **Usage**: `python3 test_mcp_tools.py` or `make test-mcp-tools`
+- **Description**: Primary MCP tools functionality test referenced in CLAUDE.md
+- **Usage**: `uv run python scripts/test_mcp_tools.py` or `make test-mcp-tools`
 
 **Features:**
 - Tests each MCP tool individually
 - Validates tool responses
 - Comprehensive functionality verification
+- Primary tool for development testing
 
-### 3. Performance Test
+### 2. Performance Test
 - **File**: `performance_test.py`
 - **Description**: Performance testing for analysis functionality
-- **Usage**: `uv run python scripts/performance_test.py`
+- **Usage**: `uv run python scripts/performance_test.py` or `make test-mcp-performance`
 
 **Features:**
 - Tests various analysis types with different complexity levels
@@ -39,10 +27,10 @@ This directory contains scripts for testing the MCP-LSP Bridge server externally
 - Identifies slow operations and performance bottlenecks
 - 100% success rate validation
 
-### 4. Memory Test
+### 3. Memory Test
 - **File**: `memory_test.py`
 - **Description**: Memory usage monitoring for analysis operations
-- **Usage**: `uv run python scripts/memory_test.py`
+- **Usage**: `uv run python scripts/memory_test.py` or `make test-mcp-memory`
 
 **Features:**
 - Monitors memory consumption during analysis operations
@@ -51,65 +39,20 @@ This directory contains scripts for testing the MCP-LSP Bridge server externally
 - No external dependencies (uses built-in `resource` module)
 - System memory info display on Linux
 
-### 5. Advanced MCP Test
-- **File**: `mcp_external_test.py`
-- **Description**: Advanced testing framework with command parsing and variable interpolation
-- **Usage**: `uv run python scripts/mcp_external_test.py`
-
-**Features:**
-- Complex command parsing with variable interpolation
-- Context preservation between tests
-- Advanced testing scenarios
-- Sophisticated error handling
-
-### 6. Hover Optimization Test
-- **File**: `test_hover_optimization.py`
-- **Description**: Demonstrates hover optimization workflow patterns
-- **Usage**: `uv run python scripts/test_hover_optimization.py`
-
-**Features:**
-- Document symbols → hover refinement workflow
-- Optimal hover position detection
-- Known issue workarounds
-- Workflow pattern demonstration
-
-### 7. New Tools Test
-- **File**: `test_new_tools.py`
-- **Description**: Tests newly fixed implementation and signature help tools
-- **Usage**: `uv run python scripts/test_new_tools.py`
-
-**Features:**
-- Specific tool validation
-- Error handling demonstration
-- Fixed tool functionality testing
-- Regression testing
-
 ## Test Coverage
 
-The external tests cover the following MCP tools:
+The MCP testing scripts cover:
 
-1. **Initialize**: MCP connection initialization
-2. **List Tools**: Enumerate available MCP tools
-3. **Infer Language**: Test language detection for files
-4. **LSP Connect**: Test language server connection
-5. **Analyze Code**: Test code analysis functionality
-6. **LSP Disconnect**: Test cleanup and disconnection
+1. **MCP Tools Test**: Core MCP tools functionality and tool responses
+2. **Performance Test**: Analysis operations performance and duration tracking
+3. **Memory Test**: Memory usage monitoring and leak detection
 
 ## Requirements
 
-### Python Script
-- Python 3.6+
-- Standard library only (no external dependencies)
-
-### Shell Script
-- Bash 4.0+
-- `nc` (netcat)
-- `bc` (basic calculator)
-- `timeout` command
-
-### Go Script
-- Go 1.19+
-- MCP-Go library
+### All Scripts
+- Python 3.8+
+- uv (Python package manager)
+- No external dependencies (uses built-in modules only)
 
 ## Usage Examples
 
@@ -117,24 +60,19 @@ The external tests cover the following MCP tools:
 # Run individual tools test (primary development tool)
 make test-mcp-tools
 
-# Run comprehensive external tests
-make test-mcp-external
-
 # Run performance tests
-uv run python scripts/performance_test.py
+make test-mcp-performance
 
 # Run memory tests
-uv run python scripts/memory_test.py
+make test-mcp-memory
+
+# Run all MCP tests
+make test-mcp-all
 
 # Run tests directly
-cd scripts
-python3 test_mcp_tools.py
-python3 test_mcp_external.py
-uv run python performance_test.py
-uv run python memory_test.py
-uv run python mcp_external_test.py
-uv run python test_hover_optimization.py
-uv run python test_new_tools.py
+uv run python scripts/test_mcp_tools.py
+uv run python scripts/performance_test.py
+uv run python scripts/memory_test.py
 ```
 
 ## Output Files

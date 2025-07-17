@@ -38,36 +38,23 @@ test-race:
 	@echo "Running tests with race detection..."
 	go test -v -race ./...
 
-# Run comprehensive external MCP tests (all 21 tools)
-.PHONY: test-mcp-external
-test-mcp-external:
-	@echo "Running comprehensive external MCP integration tests..."
-	@echo "Testing all 15 MCP tools including newly fixed implementation and signature help..."
-	@cd scripts && python3 test_mcp_external.py
-
-# Run external MCP tests (shell version)
-.PHONY: test-mcp-external-shell
-test-mcp-external-shell:
-	@echo "Running external MCP integration tests (shell)..."
-	@cd scripts && ./test_mcp_external.sh
-
-# Run simple MCP test
-.PHONY: test-mcp-simple
-test-mcp-simple:
-	@echo "Running simple MCP test..."
-	@cd scripts && python3 test_mcp_simple.py
-
-# Run MCP tools test
+# Run MCP tools test (primary development tool)
 .PHONY: test-mcp-tools
 test-mcp-tools:
-	@echo "Running MCP tools test..."
-	@cd scripts && python3 test_mcp_tools.py
+	@echo "Running MCP tools test (primary development tool)..."
+	uv run python scripts/test_mcp_tools.py
 
-# Test newly fixed tools (implementation and signature help)
-.PHONY: test-mcp-new-tools
-test-mcp-new-tools:
-	@echo "Testing newly fixed implementation and signature help tools..."
-	@cd scripts && python3 test_new_tools.py
+# Run performance tests
+.PHONY: test-mcp-performance
+test-mcp-performance:
+	@echo "Running performance tests for analysis functionality..."
+	uv run python scripts/performance_test.py
+
+# Run memory tests
+.PHONY: test-mcp-memory
+test-mcp-memory:
+	@echo "Running memory usage tests for analysis functionality..."
+	uv run python scripts/memory_test.py
 
 .PHONY: security-scan gosec
 security-scan: gosec nancy
@@ -77,21 +64,9 @@ gosec:
 nancy:
 	go list -json -deps ./... | docker run --rm -i sonatypecommunity/nancy:latest sleuth
 
-# Test hover optimization workflow
-.PHONY: test-mcp-hover-optimization
-test-mcp-hover-optimization:
-	@echo "Testing hover optimization workflow (document symbols → hover coordination)..."
-	@cd scripts && python3 test_hover_optimization.py
-
-# Programmatic MCP tool testing
-.PHONY: test-mcp-external-tool
-test-mcp-external-tool:
-	@echo "Running programmatic MCP external testing tool..."
-	@cd scripts && python3 mcp_external_test.py
-
 # Run all MCP testing (comprehensive suite)
 .PHONY: test-mcp-all
-test-mcp-all: test-mcp-simple test-mcp-tools test-mcp-external test-mcp-new-tools test-mcp-hover-optimization test-mcp-external-tool
+test-mcp-all: test-mcp-tools test-mcp-performance test-mcp-memory
 	@echo "All MCP tests completed!"
 
 # Lint the code
@@ -211,7 +186,7 @@ dev-setup:
 .PHONY: docker-build
 docker-build:
 	@echo "Building Docker image..."
-	docker build -t $(BINARY_NAME):$(VERSION) .
+	docker build -t rockerboo/$(BINARY_NAME):$(VERSION) .
 
 # Show help
 .PHONY: help
@@ -222,13 +197,9 @@ help:
 	@echo "  test         - Run tests"
 	@echo "  test-coverage- Run tests with coverage report"
 	@echo "  test-race    - Run tests with race detection"
-	@echo "  test-mcp-external - Run comprehensive external MCP tests (all 15 tools)"
-	@echo "  test-mcp-external-shell - Run external MCP tests (shell)"
-	@echo "  test-mcp-simple  - Run simple MCP connectivity test"
-	@echo "  test-mcp-tools   - Run individual MCP tools test"
-	@echo "  test-mcp-new-tools - Test newly fixed implementation and signature help tools"
-	@echo "  test-mcp-hover-optimization - Test hover optimization workflow"
-	@echo "  test-mcp-external-tool - Run programmatic external MCP tool testing"
+	@echo "  test-mcp-tools   - Run individual MCP tools test (primary development tool)"
+	@echo "  test-mcp-performance - Run performance tests for analysis functionality"
+	@echo "  test-mcp-memory  - Run memory usage tests for analysis functionality"
 	@echo "  test-mcp-all     - Run complete MCP testing suite"
 	@echo "  lint         - Lint the code"
 	@echo "  fmt          - Format the code"

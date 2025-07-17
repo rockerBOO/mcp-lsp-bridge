@@ -26,3 +26,5 @@
 !*/
 
 lsp_parsed/
+# Added by goreleaser init:
+dist/
