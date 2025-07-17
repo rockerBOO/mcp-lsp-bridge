@@ -10,8 +10,9 @@ on:
 permissions:
   contents: write
   packages: write
+  attestations: write
+  id-token: write
   # issues: write
-  # id-token: write
 
 jobs:
   goreleaser:
