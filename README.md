@@ -29,27 +29,27 @@ The MCP LSP Bridge empowers MCP-compatible agents (like LLMs) with powerful Lang
 
 ### Key Functionality
 
-1.  **Intelligent Code Understanding & Navigation**:
-    *   **Get Contextual Information**: Easily retrieve documentation, type definitions, and function signatures for any code element.
-    *   **Identify Issues**: Receive real-time diagnostics (errors, warnings, hints) to understand code health.
-    *   **Explore Code Structure**: Outline symbols within a file or search for symbols across your entire project.
-    *   **Trace Code Flow**: Discover where symbols are defined, where they are used, and analyze function call hierarchies.
+1. **Intelligent Code Understanding & Navigation**:
+   - **Get Contextual Information**: Easily retrieve documentation, type definitions, and function signatures for any code element.
+   - **Identify Issues**: Receive real-time diagnostics (errors, warnings, hints) to understand code health.
+   - **Explore Code Structure**: Outline symbols within a file or search for symbols across your entire project.
+   - **Trace Code Flow**: Discover where symbols are defined, where they are used, and analyze function call hierarchies.
 
-2.  **Automated Code Improvement & Refactoring**:
-    *   **Apply Quick Fixes & Suggestions**: Get context-aware code actions, including automatic fixes for errors, import organization, and refactoring suggestions.
-    *   **Format Code**: Standardize code style across files based on language conventions.
-    *   **Safely Rename Symbols**: Rename variables, functions, classes, and other symbols consistently across your entire codebase.
+2. **Automated Code Improvement & Refactoring**:
+   - **Apply Quick Fixes & Suggestions**: Get context-aware code actions, including automatic fixes for errors, import organization, and refactoring suggestions.
+   - **Format Code**: Standardize code style across files based on language conventions.
+   - **Safely Rename Symbols**: Rename variables, functions, classes, and other symbols consistently across your entire codebase.
 
-3.  **Project-Wide Analysis**:
-    *   **Language Detection**: Automatically identify the programming languages used in your project.
-    *   **Content Search**: Search for specific text patterns across your entire workspace.
+3. **Project-Wide Analysis**:
+   - **Language Detection**: Automatically identify the programming languages used in your project.
+   - **Content Search**: Search for specific text patterns across your entire workspace.
 
 ### Crucial Safety Features for Code Modifications (Preview & Apply)
 
 For tools that modify your code (like formatting or renaming), the bridge provides a critical safety mechanism:
 
-*   **Preview Mode**: Always run actions in preview mode first. This shows you exactly *what changes will be made* across all affected files without actually modifying them.
-*   **Apply Mode**: Once you've reviewed and approved the preview, you can then command the bridge to *apply* the changes to your codebase.
+- **Preview Mode**: Always run actions in preview mode first. This shows you exactly _what changes will be made_ across all affected files without actually modifying them.
+- **Apply Mode**: Once you've reviewed and approved the preview, you can then command the bridge to _apply_ the changes to your codebase.
 
 This dual-mode operation ensures you have full control and visibility over automated code modifications, preventing unintended changes.
 
@@ -66,7 +66,6 @@ The bridge is designed to work with over 20 programming languages (e.g., Go, Pyt
 go build -o mcp-lsp-bridge
 
 # Now you can configure the bridge with your MCP client
-
 ```
 
 ### Command-Line Options
@@ -155,11 +154,13 @@ The bridge exposes the following MCP tools for Claude Code integration:
 - **`mcp__lsp__workspace_diagnostics`**: Get comprehensive diagnostics (errors, warnings) for the entire workspace.
 - **`mcp__lsp__semantic_tokens`**: Get semantic tokens (e.g., function, variable types) for a specific range of a file.
 
-### Code Improvement Tools 
+### Code Improvement Tools
+
 - **`mcp__lsp__code_actions`**: Get quick fixes and refactoring suggestions
 - **`mcp__lsp__format_document`**: Format code with customizable options
 
-### Advanced Navigation Tools 
+### Advanced Navigation Tools
+
 - **`mcp__lsp__rename`**: Rename symbols with optional preview
 - **`mcp__lsp__implementation`**: Find symbol implementations
 - **`mcp__lsp__call_hierarchy`**: Prepare call hierarchy analysis
@@ -172,7 +173,6 @@ The bridge exposes the following MCP tools for Claude Code integration:
   - Definition location
   - Text-based search
 - **`mcp__lsp__workspace_diagnostics`**: Get comprehensive diagnostics for the entire workspace.
-
 
 ## Configuration
 
@@ -223,19 +223,21 @@ The logger can be configured through the `lsp_config.json` file under the `globa
 Docker implementation is available but no LSP servers are installed. Ideally you'd make your own extended container which includes the LSP servers you want to support.
 
 ```bash
-docker pull docker.io/rockerboo/mcp-lsp-bridge
-docker run -it --rm rockerboo/mcp-lsp-bridge:latest
+docker pull ghcr.io/rockerboo/mcp-lsp-bridge:latest
+docker run -it --rm ghcr.io/rockerboo/mcp-lsp-bridge:latest
 ```
 
 ```Dockerfile
 # Use the official rockerboo/mcp-lsp-bridge image as a base
-FROM rockerboo/mcp-lsp-bridge:latest
+FROM ghcr.io/rockerboo/mcp-lsp-bridge:latest
 
 # Install additional LSP servers
-RUN apt-get update && apt-get install -y \
-    npm \
-    && npm install -g @typescript-language-server typescript-language-server \
-    && npm install -g diagnostic-languageserver
+RUN apk add --no-cache npm
+
+# Set the user
+USER user
+
+RUN npm install -g typescript-language-server typescript
 
 # Optional: Add more LSP servers as needed
 # RUN npm install -g <another-lsp-server>
@@ -246,10 +248,6 @@ RUN mkdir -p /home/user/.config/mcp-lsp-bridge
 # Copy your LSP configuration file to the docker container
 COPY lsp_config.json /home/user/.config/mcp-lsp-bridge/lsp_config.json
 
-# Set the user
-USER user
-
 # Set the command to run when the container starts
 CMD ["mcp-lsp-bridge"]
 ```
-
