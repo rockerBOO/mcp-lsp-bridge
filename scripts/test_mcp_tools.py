@@ -14,20 +14,24 @@ logger = logging.getLogger(__name__)
 
 
 class MCPToolRunner:
-    def __init__(self):
+    def __init__(self, custom_cmd=None):
         """
         Initialize MCP server process
+
+        Args:
+            custom_cmd (list, optional): Custom command to start the MCP server. Defaults to None.
         """
         self.mcp_process = None
+        self.custom_cmd = custom_cmd
 
-    def start_mcp_server(self):
+    def start_mcp_server(self, custom_cmd=None):
         """
         Start the MCP server
         """
         logger.info("Starting MCP server...")
 
         # Build command to start MCP server
-        cmd = ["go", "run", "/home/rockerboo/code/mcp-lsp-bridge/main.go"]
+        cmd = custom_cmd or ["go", "run", "/home/rockerboo/code/mcp-lsp-bridge/main.go"]
 
         # Start the server process
         self.mcp_process = subprocess.Popen(
@@ -72,9 +76,9 @@ class MCPToolRunner:
         """
         command_str = command_str.strip()
 
-        # Updated regex to capture both lsp: and mcp__lsp__ formats
+        # Flexible regex to capture various tool name formats and optional (MCP)
         match = re.match(
-            r"^(?:●\s*)?(?:lsp:(\w+)|mcp__lsp__(\w+))\s*(?:\(MCP\))?\s*\((.*)\)$",
+            r"^(?:●\s*)?([a-zA-Z0-9_]+(?::[a-zA-Z0-9_]+)*)\s*(?:\(MCP\))?\s*\((.*)\)$",
             command_str,
         )
 
@@ -82,49 +86,60 @@ class MCPToolRunner:
             logger.error(f"Failed to match command structure: '{command_str}'")
             raise ValueError(f"Invalid MCP command format: {command_str}")
 
-        # tool_name is in either group 1 (lsp:) or group 2 (mcp__lsp__)
-        tool_name = match.group(1) or match.group(2)
-        params_str = match.group(3)
+        # tool_name is the first group
+        tool_name = match.group(1)
+        params_str = match.group(2)
         logger.info(f"params string: {params_str}")
 
         params = {}
         if params_str:
-            # Updated regex to handle URLs and complex values
-            # This pattern matches quoted strings (single or double) OR unquoted values up to comma/end
-            param_regex = r'(\w+)\s*[=|:]\s*(?:"([^"]*)"|\'([^\']*)\'|([^,\s)]+))'
-            param_matches = re.findall(param_regex, params_str)
-            if not param_matches and params_str.strip():
-                logger.warning(
-                    f"Could not parse any parameters from: '{params_str}' for command: {command_str}"
-                )
+            # More flexible regex to handle various parameter types including lists
+            # Uses ast.literal_eval for safe parsing of complex types
+            import ast
+            
+            # Split params by commas, but handle nested structures
+            def split_complex_params(s):
+                params = []
+                current = []
+                bracket_level = 0
+                for char in s:
+                    if char in '[{(' and bracket_level == 0:
+                        bracket_level += 1
+                        current.append(char)
+                    elif char in ']})' and bracket_level > 0:
+                        bracket_level -= 1
+                        current.append(char)
+                        if bracket_level == 0:
+                            params.append(''.join(current))
+                            current = []
+                    elif char == ',' and bracket_level == 0:
+                        if current:
+                            params.append(''.join(current).strip())
+                            current = []
+                    else:
+                        current.append(char)
+                if current:
+                    params.append(''.join(current).strip())
+                return params
 
-            for (
-                key,
-                double_quoted_value,
-                single_quoted_value,
-                unquoted_value,
-            ) in param_matches:
-                # Prioritize: double-quoted, then single-quoted, then unquoted
-                value = double_quoted_value or single_quoted_value or unquoted_value
-                # Attempt to convert known integer parameters
-                if key in [
-                    "line",
-                    "character",
-                    "start_line",
-                    "start_character",
-                    "end_line",
-                    "end_character",
-                    "tab_size",
-                ]:
+            # Parse each parameter
+            try:
+                for param in split_complex_params(params_str):
+                    key, value = param.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    
+                    # Use ast.literal_eval for safe parsing of lists, dicts, etc.
                     try:
-                        params[key] = int(value)
-                    except ValueError:
-                        logger.warning(
-                            f"Could not convert parameter '{key}' value '{value}' to int. Keeping as string."
-                        )
-                        params[key] = value
-                else:
-                    params[key] = value
+                        parsed_value = ast.literal_eval(value)
+                    except (ValueError, SyntaxError):
+                        # If literal_eval fails, keep as string
+                        parsed_value = value.strip('"\'')
+                    
+                    params[key] = parsed_value
+            except Exception as e:
+                logger.warning(f"Could not parse parameters: {e}")
+                logger.warning(f"Raw params string: {params_str}")
         logger.info(f"Parsed command: Tool='{tool_name}', Params={params}")
         return tool_name, params
 
@@ -194,7 +209,7 @@ class MCPToolRunner:
             return False
 
     def __enter__(self):
-        self.start_mcp_server()
+        self.start_mcp_server(self.custom_cmd)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -202,17 +217,23 @@ class MCPToolRunner:
 
 
 def main():
-    if len(sys.argv) < 2:
-        print(
-            'Usage: python test_mcp_tools.py "lsp:tool_name (MCP)(param1=value1, param2=value2)"'
-        )
-        sys.exit(1)
+    import argparse
 
-    command_str = sys.argv[1]
+    parser = argparse.ArgumentParser(description='Test MCP tools with optional custom server startup',
+        epilog='''Examples:\n\n  # Run with default MCP server (Go main.go)\n  %(prog)s "lsp:project_analysis (MCP)(analysis_type=\"document_symbols\", query=\"mcpserver/tools.go\")"\n\n  # Run with a custom MCP server startup command\n  %(prog)s "lsp:hover (MCP)(uri=\"file:///project/tools.go\", line=10, character=5)" --cmd "python3 alternative_server.py"\n''')
+    parser.add_argument('command', help='MCP tool command to run (in the format: "lsp:tool_name (MCP)(param1=value1, param2=value2)")')
+    parser.add_argument('--cmd', help='Custom command to start the MCP server. If not provided, defaults to running main.go with Go', default=None)
+
+    args = parser.parse_args()
 
     try:
-        with MCPToolRunner() as runner:
-            tool_name, params = runner.parse_mcp_command(command_str)
+        # Handle custom command, preserving full command string
+        custom_cmd = None
+        if args.cmd and isinstance(args.cmd, str) and args.cmd.strip():
+            # Replace newlines with spaces to create a single command line
+            custom_cmd = args.cmd.replace('\n', ' ').split()
+        with MCPToolRunner(custom_cmd=custom_cmd) as runner:
+            tool_name, params = runner.parse_mcp_command(args.command)
             success = runner.run_mcp_tool(tool_name, params)
             sys.exit(0 if success else 1)
     except Exception as e:

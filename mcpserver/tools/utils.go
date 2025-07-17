@@ -580,6 +580,97 @@ func getSeverityIcon(severity string) string {
 	}
 }
 
+// PaginationResult represents the result of applying pagination to a dataset
+type PaginationResult struct {
+	Offset       int  // Starting index of returned items
+	Limit        int  // Maximum number of items requested
+	Total        int  // Total number of items available
+	Start        int  // Actual starting index (1-based for display)
+	End          int  // Actual ending index (1-based for display)
+	Count        int  // Actual number of items returned
+	HasMore      bool // Whether there are more items after this page
+	HasPrevious  bool // Whether there are items before this page
+}
+
+// ApplyPagination applies offset and limit to a dataset and returns pagination info
+// Generic function that works with any slice type
+func ApplyPagination[T any](items []T, offset, limit int) ([]T, PaginationResult) {
+	total := len(items)
+	
+	// Validate offset
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= total {
+		return []T{}, PaginationResult{
+			Offset:      offset,
+			Limit:       limit,
+			Total:       total,
+			Start:       0,
+			End:         0,
+			Count:       0,
+			HasMore:     false,
+			HasPrevious: offset > 0,
+		}
+	}
+	
+	// Calculate end index
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	
+	// Get paginated slice
+	paginatedItems := items[offset:end]
+	
+	// Create pagination result
+	result := PaginationResult{
+		Offset:      offset,
+		Limit:       limit,
+		Total:       total,
+		Start:       offset + 1, // 1-based for display
+		End:         end,        // 1-based for display
+		Count:       len(paginatedItems),
+		HasMore:     end < total,
+		HasPrevious: offset > 0,
+	}
+	
+	return paginatedItems, result
+}
+
+// FormatPaginationInfo formats pagination information for display
+func FormatPaginationInfo(result PaginationResult) string {
+	if result.Count == 0 {
+		return fmt.Sprintf("No results (offset %d exceeds total %d)", result.Offset, result.Total)
+	}
+	
+	if result.HasMore || result.HasPrevious {
+		return fmt.Sprintf("Showing results %d-%d of %d total", result.Start, result.End, result.Total)
+	}
+	
+	return fmt.Sprintf("Found %d results", result.Total)
+}
+
+// FormatPaginationControls formats pagination control instructions
+func FormatPaginationControls(result PaginationResult) string {
+	var controls []string
+	
+	if result.HasMore {
+		remaining := result.Total - result.End
+		controls = append(controls, fmt.Sprintf("... and %d more results available (use offset=%d to see next page)", remaining, result.End))
+	}
+	
+	if result.HasPrevious {
+		controls = append(controls, "Use offset=0 to see from the beginning")
+	}
+	
+	if len(controls) > 0 {
+		return "\n" + strings.Join(controls, "\n")
+	}
+	
+	return ""
+}
+
 // getRangeContent returns the text that falls between the given
 // (zero-based) line/character positions.  The strict flag controls
 // whether out-of-bounds character indices are an error (strict=true)

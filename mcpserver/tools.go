@@ -22,8 +22,8 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 
 	// LSP connection management
 	// Disabling lesser used tools
-	// tools.RegisterLSPConnectTool(mcpServer, bridge)
-	// tools.RegisterLSPDisconnectTool(mcpServer, bridge)
+	tools.RegisterLSPConnectTool(mcpServer, bridge)
+	tools.RegisterLSPDisconnectTool(mcpServer, bridge)
 
 	// Code intelligence tools
 	tools.RegisterHoverTool(mcpServer, bridge)

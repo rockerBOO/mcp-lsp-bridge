@@ -19,22 +19,25 @@ import (
 )
 
 // SymbolMatch represents a symbol found during exploration
+// This is our internal representation that extends LSP WorkspaceSymbol with additional metadata
 type SymbolMatch struct {
-	Name           string
-	Kind           protocol.SymbolKind
-	Location       protocol.Location
-	ContainerName  string
-	Documentation  string
-	Signature      string
-	ReferenceCount int
-	Preview        string
+	Name           string               // Symbol name (e.g., "calculateTotal")
+	Kind           protocol.SymbolKind  // Symbol type (function, class, variable, etc.)
+	Location       protocol.Location    // File location with line/character range
+	ContainerName  string               // Parent container (e.g., package, class name)
+	Documentation  string               // Symbol documentation (populated on demand)
+	Signature      string               // Function/method signature (populated on demand)
+	ReferenceCount int                  // Number of references (populated on demand)
+	Preview        string               // Code preview (populated on demand)
 }
 
 // SymbolSessionData stores session-specific symbol exploration state
+// NOTE: Currently not fully implemented - sessions are not persistent in MCP
+// This is prepared for future session support
 type SymbolSessionData struct {
-	LastQuery     string
-	SearchResults []SymbolMatch
-	ActiveSymbol  *SymbolMatch
+	LastQuery     string         // Last search query executed
+	SearchResults []SymbolMatch  // Cached search results
+	ActiveSymbol  *SymbolMatch   // Currently selected symbol for detailed view
 }
 
 func SymbolExploreTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
@@ -120,6 +123,11 @@ BEHAVIOR:
 }
 
 // performSymbolSearch executes workspace symbol search across multiple languages asynchronously
+// This function:
+// 1. Detects all programming languages in the project
+// 2. Searches for symbols in parallel across all detected languages
+// 3. Aggregates results into a unified list of SymbolMatch objects
+// The async approach significantly improves performance for multi-language projects
 func performSymbolSearch(ctx context.Context, bridge interfaces.BridgeInterface, query string) ([]SymbolMatch, error) {
 	// TODO: Fix architecture - project directory should be stored in bridge at startup
 	// rather than calling os.Getwd() here. This is a workaround.
@@ -175,6 +183,8 @@ func performSymbolSearch(ctx context.Context, bridge interfaces.BridgeInterface,
 }
 
 // convertWorkspaceSymbolToMatch converts a protocol.WorkspaceSymbol to our SymbolMatch type
+// Handles the complex LSP location type (Or2[Location, LocationUriOnly]) by normalizing
+// to a standard Location with proper range information
 func convertWorkspaceSymbolToMatch(symbol protocol.WorkspaceSymbol) SymbolMatch {
 	// Handle the Or2[Location, LocationUriOnly] type
 	var location protocol.Location
@@ -203,7 +213,13 @@ func convertWorkspaceSymbolToMatch(symbol protocol.WorkspaceSymbol) SymbolMatch 
 	}
 }
 
-// filterSymbolsByFileContext applies fuzzy file filtering
+// filterSymbolsByFileContext applies fuzzy file filtering with scoring
+// Filters symbols based on file context using a scoring system:
+// - Exact filename match: 100 points
+// - Directory name match: 50 points  
+// - Path component match: 25 points
+// - File extension match: 10 points
+// Only symbols with score > 0 are included in results
 func filterSymbolsByFileContext(symbols []SymbolMatch, fileContext string) []SymbolMatch {
 	if fileContext == "" {
 		return symbols
@@ -231,8 +247,8 @@ func filterSymbolsByFileContext(symbols []SymbolMatch, fileContext string) []Sym
 		}
 
 		// Path component match
-		pathParts := strings.Split(strings.ToLower(uri), "/")
-		for _, part := range pathParts {
+		pathParts := strings.SplitSeq(strings.ToLower(uri), "/")
+		for part := range pathParts {
 			if strings.Contains(part, fileContext) {
 				score += 25
 				break
@@ -254,6 +270,10 @@ func filterSymbolsByFileContext(symbols []SymbolMatch, fileContext string) []Sym
 }
 
 // generateSymbolResponse creates the appropriate response based on results
+// This is the main dispatcher that chooses between different presentation formats:
+// - Empty results: Simple "no results" message
+// - Few results (≤3): Direct detailed display without table of contents
+// - Many results (>3): Table of contents with paginated detailed view
 func generateSymbolResponse(bridge interfaces.BridgeInterface, symbols []SymbolMatch, query, fileContext, detailLevel string, limit, offset int) (*mcp.CallToolResult, error) {
 	if len(symbols) == 0 {
 		message := fmt.Sprintf("No symbols found matching '%s'", query)
@@ -263,16 +283,20 @@ func generateSymbolResponse(bridge interfaces.BridgeInterface, symbols []SymbolM
 		return mcp.NewToolResultText(message), nil
 	}
 
-	// Few matches - show details directly
+	// Few matches - show details directly without table of contents overhead
 	if len(symbols) <= 3 {
 		return generateDetailedMultipleSymbols(bridge, symbols, query, fileContext)
 	}
 
-	// Multiple matches - use table of contents approach
+	// Multiple matches - use table of contents approach with pagination
 	return generateTableOfContentsResponse(bridge, symbols, query, fileContext, detailLevel, limit, offset)
 }
 
 // generateDetailedSymbolInfo gets comprehensive information for a single symbol
+// Provides different levels of detail based on detailLevel parameter:
+// - "basic": Just symbol name, location, and basic info
+// - "auto"/"full": Includes hover documentation, implementation code, and reference counts
+// Uses enhanced range detection for better code extraction
 func generateDetailedSymbolInfo(bridge interfaces.BridgeInterface, symbol SymbolMatch, detailLevel string) (*mcp.CallToolResult, error) {
 	uri := string(symbol.Location.Uri)
 	line := symbol.Location.Range.Start.Line
@@ -281,7 +305,7 @@ func generateDetailedSymbolInfo(bridge interfaces.BridgeInterface, symbol Symbol
 	var info strings.Builder
 
 	// Basic info
-	info.WriteString(fmt.Sprintf("Found: %s (%s)\n", symbol.Name, getSymbolKindName(symbol.Kind)))
+	info.WriteString(fmt.Sprintf("Found: %s (%s)\n", symbol.Name, symbolKindToString(symbol.Kind)))
 	info.WriteString(fmt.Sprintf("File: %s:%d\n", filepath.Base(uri), line+1))
 	if symbol.ContainerName != "" {
 		info.WriteString(fmt.Sprintf("Container: %s\n", symbol.ContainerName))
@@ -330,6 +354,12 @@ func generateDetailedSymbolInfo(bridge interfaces.BridgeInterface, symbol Symbol
 }
 
 // generateDetailedMultipleSymbols creates detailed information for multiple symbol matches
+// Used for small result sets (≤3 symbols) where table of contents would be unnecessary overhead
+// Provides comprehensive information for each symbol including:
+// - Enhanced range information via semantic tokens
+// - Hover documentation
+// - Implementation code
+// - Reference counts
 func generateDetailedMultipleSymbols(bridge interfaces.BridgeInterface, symbols []SymbolMatch, query, fileContext string) (*mcp.CallToolResult, error) {
 	var info strings.Builder
 
@@ -340,7 +370,7 @@ func generateDetailedMultipleSymbols(bridge interfaces.BridgeInterface, symbols 
 	info.WriteString(" (detailed view):\n\n")
 
 	for i, symbol := range symbols {
-		info.WriteString(fmt.Sprintf("=== %d. %s (%s) ===\n", i+1, symbol.Name, getSymbolKindName(symbol.Kind)))
+		info.WriteString(fmt.Sprintf("=== %d. %s (%s) ===\n", i+1, symbol.Name, symbolKindToString(symbol.Kind)))
 
 		uri := string(symbol.Location.Uri)
 		line := symbol.Location.Range.Start.Line
@@ -411,7 +441,7 @@ func generateDetailedMultipleSymbols(bridge interfaces.BridgeInterface, symbols 
 // 		uri := string(symbol.Location.Uri)
 // 		line := symbol.Location.Range.Start.Line
 //
-// 		summary.WriteString(fmt.Sprintf("%d. %s (%s)\n", i+1, symbol.Name, getSymbolKindName(symbol.Kind)))
+// 		summary.WriteString(fmt.Sprintf("%d. %s (%s)\n", i+1, symbol.Name, symbolKindToString(symbol.Kind)))
 // 		summary.WriteString(fmt.Sprintf("   File: %s:%d\n", filepath.Base(uri), line+1))
 // 		if symbol.ContainerName != "" {
 // 			summary.WriteString(fmt.Sprintf("   Container: %s\n", symbol.ContainerName))
@@ -424,7 +454,31 @@ func generateDetailedMultipleSymbols(bridge interfaces.BridgeInterface, symbols 
 // 	return mcp.NewToolResultText(summary.String()), nil
 // }
 //
-// generateTableOfContentsResponse creates a table of contents with sample detailed entries
+// generateTableOfContents creates a table of contents listing for symbol matches
+// Returns a formatted string containing numbered list of symbols with their locations
+func generateTableOfContents(symbols []SymbolMatch) string {
+	var tableOfContents strings.Builder
+	
+	for i, symbol := range symbols {
+		uri := string(symbol.Location.Uri)
+		line := symbol.Location.Range.Start.Line
+
+		tableOfContents.WriteString(fmt.Sprintf("%d. %s (%s) - %s:%d",
+			i+1, symbol.Name, symbolKindToString(symbol.Kind),
+			filepath.Base(uri), line+1))
+		
+		if symbol.ContainerName != "" {
+			tableOfContents.WriteString(fmt.Sprintf(" [%s]", symbol.ContainerName))
+		}
+		tableOfContents.WriteString("\n")
+	}
+	
+	return tableOfContents.String()
+}
+
+// generateTableOfContentsResponse creates a table of contents with detailed entries
+// This is the main response orchestrator that combines table of contents (first page only)
+// with detailed symbol information based on pagination parameters
 func generateTableOfContentsResponse(bridge interfaces.BridgeInterface, symbols []SymbolMatch, query, fileContext, detailLevel string, limit, offset int) (*mcp.CallToolResult, error) {
 	var result strings.Builder
 
@@ -438,18 +492,7 @@ func generateTableOfContentsResponse(bridge interfaces.BridgeInterface, symbols 
 	// Only show full table of contents on first page (offset=0)
 	if offset == 0 {
 		result.WriteString("TABLE OF CONTENTS:\n")
-		for i, symbol := range symbols {
-			uri := string(symbol.Location.Uri)
-			line := symbol.Location.Range.Start.Line
-
-			result.WriteString(fmt.Sprintf("%d. %s (%s) - %s:%d",
-				i+1, symbol.Name, getSymbolKindName(symbol.Kind),
-				filepath.Base(uri), line+1))
-			if symbol.ContainerName != "" {
-				result.WriteString(fmt.Sprintf(" [%s]", symbol.ContainerName))
-			}
-			result.WriteString("\n")
-		}
+		result.WriteString(generateTableOfContents(symbols))
 		result.WriteString("\n")
 	}
 
@@ -474,7 +517,7 @@ func generateTableOfContentsResponse(bridge interfaces.BridgeInterface, symbols 
 
 		for i := detailStart; i < detailEnd; i++ {
 			result.WriteString(fmt.Sprintf("\n=== %d. %s (%s) ===\n",
-				i+1, symbols[i].Name, getSymbolKindName(symbols[i].Kind)))
+				i+1, symbols[i].Name, symbolKindToString(symbols[i].Kind)))
 
 			// Get detailed info for this symbol
 			detailResult, err := generateDetailedSymbolInfo(bridge, symbols[i], detailLevel)
@@ -512,67 +555,15 @@ func generateTableOfContentsResponse(bridge interfaces.BridgeInterface, symbols 
 	return mcp.NewToolResultText(result.String()), nil
 }
 
-// getSymbolKindName converts SymbolKind to readable string
-func getSymbolKindName(kind protocol.SymbolKind) string {
-	switch kind {
-	case protocol.SymbolKindFile:
-		return "file"
-	case protocol.SymbolKindModule:
-		return "module"
-	case protocol.SymbolKindNamespace:
-		return "namespace"
-	case protocol.SymbolKindPackage:
-		return "package"
-	case protocol.SymbolKindClass:
-		return "class"
-	case protocol.SymbolKindMethod:
-		return "method"
-	case protocol.SymbolKindProperty:
-		return "property"
-	case protocol.SymbolKindField:
-		return "field"
-	case protocol.SymbolKindConstructor:
-		return "constructor"
-	case protocol.SymbolKindEnum:
-		return "enum"
-	case protocol.SymbolKindInterface:
-		return "interface"
-	case protocol.SymbolKindFunction:
-		return "function"
-	case protocol.SymbolKindVariable:
-		return "variable"
-	case protocol.SymbolKindConstant:
-		return "constant"
-	case protocol.SymbolKindString:
-		return "string"
-	case protocol.SymbolKindNumber:
-		return "number"
-	case protocol.SymbolKindBoolean:
-		return "boolean"
-	case protocol.SymbolKindArray:
-		return "array"
-	case protocol.SymbolKindObject:
-		return "object"
-	case protocol.SymbolKindKey:
-		return "key"
-	case protocol.SymbolKindNull:
-		return "null"
-	case protocol.SymbolKindEnumMember:
-		return "enum member"
-	case protocol.SymbolKindStruct:
-		return "struct"
-	case protocol.SymbolKindEvent:
-		return "event"
-	case protocol.SymbolKindOperator:
-		return "operator"
-	case protocol.SymbolKindTypeParameter:
-		return "type parameter"
-	default:
-		return "symbol"
-	}
-}
+// getSymbolKindName is now consolidated - use symbolKindToString from utils.go instead
 
 // getEnhancedSymbolRange tries to get better range information using semantic tokens
+// LSP workspace symbols often have imprecise or minimal range information.
+// This function improves accuracy by:
+// 1. First trying semantic tokens for precise, language-agnostic positioning
+// 2. Falling back to document symbols for structural information
+// 3. Using original range as final fallback
+// Returns: startLine, startChar, endLine, endChar, error
 func getEnhancedSymbolRange(bridge interfaces.BridgeInterface, symbol SymbolMatch) (uint32, uint32, uint32, uint32, error) {
 	uri := string(symbol.Location.Uri)
 	symbolLine := symbol.Location.Range.Start.Line
@@ -619,6 +610,11 @@ func getEnhancedSymbolRange(bridge interfaces.BridgeInterface, symbol SymbolMatc
 }
 
 // getSemanticTokenRange uses semantic tokens to find the full range of a symbol
+// Semantic tokens provide more accurate positioning than workspace symbols because they:
+// 1. Give exact character positions for symbol tokens
+// 2. Are language-agnostic (work across all programming languages)
+// 3. Include full method/function body ranges for complete implementations
+// The function uses a scoring system to find the best matching token
 func getSemanticTokenRange(bridge interfaces.BridgeInterface, uri string, symbol SymbolMatch) (*protocol.Range, error) {
 	symbolLine := symbol.Location.Range.Start.Line
 	symbolChar := symbol.Location.Range.Start.Character
@@ -752,6 +748,9 @@ func getSemanticTokenRange(bridge interfaces.BridgeInterface, uri string, symbol
 // }
 //
 // searchChildSymbols recursively searches for a matching symbol in children
+// Used as fallback when semantic tokens fail - searches document symbol hierarchy
+// Matches symbols based on location proximity and symbol kind rather than exact names
+// to handle different symbol name formats between workspace and document symbols
 func searchChildSymbols(children []protocol.DocumentSymbol, target SymbolMatch) *protocol.DocumentSymbol {
 	for _, child := range children {
 		// Match symbols based on location and kind, with flexible name matching
