@@ -79,7 +79,7 @@ QUERY GUIDANCE:
 
 			offset := request.GetInt("offset", 0)
 			limit := request.GetInt("limit", 20)
-			
+
 			// Handle options parameter - since GetObject might not be available, create empty map for now
 			options := make(map[string]interface{})
 
@@ -597,18 +597,18 @@ func handleTextSearch(bridge interfaces.BridgeInterface, query string, offset, l
 
 // ComplexityMetrics represents file complexity metrics
 type ComplexityMetrics struct {
-	TotalLines       int
-	FunctionCount    int
-	ClassCount       int
-	VariableCount    int
-	ComplexityScore  float64
-	ComplexityLevel  string
+	TotalLines      int
+	FunctionCount   int
+	ClassCount      int
+	VariableCount   int
+	ComplexityScore float64
+	ComplexityLevel string
 }
 
 // handleFileAnalysis handles the 'file_analysis' analysis type
 func handleFileAnalysis(bridge interfaces.BridgeInterface, clients map[types.Language]types.LanguageClientInterface, query string, options map[string]interface{}, response *strings.Builder) (*mcp.CallToolResult, error) {
 	response.WriteString("=== FILE ANALYSIS ===\n")
-	
+
 	// For file analysis, the query should be a file URI
 	fileUri := query
 	if !strings.HasPrefix(query, "file://") {
@@ -620,7 +620,7 @@ func handleFileAnalysis(bridge interfaces.BridgeInterface, clients map[types.Lan
 
 	// Create analysis engine with clients
 	analyzer := analysis.NewProjectAnalyzer(clients)
-	
+
 	// Create analysis request
 	request := analysis.AnalysisRequest{
 		Type:    analysis.FileAnalysis,
@@ -641,7 +641,7 @@ func handleFileAnalysis(bridge interfaces.BridgeInterface, clients map[types.Lan
 	if fileData, ok := result.Data.(analysis.FileAnalysisData); ok {
 		fmt.Fprintf(response, "Language: %s\n", fileData.Language)
 		fmt.Fprintf(response, "Symbols found: %d\n\n", len(fileData.Symbols))
-		
+
 		// Complexity metrics
 		complexity := fileData.Complexity
 		fmt.Fprintf(response, "COMPLEXITY METRICS:\n")
@@ -666,7 +666,7 @@ func handleFileAnalysis(bridge interfaces.BridgeInterface, clients map[types.Lan
 		fmt.Fprintf(response, "CROSS-FILE RELATIONSHIPS:\n")
 		fmt.Fprintf(response, "  Related files: %d\n", len(fileData.CrossFileRelations))
 		for _, relation := range fileData.CrossFileRelations {
-			fmt.Fprintf(response, "  - %s (%s, strength: %.2f)\n", 
+			fmt.Fprintf(response, "  - %s (%s, strength: %.2f)\n",
 				relation.TargetFile, relation.RelationType, relation.Strength)
 		}
 
@@ -683,7 +683,7 @@ func handleFileAnalysis(bridge interfaces.BridgeInterface, clients map[types.Lan
 		// Recommendations
 		fmt.Fprintf(response, "RECOMMENDATIONS:\n")
 		for _, rec := range fileData.Recommendations {
-			fmt.Fprintf(response, "  - [%s] %s: %s (effort: %s)\n", 
+			fmt.Fprintf(response, "  - [%s] %s: %s (effort: %s)\n",
 				rec.Priority, rec.Type, rec.Description, rec.Effort)
 		}
 
@@ -705,7 +705,7 @@ func handleFileAnalysis(bridge interfaces.BridgeInterface, clients map[types.Lan
 // handlePatternAnalysis handles the 'pattern_analysis' analysis type
 func handlePatternAnalysis(bridge interfaces.BridgeInterface, clients map[types.Language]types.LanguageClientInterface, query string, options map[string]interface{}, response *strings.Builder) (*mcp.CallToolResult, error) {
 	response.WriteString("=== PATTERN ANALYSIS ===\n")
-	
+
 	// Determine pattern type from options or use query as pattern type
 	patternType := query
 	if pt, exists := options["pattern_type"]; exists {
@@ -718,13 +718,13 @@ func handlePatternAnalysis(bridge interfaces.BridgeInterface, clients map[types.
 
 	// Create analysis engine with clients
 	analyzer := analysis.NewProjectAnalyzer(clients)
-	
+
 	// Add pattern_type to options if not present
 	if options == nil {
 		options = make(map[string]interface{})
 	}
 	options["pattern_type"] = patternType
-	
+
 	// Create analysis request
 	request := analysis.AnalysisRequest{
 		Type:    analysis.PatternAnalysis,
@@ -745,17 +745,17 @@ func handlePatternAnalysis(bridge interfaces.BridgeInterface, clients map[types.
 	if patternData, ok := result.Data.(analysis.PatternAnalysisData); ok {
 		fmt.Fprintf(response, "Scope: %s\n", patternData.Scope)
 		fmt.Fprintf(response, "Consistency Score: %.1f%%\n\n", patternData.ConsistencyScore*100)
-		
+
 		// Pattern instances
 		fmt.Fprintf(response, "PATTERN INSTANCES FOUND:\n")
 		for i, instance := range patternData.PatternInstances {
-			fmt.Fprintf(response, "%d. %s (confidence: %.1f%%, quality: %s)\n", 
+			fmt.Fprintf(response, "%d. %s (confidence: %.1f%%, quality: %s)\n",
 				i+1, instance.Pattern, instance.Confidence*100, instance.Quality)
 			for _, variation := range instance.Variations {
 				fmt.Fprintf(response, "   - Variation: %s\n", variation)
 			}
 		}
-		
+
 		// Pattern violations
 		if len(patternData.Violations) > 0 {
 			fmt.Fprintf(response, "\nPATTERN VIOLATIONS:\n")
@@ -766,7 +766,7 @@ func handlePatternAnalysis(bridge interfaces.BridgeInterface, clients map[types.
 				fmt.Fprintf(response, "   Suggestion: %s\n", violation.Suggestion)
 			}
 		}
-		
+
 		// Trend analysis
 		trend := patternData.TrendAnalysis
 		fmt.Fprintf(response, "\nTREND ANALYSIS:\n")
@@ -798,12 +798,12 @@ func handlePatternAnalysis(bridge interfaces.BridgeInterface, clients map[types.
 // handleWorkspaceAnalysis handles the 'workspace_analysis' analysis type
 func handleWorkspaceAnalysis(bridge interfaces.BridgeInterface, clients map[types.Language]types.LanguageClientInterface, query string, options map[string]interface{}, response *strings.Builder) (*mcp.CallToolResult, error) {
 	response.WriteString("=== WORKSPACE ANALYSIS ===\n")
-	
+
 	fmt.Fprintf(response, "Analyzing workspace for: %s\n\n", query)
 
 	// Create analysis engine with clients
 	analyzer := analysis.NewProjectAnalyzer(clients)
-	
+
 	// Create analysis request
 	request := analysis.AnalysisRequest{
 		Type:    analysis.WorkspaceAnalysis,
@@ -824,15 +824,15 @@ func handleWorkspaceAnalysis(bridge interfaces.BridgeInterface, clients map[type
 	if workspaceData, ok := result.Data.(analysis.WorkspaceAnalysisData); ok {
 		fmt.Fprintf(response, "LANGUAGE DISTRIBUTION:\n")
 		for lang, stats := range workspaceData.LanguageDistribution {
-			fmt.Fprintf(response, "• %s: %d files (%.1f%%), %d symbols, avg complexity: %.2f\n", 
+			fmt.Fprintf(response, "• %s: %d files (%.1f%%), %d symbols, avg complexity: %.2f\n",
 				lang, stats.FileCount, stats.Percentage, stats.SymbolCount, stats.ComplexityAvg)
 		}
-		
+
 		fmt.Fprintf(response, "\nPROJECT OVERVIEW:\n")
 		fmt.Fprintf(response, "• Total symbols: %d\n", workspaceData.TotalSymbols)
 		fmt.Fprintf(response, "• Total files: %d\n", workspaceData.TotalFiles)
 		fmt.Fprintf(response, "• Dependency patterns: %d\n", len(workspaceData.DependencyPatterns))
-		
+
 		// Dependency patterns
 		if len(workspaceData.DependencyPatterns) > 0 {
 			fmt.Fprintf(response, "\nDEPENDENCY PATTERNS:\n")
@@ -845,11 +845,11 @@ func handleWorkspaceAnalysis(bridge interfaces.BridgeInterface, clients map[type
 				if pattern.IsCircular {
 					circular = " (circular)"
 				}
-				fmt.Fprintf(response, "• %s → %s (%s, freq: %d, depth: %d)%s\n", 
+				fmt.Fprintf(response, "• %s → %s (%s, freq: %d, depth: %d)%s\n",
 					pattern.Source, pattern.Target, pattern.Type, pattern.Frequency, pattern.Depth, circular)
 			}
 		}
-		
+
 		// Architectural health
 		health := workspaceData.ArchitecturalHealth
 		fmt.Fprintf(response, "\nARCHITECTURAL HEALTH:\n")
@@ -859,7 +859,7 @@ func handleWorkspaceAnalysis(bridge interfaces.BridgeInterface, clients map[type
 		fmt.Fprintf(response, "• Test Coverage: %.1f%% (%s)\n", health.TestCoverage.Score, health.TestCoverage.Level)
 		fmt.Fprintf(response, "• Documentation: %.1f%% (%s)\n", health.Documentation.Score, health.Documentation.Level)
 		fmt.Fprintf(response, "• Overall Score: %.1f%% (%s)\n", health.OverallScore.Score, health.OverallScore.Level)
-		
+
 		// Suggestions
 		if len(health.OverallScore.Suggestions) > 0 {
 			fmt.Fprintf(response, "\nSUGGESTIONS:\n")
@@ -886,12 +886,12 @@ func handleWorkspaceAnalysis(bridge interfaces.BridgeInterface, clients map[type
 // handleSymbolRelationships handles the 'symbol_relationships' analysis type
 func handleSymbolRelationships(bridge interfaces.BridgeInterface, clients map[types.Language]types.LanguageClientInterface, query string, options map[string]interface{}, response *strings.Builder) (*mcp.CallToolResult, error) {
 	response.WriteString("=== SYMBOL RELATIONSHIPS ===\n")
-	
+
 	fmt.Fprintf(response, "Analyzing symbol: %s\n\n", query)
 
 	// Create analysis engine with clients
 	analyzer := analysis.NewProjectAnalyzer(clients)
-	
+
 	// Create analysis request
 	request := analysis.AnalysisRequest{
 		Type:    analysis.SymbolRelationships,
@@ -914,21 +914,70 @@ func handleSymbolRelationships(bridge interfaces.BridgeInterface, clients map[ty
 		fmt.Fprintf(response, "• Name: %s\n", symbolData.Symbol.Name)
 		fmt.Fprintf(response, "• Language: %s\n", symbolData.Language)
 		fmt.Fprintf(response, "• Kind: %s\n", symbolKindToString(symbolData.Symbol.Kind))
-		
+
 		fmt.Fprintf(response, "\nRELATIONSHIPS:\n")
 		fmt.Fprintf(response, "• References: %d\n", len(symbolData.References))
 		fmt.Fprintf(response, "• Definitions: %d\n", len(symbolData.Definitions))
 		fmt.Fprintf(response, "• Call hierarchy items: %d\n", len(symbolData.CallHierarchy))
+		fmt.Fprintf(response, "• Incoming calls: %d\n", len(symbolData.IncomingCalls))
+		fmt.Fprintf(response, "• Outgoing calls: %d\n", len(symbolData.OutgoingCalls))
 		fmt.Fprintf(response, "• Implementations: %d\n", len(symbolData.Implementations))
 		fmt.Fprintf(response, "• Type hierarchy: %d\n", len(symbolData.TypeHierarchy))
-		
+
+		// Show detailed call hierarchy if present
+		if len(symbolData.IncomingCalls) > 0 || len(symbolData.OutgoingCalls) > 0 {
+			fmt.Fprintf(response, "\nCALL HIERARCHY DETAILS:\n")
+
+			if len(symbolData.IncomingCalls) > 0 {
+				fmt.Fprintf(response, "• Incoming calls:\n")
+				for i, call := range symbolData.IncomingCalls {
+					if i >= 5 { // Limit to first 5 to avoid overwhelming output
+						fmt.Fprintf(response, "  ... and %d more\n", len(symbolData.IncomingCalls)-5)
+						break
+					}
+					// Show caller with location details
+					fmt.Fprintf(response, "  - %s (from %s", call.From.Name, call.From.Uri)
+					if len(call.FromRanges) > 0 {
+						// Show the first call location (there could be multiple calls from the same function)
+						firstRange := call.FromRanges[0]
+						fmt.Fprintf(response, ":%d:%d", firstRange.Start.Line+1, firstRange.Start.Character+1) // Convert to 1-based for readability
+						if len(call.FromRanges) > 1 {
+							fmt.Fprintf(response, " +%d more", len(call.FromRanges)-1)
+						}
+					}
+					fmt.Fprintf(response, ")\n")
+				}
+			}
+
+			if len(symbolData.OutgoingCalls) > 0 {
+				fmt.Fprintf(response, "• Outgoing calls:\n")
+				for i, call := range symbolData.OutgoingCalls {
+					if i >= 5 { // Limit to first 5 to avoid overwhelming output
+						fmt.Fprintf(response, "  ... and %d more\n", len(symbolData.OutgoingCalls)-5)
+						break
+					}
+					// Show callee with location details
+					fmt.Fprintf(response, "  - %s (to %s", call.To.Name, call.To.Uri)
+					if len(call.FromRanges) > 0 {
+						// Show where in the current function this call is made
+						firstRange := call.FromRanges[0]
+						fmt.Fprintf(response, " called at line %d:%d", firstRange.Start.Line+1, firstRange.Start.Character+1) // Convert to 1-based for readability
+						if len(call.FromRanges) > 1 {
+							fmt.Fprintf(response, " +%d more", len(call.FromRanges)-1)
+						}
+					}
+					fmt.Fprintf(response, ")\n")
+				}
+			}
+		}
+
 		// Usage patterns
 		usage := symbolData.UsagePatterns
 		fmt.Fprintf(response, "\nUSAGE PATTERNS:\n")
 		fmt.Fprintf(response, "• Primary usage: %s\n", usage.PrimaryUsage)
 		fmt.Fprintf(response, "• Secondary usage: %s\n", usage.SecondaryUsage)
 		fmt.Fprintf(response, "• Usage frequency: %d\n", usage.UsageFrequency)
-		
+
 		// Caller patterns
 		if len(usage.CallerPatterns) > 0 {
 			fmt.Fprintf(response, "• Caller patterns:\n")
@@ -936,16 +985,16 @@ func handleSymbolRelationships(bridge interfaces.BridgeInterface, clients map[ty
 				fmt.Fprintf(response, "  - %s: %d calls\n", pattern.CallerType, pattern.CallFrequency)
 			}
 		}
-		
+
 		// Related symbols
 		if len(symbolData.RelatedSymbols) > 0 {
 			fmt.Fprintf(response, "\nRELATED SYMBOLS:\n")
 			for _, related := range symbolData.RelatedSymbols {
-				fmt.Fprintf(response, "• %s (%s, strength: %.2f)\n", 
+				fmt.Fprintf(response, "• %s (%s, strength: %.2f)\n",
 					related.Symbol.Name, related.Relationship, related.Strength)
 			}
 		}
-		
+
 		// Impact analysis
 		impact := symbolData.ImpactAnalysis
 		fmt.Fprintf(response, "\nIMPACT ANALYSIS:\n")
@@ -953,7 +1002,7 @@ func handleSymbolRelationships(bridge interfaces.BridgeInterface, clients map[ty
 		fmt.Fprintf(response, "• Critical paths: %d\n", len(impact.CriticalPaths))
 		fmt.Fprintf(response, "• Dependencies: %d\n", len(impact.Dependencies))
 		fmt.Fprintf(response, "• Refactoring complexity: %s\n", impact.RefactoringComplexity)
-		
+
 		// Breaking changes
 		if len(impact.BreakingChanges) > 0 {
 			fmt.Fprintf(response, "• Potential breaking changes:\n")

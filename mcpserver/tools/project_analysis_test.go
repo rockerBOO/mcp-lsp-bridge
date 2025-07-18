@@ -193,7 +193,7 @@ func TestProjectAnalysisTool_SymbolReferences(t *testing.T) {
 				}
 
 				bridge.On("GetMultiLanguageClients", languageStrings).Return(mockClients, nil)
-				
+
 				// Mock bridge methods needed by handleReferences
 				bridge.On("SemanticTokens", "file:///main.go", uint32(5), uint32(0), uint32(5), uint32(1000)).Return([]types.TokenPosition{}, nil)
 				bridge.On("FindSymbolReferences", "go", "file:///main.go", uint32(5), uint32(0), true).Return(tc.mockReferences, nil)
@@ -419,7 +419,7 @@ func TestProjectAnalysisTool_TextSearch(t *testing.T) {
 					mockClient := &mocks.MockLanguageClient{}
 					mockClients[lang] = mockClient
 				}
-				
+
 				// Text search uses bridge.SearchTextInWorkspace, not client methods
 				bridge.On("SearchTextInWorkspace", "go", tc.query).Return(tc.mockResults, nil)
 				var languageStrings []string
@@ -562,12 +562,12 @@ func TestProjectAnalysisTool_UnsupportedAnalysisType(t *testing.T) {
 }
 func TestProjectAnalysisTool_FileAnalysis(t *testing.T) {
 	testCases := []struct {
-		name          string
-		workspaceUri  string
-		query         string
-		mockLanguages []types.Language
-		mockSymbols   []protocol.DocumentSymbol
-		expectError   bool
+		name            string
+		workspaceUri    string
+		query           string
+		mockLanguages   []types.Language
+		mockSymbols     []protocol.DocumentSymbol
+		expectError     bool
 		expectedContent string
 	}{
 		{
@@ -597,12 +597,12 @@ func TestProjectAnalysisTool_FileAnalysis(t *testing.T) {
 			expectedContent: "FILE ANALYSIS",
 		},
 		{
-			name:          "file analysis with no symbols",
-			workspaceUri:  "file:///workspace",
-			query:         "empty.go",
-			mockLanguages: []types.Language{"go"},
-			mockSymbols:   []protocol.DocumentSymbol{},
-			expectError:   false,
+			name:            "file analysis with no symbols",
+			workspaceUri:    "file:///workspace",
+			query:           "empty.go",
+			mockLanguages:   []types.Language{"go"},
+			mockSymbols:     []protocol.DocumentSymbol{},
+			expectError:     false,
 			expectedContent: "could not determine language for file",
 		},
 	}
@@ -806,11 +806,11 @@ func TestProjectAnalysisTool_PatternAnalysis(t *testing.T) {
 
 func TestCalculateFileComplexityFromSymbols(t *testing.T) {
 	testCases := []struct {
-		name                   string
-		symbols               []protocol.DocumentSymbol
-		expectedFunctionCount int
-		expectedClassCount    int
-		expectedVariableCount int
+		name                    string
+		symbols                 []protocol.DocumentSymbol
+		expectedFunctionCount   int
+		expectedClassCount      int
+		expectedVariableCount   int
 		expectedComplexityLevel string
 	}{
 		{
@@ -876,7 +876,7 @@ func TestCalculateFileComplexityFromSymbols(t *testing.T) {
 			},
 			expectedFunctionCount:   2, // methods count as functions
 			expectedClassCount:      1,
-			expectedVariableCount:   1, // constant counts as variable
+			expectedVariableCount:   1,     // constant counts as variable
 			expectedComplexityLevel: "low", // 2*2 + 1*3 + 1*1 = 8 < 10
 		},
 		{
@@ -902,11 +902,11 @@ func TestCalculateFileComplexityFromSymbols(t *testing.T) {
 			expectedComplexityLevel: "high", // 30*2 = 60 > 50
 		},
 		{
-			name:                   "empty file",
-			symbols:               []protocol.DocumentSymbol{},
-			expectedFunctionCount: 0,
-			expectedClassCount:    0,
-			expectedVariableCount: 0,
+			name:                    "empty file",
+			symbols:                 []protocol.DocumentSymbol{},
+			expectedFunctionCount:   0,
+			expectedClassCount:      0,
+			expectedVariableCount:   0,
 			expectedComplexityLevel: "low",
 		},
 	}
@@ -979,7 +979,7 @@ func TestProjectAnalysisTool_NewAnalysisTypes(t *testing.T) {
 
 			// Set up basic mock expectations
 			bridge.On("DetectProjectLanguages", "/workspace").Return([]types.Language{"go"}, nil)
-			
+
 			mockClients := make(map[types.Language]types.LanguageClientInterface)
 			mockClient := &mocks.MockLanguageClient{}
 			mockClients["go"] = mockClient

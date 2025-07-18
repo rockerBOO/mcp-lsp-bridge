@@ -153,13 +153,13 @@ func formatMultiLanguageImplementations(implementations []protocol.Location, err
 		for i, impl := range implementations {
 			uri := string(impl.Uri)
 			filename := filepath.Base(strings.TrimPrefix(uri, "file://"))
-			
+
 			fmt.Fprintf(&result, "%d. %s\n", i+1, filename)
 			fmt.Fprintf(&result, "   URI: %s\n", uri)
-			fmt.Fprintf(&result, "   Range: %d:%d-%d:%d\n", 
+			fmt.Fprintf(&result, "   Range: %d:%d-%d:%d\n",
 				impl.Range.Start.Line, impl.Range.Start.Character,
 				impl.Range.End.Line, impl.Range.End.Character)
-			fmt.Fprintf(&result, "   Position: line=%d, character=%d\n", 
+			fmt.Fprintf(&result, "   Position: line=%d, character=%d\n",
 				impl.Range.Start.Line, impl.Range.Start.Character)
 			fmt.Fprintf(&result, "\n")
 		}

@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"rockerboo/mcp-lsp-bridge/types"
 	"github.com/myleshyson/lsprotocol-go/protocol"
+	"rockerboo/mcp-lsp-bridge/types"
 )
 
 // ProjectAnalyzer provides capabilities for comprehensive project analysis
@@ -134,7 +134,7 @@ func (a *ProjectAnalyzer) analyzeWorkspace(request AnalysisRequest, metadata *An
 	symbolsByLanguage := make(map[types.Language][]protocol.WorkspaceSymbol)
 	allFiles := make(map[string]bool)
 	allSymbols := make([]protocol.WorkspaceSymbol, 0)
-	
+
 	for lang, client := range a.clients {
 		// Get workspace symbols
 		symbols, err := client.WorkspaceSymbols(request.Target)
@@ -142,7 +142,7 @@ func (a *ProjectAnalyzer) analyzeWorkspace(request AnalysisRequest, metadata *An
 			a.errors.HandleError(err, fmt.Sprintf("language:%s", lang), metadata)
 			continue
 		}
-		
+
 		// Get unique files for this language
 		langFiles := make(map[string]bool)
 		for _, symbol := range symbols {
@@ -152,26 +152,26 @@ func (a *ProjectAnalyzer) analyzeWorkspace(request AnalysisRequest, metadata *An
 				allFiles[filePath] = true
 			}
 		}
-		
+
 		// Convert files to slice
 		fileList := make([]string, 0, len(langFiles))
 		for file := range langFiles {
 			fileList = append(fileList, file)
 		}
-		
+
 		symbolsByLanguage[lang] = symbols
 		filesByLanguage[lang] = fileList
 		allSymbols = append(allSymbols, symbols...)
 		metadata.LanguagesUsed = append(metadata.LanguagesUsed, lang)
 	}
-	
+
 	// Analyze language distribution with more accurate metrics
 	langStats := make(map[types.Language]LanguageStats)
 	totalFiles := len(allFiles)
-	
+
 	for lang, symbols := range symbolsByLanguage {
 		langFiles := filesByLanguage[lang]
-		
+
 		langStats[lang] = LanguageStats{
 			FileCount:     len(langFiles),
 			SymbolCount:   len(symbols),
@@ -179,13 +179,13 @@ func (a *ProjectAnalyzer) analyzeWorkspace(request AnalysisRequest, metadata *An
 			ComplexityAvg: a.calculateEnhancedLanguageComplexity(symbols, langFiles),
 		}
 	}
-	
+
 	// Enhanced dependency pattern detection
 	dependencyPatterns := a.detectAdvancedDependencyPatterns(allSymbols)
-	
+
 	// More comprehensive architectural health assessment
 	architecturalHealth := a.assessEnhancedArchitecturalHealth(symbolsByLanguage, filesByLanguage)
-	
+
 	return &AnalysisResult{
 		Type:   WorkspaceAnalysis,
 		Target: request.Target,
@@ -205,14 +205,14 @@ func (a *ProjectAnalyzer) calculateEnhancedLanguageComplexity(symbols []protocol
 	if len(symbols) == 0 {
 		return 0
 	}
-	
+
 	complexityScore := 0.0
 	symbolTypes := make(map[protocol.SymbolKind]int)
-	
+
 	for _, symbol := range symbols {
 		// Count symbol types
 		symbolTypes[symbol.Kind]++
-		
+
 		// Weighted complexity based on symbol type
 		switch symbol.Kind {
 		case protocol.SymbolKindClass, protocol.SymbolKindInterface:
@@ -225,11 +225,11 @@ func (a *ProjectAnalyzer) calculateEnhancedLanguageComplexity(symbols []protocol
 			complexityScore += 0.5
 		}
 	}
-	
+
 	// Factor in file count and symbol diversity
 	fileComplexity := math.Log(float64(len(files)) + 1)
 	symbolDiversity := float64(len(symbolTypes)) / 10.0 // Approximate number of common symbol kinds
-	
+
 	return (complexityScore / float64(len(symbols))) * fileComplexity * (1 + symbolDiversity)
 }
 
@@ -237,13 +237,13 @@ func (a *ProjectAnalyzer) calculateEnhancedLanguageComplexity(symbols []protocol
 func (a *ProjectAnalyzer) detectAdvancedDependencyPatterns(symbols []protocol.WorkspaceSymbol) []DependencyPattern {
 	patterns := []DependencyPattern{}
 	symbolGraph := make(map[string][]string)
-	
+
 	// Build symbol graph
 	for i := 0; i < len(symbols); i++ {
 		for j := i + 1; j < len(symbols); j++ {
 			symbolA := symbols[i].Name
 			symbolB := symbols[j].Name
-			
+
 			// Determine if symbols have potential dependency
 			if a.havePotentialDependency(symbols[i], symbols[j]) {
 				symbolGraph[symbolA] = append(symbolGraph[symbolA], symbolB)
@@ -251,7 +251,7 @@ func (a *ProjectAnalyzer) detectAdvancedDependencyPatterns(symbols []protocol.Wo
 			}
 		}
 	}
-	
+
 	// Detect dependency patterns
 	for source, targets := range symbolGraph {
 		for _, target := range targets {
@@ -266,7 +266,7 @@ func (a *ProjectAnalyzer) detectAdvancedDependencyPatterns(symbols []protocol.Wo
 			patterns = append(patterns, pattern)
 		}
 	}
-	
+
 	return patterns
 }
 
@@ -276,63 +276,69 @@ func (a *ProjectAnalyzer) havePotentialDependency(symbolA, symbolB protocol.Work
 	if symbolA.Kind == symbolB.Kind {
 		return true
 	}
-	
+
 	// Check if symbols have similar name prefixes
-	return strings.HasPrefix(symbolA.Name, symbolB.Name) || 
-		   strings.HasPrefix(symbolB.Name, symbolA.Name)
+	return strings.HasPrefix(symbolA.Name, symbolB.Name) ||
+		strings.HasPrefix(symbolB.Name, symbolA.Name)
 }
 
 // isCircularDependency checks for potential circular references
 func (a *ProjectAnalyzer) isCircularDependency(graph map[string][]string, start, end string) bool {
 	visited := make(map[string]bool)
-	
+
 	var dfs func(string, string) bool
 	dfs = func(current, target string) bool {
 		if current == target && visited[current] {
 			return true
 		}
-		
+
 		visited[current] = true
 		for _, neighbor := range graph[current] {
 			if !visited[neighbor] && dfs(neighbor, target) {
 				return true
 			}
 		}
-		
+
 		return false
 	}
-	
+
 	return dfs(start, end)
 }
 
 // calculateDependencyDepth finds the shortest path between two symbols
 func (a *ProjectAnalyzer) calculateDependencyDepth(graph map[string][]string, start, end string) int {
-	queue := []struct{symbol string; depth int}{{start, 0}}
+	queue := []struct {
+		symbol string
+		depth  int
+	}{{start, 0}}
 	visited := make(map[string]bool)
-	
+
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
-		
+
 		if current.symbol == end {
 			return current.depth
 		}
-		
+
 		visited[current.symbol] = true
-		
+
 		for _, neighbor := range graph[current.symbol] {
 			if !visited[neighbor] {
-				queue = append(queue, struct{symbol string; depth int}{neighbor, current.depth + 1})
+				queue = append(queue, struct {
+					symbol string
+					depth  int
+				}{neighbor, current.depth + 1})
 			}
 		}
 	}
-	
+
 	return -1 // No path found
 }
 
 // assessEnhancedArchitecturalHealth provides a more comprehensive architecture assessment
 func (a *ProjectAnalyzer) assessEnhancedArchitecturalHealth(
-	symbolsByLanguage map[types.Language][]protocol.WorkspaceSymbol, 
+	symbolsByLanguage map[types.Language][]protocol.WorkspaceSymbol,
 	filesByLanguage map[types.Language][]string,
 ) ArchitecturalHealthMetrics {
 	// Calculate metrics for each dimension
@@ -341,7 +347,7 @@ func (a *ProjectAnalyzer) assessEnhancedArchitecturalHealth(
 	errorHandling := a.assessErrorHandlingPatterns(symbolsByLanguage)
 	testCoverage := a.estimateTestCoverage(symbolsByLanguage)
 	docs := a.assessDocumentationQuality(symbolsByLanguage)
-	
+
 	// Calculate overall architectural health
 	scores := []float64{
 		codeOrg.Score,
@@ -350,19 +356,19 @@ func (a *ProjectAnalyzer) assessEnhancedArchitecturalHealth(
 		testCoverage.Score,
 		docs.Score,
 	}
-	
+
 	overallScore := 0.0
 	for _, score := range scores {
 		overallScore += score
 	}
 	overallScore /= float64(len(scores))
-	
+
 	return ArchitecturalHealthMetrics{
-		CodeOrganization:   codeOrg,
-		NamingConsistency:  namingConv,
-		ErrorHandling:      errorHandling,
-		TestCoverage:       testCoverage,
-		Documentation:      docs,
+		CodeOrganization:  codeOrg,
+		NamingConsistency: namingConv,
+		ErrorHandling:     errorHandling,
+		TestCoverage:      testCoverage,
+		Documentation:     docs,
 		OverallScore: HealthScore{
 			Score: overallScore,
 			Level: a.categorizeHealthScore(overallScore),
@@ -375,19 +381,19 @@ func (a *ProjectAnalyzer) assessEnhancedArchitecturalHealth(
 
 // Helper methods for architectural health assessment
 func (a *ProjectAnalyzer) assessCodeOrganization(
-	symbolsByLanguage map[types.Language][]protocol.WorkspaceSymbol, 
+	symbolsByLanguage map[types.Language][]protocol.WorkspaceSymbol,
 	filesByLanguage map[types.Language][]string,
 ) HealthScore {
 	// Analyze module boundaries, file structure, and symbol distribution
 	var suggestions []string
-	
+
 	if len(symbolsByLanguage) > 3 {
 		suggestions = append(suggestions, "Consider consolidating language-specific modules")
 	}
-	
+
 	return HealthScore{
-		Score: 75.0, 
-		Level: "good",
+		Score:       75.0,
+		Level:       "good",
 		Suggestions: suggestions,
 	}
 }
@@ -398,22 +404,22 @@ func (a *ProjectAnalyzer) assessNamingConsistency(
 	// Analyze naming patterns across languages
 	var suggestions []string
 	var totalInconsistencies int
-	
+
 	for lang, symbols := range symbolsByLanguage {
 		inconsistentNames := a.countNamingInconsistencies(symbols)
 		if inconsistentNames > 0 {
-			suggestions = append(suggestions, 
+			suggestions = append(suggestions,
 				fmt.Sprintf("Improve %s naming consistency (%d inconsistencies)", lang, inconsistentNames),
 			)
 			totalInconsistencies += inconsistentNames
 		}
 	}
-	
-	score := math.Max(0, 90.0 - float64(totalInconsistencies)*2)
-	
+
+	score := math.Max(0, 90.0-float64(totalInconsistencies)*2)
+
 	return HealthScore{
-		Score: score,
-		Level: a.categorizeHealthScore(score),
+		Score:       score,
+		Level:       a.categorizeHealthScore(score),
 		Suggestions: suggestions,
 	}
 }
@@ -430,22 +436,22 @@ func (a *ProjectAnalyzer) assessErrorHandlingPatterns(
 	// Analyze error handling across languages
 	var suggestions []string
 	var totalErrorHandlingIssues int
-	
+
 	for lang, symbols := range symbolsByLanguage {
 		errorHandlingIssues := a.detectErrorHandlingProblems(symbols)
 		if errorHandlingIssues > 0 {
-			suggestions = append(suggestions, 
+			suggestions = append(suggestions,
 				fmt.Sprintf("Improve %s error handling patterns (%d issues)", lang, errorHandlingIssues),
 			)
 			totalErrorHandlingIssues += errorHandlingIssues
 		}
 	}
-	
-	score := math.Max(0, 85.0 - float64(totalErrorHandlingIssues)*3)
-	
+
+	score := math.Max(0, 85.0-float64(totalErrorHandlingIssues)*3)
+
 	return HealthScore{
-		Score: score,
-		Level: a.categorizeHealthScore(score),
+		Score:       score,
+		Level:       a.categorizeHealthScore(score),
 		Suggestions: suggestions,
 	}
 }
@@ -461,22 +467,22 @@ func (a *ProjectAnalyzer) estimateTestCoverage(
 	// Estimate test coverage across languages
 	var suggestions []string
 	var totalMissingTests int
-	
+
 	for lang, symbols := range symbolsByLanguage {
 		missingTests := a.countMissingTests(symbols)
 		if missingTests > 0 {
-			suggestions = append(suggestions, 
+			suggestions = append(suggestions,
 				fmt.Sprintf("Add tests for %s modules (%d modules without tests)", lang, missingTests),
 			)
 			totalMissingTests += missingTests
 		}
 	}
-	
-	score := math.Max(0, 80.0 - float64(totalMissingTests)*2)
-	
+
+	score := math.Max(0, 80.0-float64(totalMissingTests)*2)
+
 	return HealthScore{
-		Score: score,
-		Level: a.categorizeHealthScore(score),
+		Score:       score,
+		Level:       a.categorizeHealthScore(score),
 		Suggestions: suggestions,
 	}
 }
@@ -492,22 +498,22 @@ func (a *ProjectAnalyzer) assessDocumentationQuality(
 	// Assess documentation quality
 	var suggestions []string
 	var totalDocIssues int
-	
+
 	for lang, symbols := range symbolsByLanguage {
 		docIssues := a.detectDocumentationProblems(symbols)
 		if docIssues > 0 {
-			suggestions = append(suggestions, 
+			suggestions = append(suggestions,
 				fmt.Sprintf("Improve %s documentation (%d symbols need documentation)", lang, docIssues),
 			)
 			totalDocIssues += docIssues
 		}
 	}
-	
-	score := math.Max(0, 70.0 - float64(totalDocIssues)*2)
-	
+
+	score := math.Max(0, 70.0-float64(totalDocIssues)*2)
+
 	return HealthScore{
-		Score: score,
-		Level: a.categorizeHealthScore(score),
+		Score:       score,
+		Level:       a.categorizeHealthScore(score),
 		Suggestions: suggestions,
 	}
 }
@@ -534,17 +540,17 @@ func (a *ProjectAnalyzer) generateArchitecturalImprovement(
 	scores ...HealthScore,
 ) []string {
 	var suggestions []string
-	
+
 	for _, score := range scores {
 		suggestions = append(suggestions, score.Suggestions...)
 	}
-	
+
 	// Add global architectural suggestions
-	suggestions = append(suggestions, 
+	suggestions = append(suggestions,
 		"Consider implementing a consistent architecture across languages",
 		"Review and standardize dependency management",
 	)
-	
+
 	return suggestions
 }
 
@@ -555,7 +561,7 @@ func (a *ProjectAnalyzer) analyzeSymbolRelationships(request AnalysisRequest, me
 	var targetLang types.Language
 	var targetClient types.LanguageClientInterface
 	var targetLocation protocol.Location
-	
+
 	for lang, client := range a.clients {
 		symbols, err := client.WorkspaceSymbols(request.Target)
 		if err != nil {
@@ -576,27 +582,29 @@ func (a *ProjectAnalyzer) analyzeSymbolRelationships(request AnalysisRequest, me
 			break
 		}
 	}
-	
+
 	if targetSymbol == nil {
 		return nil, fmt.Errorf("symbol not found: %s", request.Target)
 	}
-	
+
 	uri := string(targetLocation.Uri)
 	line := targetLocation.Range.Start.Line
 	character := targetLocation.Range.Start.Character
-	
+
 	// Parallel analysis of relationships
 	var (
-		references     []protocol.Location
-		definitions    []protocol.Or2[protocol.LocationLink, protocol.Location]
-		callHierarchy  []protocol.CallHierarchyItem
-		implementors   []protocol.Location
-		typeHierarchy  []protocol.Location
+		references    []protocol.Location
+		definitions   []protocol.Or2[protocol.LocationLink, protocol.Location]
+		callHierarchy []protocol.CallHierarchyItem
+		incomingCalls []protocol.CallHierarchyIncomingCall
+		outgoingCalls []protocol.CallHierarchyOutgoingCall
+		implementors  []protocol.Location
+		typeHierarchy []protocol.Location
 	)
-	
+
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	
+
 	wg.Add(5)
 	go func() {
 		defer wg.Done()
@@ -609,7 +617,7 @@ func (a *ProjectAnalyzer) analyzeSymbolRelationships(request AnalysisRequest, me
 			mu.Unlock()
 		}
 	}()
-	
+
 	go func() {
 		defer wg.Done()
 		defs, err := targetClient.Definition(uri, line, character)
@@ -621,19 +629,21 @@ func (a *ProjectAnalyzer) analyzeSymbolRelationships(request AnalysisRequest, me
 			mu.Unlock()
 		}
 	}()
-	
+
 	go func() {
 		defer wg.Done()
-		hier, err := a.getCallHierarchy(targetClient, uri, line, character)
+		hier, incoming, outgoing, err := a.getCallHierarchy(targetClient, uri, line, character)
 		if err != nil {
 			a.errors.HandleError(err, "call_hierarchy", metadata)
 		} else {
 			mu.Lock()
 			callHierarchy = hier
+			incomingCalls = incoming
+			outgoingCalls = outgoing
 			mu.Unlock()
 		}
 	}()
-	
+
 	go func() {
 		defer wg.Done()
 		impls, err := a.findImplementations(targetClient, uri, line, character)
@@ -645,7 +655,7 @@ func (a *ProjectAnalyzer) analyzeSymbolRelationships(request AnalysisRequest, me
 			mu.Unlock()
 		}
 	}()
-	
+
 	go func() {
 		defer wg.Done()
 		types, err := a.findTypeHierarchy(targetClient, uri, line, character)
@@ -657,43 +667,60 @@ func (a *ProjectAnalyzer) analyzeSymbolRelationships(request AnalysisRequest, me
 			mu.Unlock()
 		}
 	}()
-	
+
 	wg.Wait()
-	
+
 	// Analyze relationships
 	usagePatterns := a.analyzeComprehensiveUsagePatterns(references)
 	relatedSymbols := a.findRelatedSymbols(references, definitions)
 	impactAnalysis := a.performEnhancedImpactAnalysis(references, definitions, implementors)
-	
+
 	return &AnalysisResult{
 		Type:   SymbolRelationships,
 		Target: request.Target,
 		Data: SymbolRelationshipsData{
-			Symbol:             *targetSymbol,
-			Language:          targetLang,
-			References:        references,
-			Definitions:       a.convertDefinitionsToLocations(definitions),
-			CallHierarchy:     callHierarchy,
-			Implementations:   implementors,
-			TypeHierarchy:     typeHierarchy,
-			UsagePatterns:     usagePatterns,
-			RelatedSymbols:    relatedSymbols,
-			ImpactAnalysis:    impactAnalysis,
+			Symbol:          *targetSymbol,
+			Language:        targetLang,
+			References:      references,
+			Definitions:     a.convertDefinitionsToLocations(definitions),
+			CallHierarchy:   callHierarchy,
+			IncomingCalls:   incomingCalls,
+			OutgoingCalls:   outgoingCalls,
+			Implementations: implementors,
+			TypeHierarchy:   typeHierarchy,
+			UsagePatterns:   usagePatterns,
+			RelatedSymbols:  relatedSymbols,
+			ImpactAnalysis:  impactAnalysis,
 		},
 		Metadata: *metadata,
 	}, nil
 }
 
-// getCallHierarchy retrieves the call hierarchy for a symbol
-func (a *ProjectAnalyzer) getCallHierarchy(client types.LanguageClientInterface, uri string, line, character uint32) ([]protocol.CallHierarchyItem, error) {
+// getCallHierarchy retrieves the call hierarchy for a symbol with full incoming/outgoing call data
+func (a *ProjectAnalyzer) getCallHierarchy(client types.LanguageClientInterface, uri string, line, character uint32) ([]protocol.CallHierarchyItem, []protocol.CallHierarchyIncomingCall, []protocol.CallHierarchyOutgoingCall, error) {
 	// Attempt to prepare call hierarchy
 	items, err := client.PrepareCallHierarchy(uri, line, character)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
-	
-	// Return items as-is since we don't have access to IncomingCalls/OutgoingCalls
-	return items, nil
+
+	var allIncomingCalls []protocol.CallHierarchyIncomingCall
+	var allOutgoingCalls []protocol.CallHierarchyOutgoingCall
+
+	// For each call hierarchy item, get incoming and outgoing calls
+	for _, item := range items {
+		// Get incoming calls
+		if incomingCalls, err := client.IncomingCalls(item); err == nil {
+			allIncomingCalls = append(allIncomingCalls, incomingCalls...)
+		}
+
+		// Get outgoing calls
+		if outgoingCalls, err := client.OutgoingCalls(item); err == nil {
+			allOutgoingCalls = append(allOutgoingCalls, outgoingCalls...)
+		}
+	}
+
+	return items, allIncomingCalls, allOutgoingCalls, nil
 }
 
 // findImplementations finds all implementations of an interface or abstract type
@@ -703,10 +730,10 @@ func (a *ProjectAnalyzer) findImplementations(client types.LanguageClientInterfa
 	if err != nil {
 		return nil, err
 	}
-	
+
 	locations := make([]protocol.Location, 0, len(impls))
 	locations = append(locations, impls...)
-	
+
 	return locations, nil
 }
 
@@ -721,49 +748,49 @@ func (a *ProjectAnalyzer) analyzeComprehensiveUsagePatterns(references []protoco
 	if len(references) == 0 {
 		return UsagePatternAnalysis{}
 	}
-	
+
 	// Categorize usage based on multiple dimensions
 	usageContexts := make(map[string]int)
 	callerTypes := make(map[string]int)
 	fileUsage := make(map[string]int)
-	
+
 	for _, ref := range references {
 		filePath := string(ref.Uri)
 		callerType := a.determineCallerType(ref)
 		context := a.inferUsageContext(ref)
-		
+
 		usageContexts[context]++
 		callerTypes[callerType]++
 		fileUsage[filePath]++
 	}
-	
+
 	// Convert maps to sorted slices for reporting
 	callerPatterns := make([]CallerPattern, 0, len(callerTypes))
 	for callerType, freq := range callerTypes {
 		callerPatterns = append(callerPatterns, CallerPattern{
-			CallerType:     callerType,
+			CallerType:    callerType,
 			CallFrequency: freq,
 			CallContexts:  a.determineCallContexts(callerType),
 		})
 	}
-	
+
 	// Determine primary and secondary usage
 	primaryUsage, secondaryUsage := a.determinePrimaryUsage(usageContexts)
-	
+
 	return UsagePatternAnalysis{
-		PrimaryUsage:    primaryUsage,
-		SecondaryUsage:  secondaryUsage,
-		UsageFrequency:  len(references),
-		CallerPatterns:  callerPatterns,
-		FileUsageMap:    fileUsage,
-		UsageContexts:   usageContexts,
+		PrimaryUsage:   primaryUsage,
+		SecondaryUsage: secondaryUsage,
+		UsageFrequency: len(references),
+		CallerPatterns: callerPatterns,
+		FileUsageMap:   fileUsage,
+		UsageContexts:  usageContexts,
 	}
 }
 
 // determineCallerType with more advanced heuristics
 func (a *ProjectAnalyzer) determineCallerType(location protocol.Location) string {
 	filePath := string(location.Uri)
-	
+
 	// More advanced heuristics for caller type detection
 	callerMappings := map[string]string{
 		"handler":    "handler",
@@ -777,20 +804,20 @@ func (a *ProjectAnalyzer) determineCallerType(location protocol.Location) string
 		"helper":     "utility",
 		"manager":    "manager",
 	}
-	
+
 	for pattern, callerType := range callerMappings {
 		if strings.Contains(strings.ToLower(filePath), pattern) {
 			return callerType
 		}
 	}
-	
+
 	return "generic"
 }
 
 // inferUsageContext provides deeper context about symbol usage
 func (a *ProjectAnalyzer) inferUsageContext(location protocol.Location) string {
 	filePath := string(location.Uri)
-	
+
 	contextMappings := map[string]string{
 		"validation": "input_validation",
 		"security":   "authentication",
@@ -802,13 +829,13 @@ func (a *ProjectAnalyzer) inferUsageContext(location protocol.Location) string {
 		"cache":      "caching",
 		"network":    "communication",
 	}
-	
+
 	for pattern, context := range contextMappings {
 		if strings.Contains(strings.ToLower(filePath), pattern) {
 			return context
 		}
 	}
-	
+
 	return "general"
 }
 
@@ -816,7 +843,7 @@ func (a *ProjectAnalyzer) inferUsageContext(location protocol.Location) string {
 func (a *ProjectAnalyzer) determinePrimaryUsage(usageContexts map[string]int) (string, string) {
 	var primaryUsage, secondaryUsage string
 	var primaryCount, secondaryCount int
-	
+
 	for context, count := range usageContexts {
 		if count > primaryCount {
 			secondaryUsage = primaryUsage
@@ -828,40 +855,40 @@ func (a *ProjectAnalyzer) determinePrimaryUsage(usageContexts map[string]int) (s
 			secondaryCount = count
 		}
 	}
-	
+
 	return primaryUsage, secondaryUsage
 }
 
 // determineCallContexts provides additional context for caller types
 func (a *ProjectAnalyzer) determineCallContexts(callerType string) []string {
 	contextMap := map[string][]string{
-		"handler":          {"request_processing", "routing"},
-		"service":          {"business_logic", "data_transformation"},
-		"middleware":       {"request_filtering", "preprocessing"},
-		"authentication":   {"security", "access_control"},
-		"test":             {"validation", "verification"},
-		"utility":          {"helper_functions", "common_operations"},
-		"manager":          {"resource_management", "coordination"},
-		"generic":          {"generic_usage"},
+		"handler":        {"request_processing", "routing"},
+		"service":        {"business_logic", "data_transformation"},
+		"middleware":     {"request_filtering", "preprocessing"},
+		"authentication": {"security", "access_control"},
+		"test":           {"validation", "verification"},
+		"utility":        {"helper_functions", "common_operations"},
+		"manager":        {"resource_management", "coordination"},
+		"generic":        {"generic_usage"},
 	}
-	
+
 	return contextMap[callerType]
 }
 
 // findRelatedSymbols discovers symbols with potential relationships
 func (a *ProjectAnalyzer) findRelatedSymbols(
-	references []protocol.Location, 
+	references []protocol.Location,
 	definitions []protocol.Or2[protocol.LocationLink, protocol.Location],
 ) []RelatedSymbol {
 	relatedSymbols := make([]RelatedSymbol, 0)
 	symbolLocations := make(map[string][]protocol.Location)
-	
+
 	// Map symbol locations from references and definitions
 	for _, ref := range references {
 		symbolName := a.extractSymbolName(string(ref.Uri))
 		symbolLocations[symbolName] = append(symbolLocations[symbolName], ref)
 	}
-	
+
 	for _, def := range definitions {
 		var loc protocol.Location
 		switch v := def.Value.(type) {
@@ -875,11 +902,11 @@ func (a *ProjectAnalyzer) findRelatedSymbols(
 		default:
 			continue
 		}
-		
+
 		symbolName := a.extractSymbolName(string(loc.Uri))
 		symbolLocations[symbolName] = append(symbolLocations[symbolName], loc)
 	}
-	
+
 	// Calculate symbol relationships
 	for symbol, locations := range symbolLocations {
 		if len(locations) > 1 {
@@ -892,7 +919,7 @@ func (a *ProjectAnalyzer) findRelatedSymbols(
 			})
 		}
 	}
-	
+
 	return relatedSymbols
 }
 
@@ -906,25 +933,25 @@ func (a *ProjectAnalyzer) extractSymbolName(filePath string) string {
 
 // performEnhancedImpactAnalysis provides more comprehensive impact assessment
 func (a *ProjectAnalyzer) performEnhancedImpactAnalysis(
-	references []protocol.Location, 
+	references []protocol.Location,
 	definitions []protocol.Or2[protocol.LocationLink, protocol.Location],
 	implementors []protocol.Location,
 ) ImpactAnalysisData {
 	filesAffected := make(map[string]bool)
 	criticalPaths := make(map[string]bool)
 	dependencies := make(map[string]bool)
-	
+
 	// Analyze references and their files
 	for _, ref := range references {
 		filePath := string(ref.Uri)
 		filesAffected[filePath] = true
-		
+
 		// Detect potential critical paths
 		if a.isFileCritical(filePath) {
 			criticalPaths[filePath] = true
 		}
 	}
-	
+
 	// Analyze definitions for dependencies
 	for _, def := range definitions {
 		var loc protocol.Location
@@ -939,11 +966,11 @@ func (a *ProjectAnalyzer) performEnhancedImpactAnalysis(
 		default:
 			continue
 		}
-		
+
 		depFilePath := string(loc.Uri)
 		dependencies[depFilePath] = true
 	}
-	
+
 	// Include implementors in impact analysis
 	for _, impl := range implementors {
 		implFilePath := string(impl.Uri)
@@ -952,28 +979,28 @@ func (a *ProjectAnalyzer) performEnhancedImpactAnalysis(
 			criticalPaths[implFilePath] = true
 		}
 	}
-	
+
 	// Convert maps to slices
 	affectedFiles := mapKeysToSlice(filesAffected)
 	criticalPathsList := mapKeysToSlice(criticalPaths)
 	dependenciesList := mapKeysToSlice(dependencies)
-	
+
 	// Detect potential breaking changes
 	breakingChanges := a.detectBreakingChanges(references, definitions, implementors)
-	
+
 	// Estimate refactoring complexity
 	refactoringComplexity := a.estimateRefactoringComplexity(
-		len(affectedFiles), 
-		len(criticalPathsList), 
+		len(affectedFiles),
+		len(criticalPathsList),
 		len(dependenciesList),
 	)
-	
+
 	return ImpactAnalysisData{
-		FilesAffected:          len(affectedFiles),
-		AffectedFiles:          affectedFiles,
-		CriticalPaths:          criticalPathsList,
-		BreakingChanges:        breakingChanges,
-		Dependencies:           dependenciesList,
+		FilesAffected:         len(affectedFiles),
+		AffectedFiles:         affectedFiles,
+		CriticalPaths:         criticalPathsList,
+		BreakingChanges:       breakingChanges,
+		Dependencies:          dependenciesList,
 		RefactoringComplexity: refactoringComplexity,
 	}
 }
@@ -981,27 +1008,27 @@ func (a *ProjectAnalyzer) performEnhancedImpactAnalysis(
 // isFileCritical determines if a file is part of critical project infrastructure
 func (a *ProjectAnalyzer) isFileCritical(filePath string) bool {
 	criticalPatterns := []string{
-		"core", "main", "config", "bootstrap", "server", 
+		"core", "main", "config", "bootstrap", "server",
 		"router", "middleware", "database", "auth", "security",
 	}
-	
+
 	for _, pattern := range criticalPatterns {
 		if strings.Contains(strings.ToLower(filePath), pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
 // detectBreakingChanges identifies potential disruptive modifications
 func (a *ProjectAnalyzer) detectBreakingChanges(
-	references []protocol.Location, 
+	references []protocol.Location,
 	definitions []protocol.Or2[protocol.LocationLink, protocol.Location],
 	implementors []protocol.Location,
 ) []BreakingChange {
 	breakingChanges := []BreakingChange{}
-	
+
 	// Multiple definitions suggest potential type/function overloading
 	if len(definitions) > 1 {
 		breakingChanges = append(breakingChanges, BreakingChange{
@@ -1010,7 +1037,7 @@ func (a *ProjectAnalyzer) detectBreakingChanges(
 			Severity:    "medium",
 		})
 	}
-	
+
 	// Multiple implementors suggest interface complexity
 	if len(implementors) > 3 {
 		breakingChanges = append(breakingChanges, BreakingChange{
@@ -1019,13 +1046,13 @@ func (a *ProjectAnalyzer) detectBreakingChanges(
 			Severity:    "high",
 		})
 	}
-	
+
 	// Cross-file references might indicate tight coupling
 	crossFileReferences := make(map[string]bool)
 	for _, ref := range references {
 		crossFileReferences[string(ref.Uri)] = true
 	}
-	
+
 	if len(crossFileReferences) > 5 {
 		breakingChanges = append(breakingChanges, BreakingChange{
 			Type:        "high_coupling",
@@ -1033,7 +1060,7 @@ func (a *ProjectAnalyzer) detectBreakingChanges(
 			Severity:    "medium",
 		})
 	}
-	
+
 	return breakingChanges
 }
 
@@ -1042,7 +1069,7 @@ func (a *ProjectAnalyzer) estimateRefactoringComplexity(
 	affectedFiles, criticalPaths, dependencies int,
 ) string {
 	complexityScore := float64(affectedFiles) + (float64(criticalPaths) * 2) + (float64(dependencies) * 1.5)
-	
+
 	switch {
 	case complexityScore < 5:
 		return "low"
@@ -1065,7 +1092,7 @@ func mapKeysToSlice[K comparable, V any](m map[K]V) []K {
 // convertDefinitionsToLocations converts definitions to locations
 func (a *ProjectAnalyzer) convertDefinitionsToLocations(definitions []protocol.Or2[protocol.LocationLink, protocol.Location]) []protocol.Location {
 	locations := make([]protocol.Location, 0, len(definitions))
-	
+
 	for _, def := range definitions {
 		switch v := def.Value.(type) {
 		case protocol.Location:
@@ -1080,7 +1107,7 @@ func (a *ProjectAnalyzer) convertDefinitionsToLocations(definitions []protocol.O
 			fmt.Printf("Unexpected definition type: %T\n", def.Value)
 		}
 	}
-	
+
 	return locations
 }
 
@@ -1167,7 +1194,7 @@ func (a *ProjectAnalyzer) calculateEnhancedFileComplexity(symbols []protocol.Doc
 	}
 
 	metrics := ComplexityMetrics{
-		TotalLines:     0,
+		TotalLines:    0,
 		FunctionCount: 0,
 		ClassCount:    0,
 		VariableCount: 0,
@@ -1258,12 +1285,12 @@ func (a *ProjectAnalyzer) analyzeDetailedImportExport(uri string, lang types.Lan
 	unusedImports := a.findUnusedImports(importInfo)
 
 	return ImportExportAnalysis{
-		Imports:          importInfo,
-		Exports:          exportInfo,
-		ExternalDeps:     externalDeps,
-		InternalDeps:     internalDeps,
-		CircularDeps:     circularDeps,
-		UnusedImports:    unusedImports,
+		Imports:       importInfo,
+		Exports:       exportInfo,
+		ExternalDeps:  externalDeps,
+		InternalDeps:  internalDeps,
+		CircularDeps:  circularDeps,
+		UnusedImports: unusedImports,
 	}
 }
 
@@ -1325,12 +1352,12 @@ func (a *ProjectAnalyzer) analyzeEnhancedCrossFileRelationships(uri string, clie
 // assessCodeQualityMetrics provides comprehensive code quality assessment
 func (a *ProjectAnalyzer) assessCodeQualityMetrics(symbols []protocol.DocumentSymbol) CodeQualityMetrics {
 	metrics := CodeQualityMetrics{
-		DuplicationScore:    a.calculateDuplicationScore(symbols),
-		CohesionScore:       a.calculateCohesionScore(symbols),
-		CouplingScore:       a.calculateCouplingScore(symbols),
+		DuplicationScore:     a.calculateDuplicationScore(symbols),
+		CohesionScore:        a.calculateCohesionScore(symbols),
+		CouplingScore:        a.calculateCouplingScore(symbols),
 		MaintainabilityIndex: a.calculateMaintainabilityIndex(symbols),
-		TestCoverage:        0.0, // Placeholder
-		DocumentationScore:  0.0, // Placeholder
+		TestCoverage:         0.0, // Placeholder
+		DocumentationScore:   0.0, // Placeholder
 	}
 
 	return metrics
@@ -1356,10 +1383,9 @@ func (a *ProjectAnalyzer) calculateMaintainabilityIndex(symbols []protocol.Docum
 	return 0.0
 }
 
-
 // generateFileImprovementRecommendations suggests improvements for the file
 func (a *ProjectAnalyzer) generateFileImprovementRecommendations(
-	symbols []protocol.DocumentSymbol, 
+	symbols []protocol.DocumentSymbol,
 	complexity ComplexityMetrics,
 ) []Recommendation {
 	recommendations := []Recommendation{}
@@ -1375,7 +1401,7 @@ func (a *ProjectAnalyzer) generateFileImprovementRecommendations(
 	}
 
 	// Additional recommendation types
-	recommendations = append(recommendations, 
+	recommendations = append(recommendations,
 		a.recommendTestCoverage(symbols),
 		a.recommendDocumentation(symbols),
 		a.recommendCodeStyle(symbols),
@@ -1471,9 +1497,9 @@ func (a *ProjectAnalyzer) analyzePatterns(request AnalysisRequest, metadata *Ana
 	wg.Wait()
 
 	// Handle unsupported pattern type
-	if patternType != "error_handling" && 
-	   patternType != "naming_conventions" && 
-	   patternType != "architecture_patterns" {
+	if patternType != "error_handling" &&
+		patternType != "naming_conventions" &&
+		patternType != "architecture_patterns" {
 		return nil, fmt.Errorf("unsupported pattern type: %s", patternType)
 	}
 
@@ -1481,12 +1507,12 @@ func (a *ProjectAnalyzer) analyzePatterns(request AnalysisRequest, metadata *Ana
 		Type:   PatternAnalysis,
 		Target: request.Target,
 		Data: PatternAnalysisData{
-			PatternType:         patternType,
-			Scope:              request.Scope,
-			ConsistencyScore:   consistencyScore,
-			PatternInstances:   patternInstances,
-			Violations:        patternViolations,
-			TrendAnalysis:     trendAnalysis,
+			PatternType:      patternType,
+			Scope:            request.Scope,
+			ConsistencyScore: consistencyScore,
+			PatternInstances: patternInstances,
+			Violations:       patternViolations,
+			TrendAnalysis:    trendAnalysis,
 		},
 		Metadata: *metadata,
 	}, nil
@@ -1531,11 +1557,11 @@ func (a *ProjectAnalyzer) analyzeAdvancedNamingConventions(target string) ([]Pat
 
 	// Comprehensive naming patterns
 	namingConventions := map[string]string{
-		"camelCase":      "Variables and function names use camelCase",
-		"PascalCase":     "Classes and interfaces use PascalCase",
-		"snake_case":     "Constants and configuration use snake_case",
-		"UPPER_CASE":     "Global constants and enum values use UPPER_CASE",
-		"prefix_type":    "Variables prefixed with type (e.g., str_, int_)",
+		"camelCase":   "Variables and function names use camelCase",
+		"PascalCase":  "Classes and interfaces use PascalCase",
+		"snake_case":  "Constants and configuration use snake_case",
+		"UPPER_CASE":  "Global constants and enum values use UPPER_CASE",
+		"prefix_type": "Variables prefixed with type (e.g., str_, int_)",
 	}
 
 	// Implement detailed naming convention scanning
@@ -1593,11 +1619,11 @@ func (a *ProjectAnalyzer) analyzeDetailedArchitecturePatterns(target string) ([]
 func (a *ProjectAnalyzer) analyzeTrendInPatternConsistency(patternType, target string) TrendAnalysis {
 	// Analyze trend in pattern consistency
 	return TrendAnalysis{
-		Direction:   "stable",
+		Direction:  "stable",
 		Confidence: 0.7,
 		Factors:    []string{"increasing code quality", "consistent team practices"},
 		Predictions: []string{
-			"Continued improvement in pattern adherence", 
+			"Continued improvement in pattern adherence",
 			"Potential need for periodic architectural reviews",
 		},
 	}

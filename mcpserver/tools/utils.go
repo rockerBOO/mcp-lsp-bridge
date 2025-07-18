@@ -53,7 +53,7 @@ func safeUint32(val int) (uint32, error) {
 	if uint64(val) > math.MaxUint32 {
 		return 0, fmt.Errorf("value exceeds uint32 maximum: %d", val)
 	}
-	return uint32(val), nil
+	return uint32(val), nil // #nosec G115 -- overflow already checked above
 }
 
 // safeInt32 safely converts an int to int32, checking for overflow
@@ -584,21 +584,21 @@ func getSeverityIcon(severity string) string {
 
 // PaginationResult represents the result of applying pagination to a dataset
 type PaginationResult struct {
-	Offset       int  // Starting index of returned items
-	Limit        int  // Maximum number of items requested
-	Total        int  // Total number of items available
-	Start        int  // Actual starting index (1-based for display)
-	End          int  // Actual ending index (1-based for display)
-	Count        int  // Actual number of items returned
-	HasMore      bool // Whether there are more items after this page
-	HasPrevious  bool // Whether there are items before this page
+	Offset      int  // Starting index of returned items
+	Limit       int  // Maximum number of items requested
+	Total       int  // Total number of items available
+	Start       int  // Actual starting index (1-based for display)
+	End         int  // Actual ending index (1-based for display)
+	Count       int  // Actual number of items returned
+	HasMore     bool // Whether there are more items after this page
+	HasPrevious bool // Whether there are items before this page
 }
 
 // ApplyPagination applies offset and limit to a dataset and returns pagination info
 // Generic function that works with any slice type
 func ApplyPagination[T any](items []T, offset, limit int) ([]T, PaginationResult) {
 	total := len(items)
-	
+
 	// Validate offset
 	if offset < 0 {
 		offset = 0
@@ -615,16 +615,16 @@ func ApplyPagination[T any](items []T, offset, limit int) ([]T, PaginationResult
 			HasPrevious: offset > 0,
 		}
 	}
-	
+
 	// Calculate end index
 	end := offset + limit
 	if end > total {
 		end = total
 	}
-	
+
 	// Get paginated slice
 	paginatedItems := items[offset:end]
-	
+
 	// Create pagination result
 	result := PaginationResult{
 		Offset:      offset,
@@ -636,7 +636,7 @@ func ApplyPagination[T any](items []T, offset, limit int) ([]T, PaginationResult
 		HasMore:     end < total,
 		HasPrevious: offset > 0,
 	}
-	
+
 	return paginatedItems, result
 }
 
@@ -645,31 +645,31 @@ func FormatPaginationInfo(result PaginationResult) string {
 	if result.Count == 0 {
 		return fmt.Sprintf("No results (offset %d exceeds total %d)", result.Offset, result.Total)
 	}
-	
+
 	if result.HasMore || result.HasPrevious {
 		return fmt.Sprintf("Showing results %d-%d of %d total", result.Start, result.End, result.Total)
 	}
-	
+
 	return fmt.Sprintf("Found %d results", result.Total)
 }
 
 // FormatPaginationControls formats pagination control instructions
 func FormatPaginationControls(result PaginationResult) string {
 	var controls []string
-	
+
 	if result.HasMore {
 		remaining := result.Total - result.End
 		controls = append(controls, fmt.Sprintf("... and %d more results available (use offset=%d to see next page)", remaining, result.End))
 	}
-	
+
 	if result.HasPrevious {
 		controls = append(controls, "Use offset=0 to see from the beginning")
 	}
-	
+
 	if len(controls) > 0 {
 		return "\n" + strings.Join(controls, "\n")
 	}
-	
+
 	return ""
 }
 
@@ -703,7 +703,10 @@ func getRangeContent(
 
 	// 3. Split into lines.
 	lines := strings.Split(string(content), "\n")
-	linesLen := uint32(len(lines))
+	linesLen, err := safeUint32(len(lines))
+	if err != nil {
+		return "", fmt.Errorf("file too large (too many lines): %w", err)
+	}
 
 	// 4. Basic line-range validation.
 	if startLine >= linesLen || endLine >= linesLen {
@@ -718,7 +721,10 @@ func getRangeContent(
 
 	// 5. Helper: clamp or reject out-of-bounds character indices.
 	clamp := func(line string, pos uint32, lineNo int, which string) (uint32, error) {
-		lineLen := uint32(len(line))
+		lineLen, err := safeUint32(len(line))
+		if err != nil {
+			return 0, fmt.Errorf("line too long: %w", err)
+		}
 		if pos > lineLen {
 			if strict {
 				return 0, fmt.Errorf("invalid %s character on line %d: %d (line length: %d)",
@@ -747,7 +753,11 @@ func getRangeContent(
 			return "", fmt.Errorf("invalid character range on line %d: start %d > end %d",
 				startLine, start, end)
 		}
-		if start >= uint32(len(line)) {
+		lineStartLen, err := safeUint32(len(line))
+		if err != nil {
+			return "", fmt.Errorf("line too long: %w", err)
+		}
+		if start >= lineStartLen {
 			result = append(result, "")
 		} else {
 			result = append(result, line[start:end])
@@ -760,7 +770,11 @@ func getRangeContent(
 		if err != nil {
 			return "", err
 		}
-		if start >= uint32(len(first)) {
+		firstLen, err := safeUint32(len(first))
+		if err != nil {
+			return "", fmt.Errorf("line too long: %w", err)
+		}
+		if start >= firstLen {
 			result = append(result, "")
 		} else {
 			result = append(result, first[start:])
@@ -773,7 +787,10 @@ func getRangeContent(
 
 		// Last line: treat endChar as exclusive, but allow clamping/clipping
 		last := lines[endLine]
-		lineLen := uint32(len(last))
+		lineLen, err := safeUint32(len(last))
+		if err != nil {
+			return "", fmt.Errorf("line too long: %w", err)
+		}
 
 		if endChar > lineLen {
 			if strict {

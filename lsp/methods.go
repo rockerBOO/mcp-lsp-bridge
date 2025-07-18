@@ -460,3 +460,35 @@ func (lc *LanguageClient) SemanticTokensRange(uri string, startLine, startCharac
 	logger.Debug(fmt.Sprintf("SemanticTokensRange: Parsed result: %+v", result))
 	return &result, nil
 }
+
+// IncomingCalls retrieves incoming calls for a given Call Hierarchy Item
+func (lc *LanguageClient) IncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error) {
+	params := protocol.CallHierarchyIncomingCallsParams{
+		Item: item,
+	}
+
+	var result []protocol.CallHierarchyIncomingCall
+
+	err := lc.SendRequest("callHierarchy/incomingCalls", params, &result, 5*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("incoming calls request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+// OutgoingCalls retrieves outgoing calls for a given Call Hierarchy Item
+func (lc *LanguageClient) OutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error) {
+	params := protocol.CallHierarchyOutgoingCallsParams{
+		Item: item,
+	}
+
+	var result []protocol.CallHierarchyOutgoingCall
+
+	err := lc.SendRequest("callHierarchy/outgoingCalls", params, &result, 5*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("outgoing calls request failed: %w", err)
+	}
+
+	return result, nil
+}

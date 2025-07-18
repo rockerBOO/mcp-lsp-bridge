@@ -41,9 +41,9 @@ func TestFormatMultiLanguageImplementations(t *testing.T) {
 					},
 				},
 			},
-			errors: []error{},
-			uri:    "file:///test/interface.go",
-			line:   5,
+			errors:    []error{},
+			uri:       "file:///test/interface.go",
+			line:      5,
 			character: 10,
 			languages: []types.Language{
 				types.Language("go"),

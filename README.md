@@ -63,6 +63,7 @@ See [docs/configuration.md](docs/configuration.md) for complete setup instructio
 
 **📚 Documentation:**
 
+- [Codebase Guide](docs/codebase-guide.md) - Architecture and structure overview 🆕
 - [Tools Reference](docs/tools/tools-reference.md) - Complete tool list
 - [Analysis Overview](docs/analysis-overview.md) - Quick start guide
 - [Project Analysis Guide](docs/tools/project-analysis-guide.md) - Detailed analysis tool guide

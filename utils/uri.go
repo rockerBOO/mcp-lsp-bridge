@@ -41,11 +41,11 @@ func FilePathToURI(path string) string {
 	if strings.HasPrefix(path, "file://") {
 		return path // Already a URI
 	}
-	
+
 	// Convert to absolute path if relative
 	if absPath, err := filepath.Abs(path); err == nil {
 		path = absPath
 	}
-	
+
 	return "file://" + path
 }

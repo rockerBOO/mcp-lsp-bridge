@@ -253,7 +253,7 @@ func TestMapWithKeys(t *testing.T) {
 func TestConcurrency(t *testing.T) {
 	t.Run("operations run concurrently", func(t *testing.T) {
 		start := time.Now()
-		
+
 		ops := []func() (int, error){
 			func() (int, error) {
 				time.Sleep(50 * time.Millisecond)

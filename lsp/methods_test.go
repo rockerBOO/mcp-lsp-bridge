@@ -553,6 +553,94 @@ func TestSemanticTokens(t *testing.T) {
 	mockConn.AssertExpectations(t)
 }
 
+func TestIncomingCalls(t *testing.T) {
+	mockConn := new(mocks.MockLSPConnectionInterface)
+
+	// Prepare a context
+	ctx := t.Context()
+
+	// Sample CallHierarchyItem for testing
+	sampleItem := protocol.CallHierarchyItem{
+		Name: "testFunction",
+		Kind: protocol.SymbolKindFunction,
+		Uri:  "file:///test.go",
+		Range: protocol.Range{
+			Start: protocol.Position{Line: 10, Character: 5},
+			End:   protocol.Position{Line: 10, Character: 15},
+		},
+	}
+
+	// Successful incoming calls request
+	mockConn.On("Call", mock.Anything, "callHierarchy/incomingCalls", mock.AnythingOfType("protocol.CallHierarchyIncomingCallsParams"), mock.AnythingOfType("*[]protocol.CallHierarchyIncomingCall"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Run(func(args mock.Arguments) {
+		result := args.Get(3).(*[]protocol.CallHierarchyIncomingCall)
+		*result = []protocol.CallHierarchyIncomingCall{
+			{
+				From: protocol.CallHierarchyItem{
+					Name: "callerFunction",
+					Kind: protocol.SymbolKindFunction,
+				},
+				FromRanges: []protocol.Range{{}},
+			},
+		}
+	}).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
+
+	client := &LanguageClient{
+		conn: mockConn,
+		ctx:  ctx,
+	}
+
+	incomingCalls, err := client.IncomingCalls(sampleItem)
+	require.NoError(t, err)
+	assert.NotNil(t, incomingCalls)
+
+	mockConn.AssertExpectations(t)
+}
+
+func TestOutgoingCalls(t *testing.T) {
+	mockConn := new(mocks.MockLSPConnectionInterface)
+
+	// Prepare a context
+	ctx := t.Context()
+
+	// Sample CallHierarchyItem for testing
+	sampleItem := protocol.CallHierarchyItem{
+		Name: "testFunction",
+		Kind: protocol.SymbolKindFunction,
+		Uri:  "file:///test.go",
+		Range: protocol.Range{
+			Start: protocol.Position{Line: 10, Character: 5},
+			End:   protocol.Position{Line: 10, Character: 15},
+		},
+	}
+
+	// Successful outgoing calls request
+	mockConn.On("Call", mock.Anything, "callHierarchy/outgoingCalls", mock.AnythingOfType("protocol.CallHierarchyOutgoingCallsParams"), mock.AnythingOfType("*[]protocol.CallHierarchyOutgoingCall"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Run(func(args mock.Arguments) {
+		result := args.Get(3).(*[]protocol.CallHierarchyOutgoingCall)
+		*result = []protocol.CallHierarchyOutgoingCall{
+			{
+				To: protocol.CallHierarchyItem{
+					Name: "calleeFunction",
+					Kind: protocol.SymbolKindFunction,
+				},
+				FromRanges: []protocol.Range{{}},
+			},
+		}
+	}).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
+
+	client := &LanguageClient{
+		conn: mockConn,
+		ctx:  ctx,
+	}
+
+	outgoingCalls, err := client.OutgoingCalls(sampleItem)
+	require.NoError(t, err)
+	assert.NotNil(t, outgoingCalls)
+
+	mockConn.AssertExpectations(t)
+}
+
 func TestSemanticTokensRange(t *testing.T) {
 	mockConn := new(mocks.MockLSPConnectionInterface)
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)

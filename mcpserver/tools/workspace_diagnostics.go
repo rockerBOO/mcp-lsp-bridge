@@ -24,98 +24,98 @@ func RegisterWorkspaceDiagnosticsTool(mcpServer ToolServer, bridge interfaces.Br
 
 func WorkspaceDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("workspace_diagnostics",
-		mcp.WithDescription("Get comprehensive diagnostics for entire workspace"),
-		mcp.WithDestructiveHintAnnotation(false),
-		mcp.WithString("workspace_uri", mcp.Description("URI to the workspace/project root")),
-		mcp.WithString("identifier", mcp.Description("Optional identifier for diagnostic session")), // TODO: Add optional when supported
-	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// Parameter parsing
-		workspaceUri, err := request.RequireString("workspace_uri")
-		if err != nil {
-			logger.Error("workspace_diagnostics: workspace_uri parsing failed", err)
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		// Strip file:// prefix if present
-		if after, ok := strings.CutPrefix(workspaceUri, "file://"); ok {
-			workspaceUri = after
-			logger.Info("workspace_diagnostics: stripped file:// prefix",
-				"Processed URI: "+workspaceUri)
-		}
-
-		// Optional identifier
-		identifier := "mcp-lsp-bridge-workspace-diagnostics"
-		if id, err := request.RequireString("identifier"); err == nil {
-			identifier = id
-		}
-
-		// Detect project languages
-		languages, err := bridge.DetectProjectLanguages(workspaceUri)
-		if err != nil {
-			logger.Error("workspace_diagnostics: language detection failed", err)
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to detect project languages: %v", err)), nil
-		}
-
-		if len(languages) == 0 {
-			return mcp.NewToolResultText("No programming languages detected in project"), nil
-		}
-
-		// Convert languages to strings
-		languageStrings := collections.ToString(languages)
-
-		// Get language clients
-		clients, err := bridge.GetMultiLanguageClients(languageStrings)
-		if err != nil || len(clients) == 0 {
-			logger.Error("workspace_diagnostics: failed to get language clients", err)
-			return mcp.NewToolResultError("No LSP clients available for detected languages"), nil
-		}
-
-		// Convert clients to async operations
-		ops := collections.TransformMap(clients, func(client types.LanguageClientInterface) func() (*protocol.WorkspaceDiagnosticReport, error) {
-			return func() (*protocol.WorkspaceDiagnosticReport, error) {
-				return client.WorkspaceDiagnostic(identifier)
+			mcp.WithDescription("Get comprehensive diagnostics for entire workspace"),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithString("workspace_uri", mcp.Description("URI to the workspace/project root")),
+			mcp.WithString("identifier", mcp.Description("Optional identifier for diagnostic session")), // TODO: Add optional when supported
+		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			// Parameter parsing
+			workspaceUri, err := request.RequireString("workspace_uri")
+			if err != nil {
+				logger.Error("workspace_diagnostics: workspace_uri parsing failed", err)
+				return mcp.NewToolResultError(err.Error()), nil
 			}
-		})
 
-		// Execute diagnostics across all clients in parallel
-		results, err := async.MapWithKeys(ctx, ops)
-		if err != nil {
-			logger.Error("workspace_diagnostics: async execution failed", err)
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to execute workspace diagnostics: %v", err)), nil
-		}
-
-		// Process results and extract core Diagnostic items
-		var allDiagnostics []protocol.Diagnostic
-		var languageResults []LanguageDiagnosticResult
-		var errors []DiagnosticError
-
-		for _, result := range results {
-			if result.Error != nil {
-				// Categorize the error for better user understanding
-			diagError := categorizeDiagnosticError(string(result.Key), result.Error)
-			errors = append(errors, diagError)
-				logger.Warn(fmt.Sprintf("Workspace diagnostics failed for %s: %v", result.Key, result.Error))
-			} else if result.Value != nil {
-				// Extract diagnostics from the workspace report
-				diagnostics := extractDiagnosticsFromWorkspaceReport(result.Value)
-				allDiagnostics = append(allDiagnostics, diagnostics...)
-				languageResults = append(languageResults, LanguageDiagnosticResult{
-					Language:    string(result.Key),
-					Diagnostics: diagnostics,
-				})
+			// Strip file:// prefix if present
+			if after, ok := strings.CutPrefix(workspaceUri, "file://"); ok {
+				workspaceUri = after
+				logger.Info("workspace_diagnostics: stripped file:// prefix",
+					"Processed URI: "+workspaceUri)
 			}
+
+			// Optional identifier
+			identifier := "mcp-lsp-bridge-workspace-diagnostics"
+			if id, err := request.RequireString("identifier"); err == nil {
+				identifier = id
+			}
+
+			// Detect project languages
+			languages, err := bridge.DetectProjectLanguages(workspaceUri)
+			if err != nil {
+				logger.Error("workspace_diagnostics: language detection failed", err)
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to detect project languages: %v", err)), nil
+			}
+
+			if len(languages) == 0 {
+				return mcp.NewToolResultText("No programming languages detected in project"), nil
+			}
+
+			// Convert languages to strings
+			languageStrings := collections.ToString(languages)
+
+			// Get language clients
+			clients, err := bridge.GetMultiLanguageClients(languageStrings)
+			if err != nil || len(clients) == 0 {
+				logger.Error("workspace_diagnostics: failed to get language clients", err)
+				return mcp.NewToolResultError("No LSP clients available for detected languages"), nil
+			}
+
+			// Convert clients to async operations
+			ops := collections.TransformMap(clients, func(client types.LanguageClientInterface) func() (*protocol.WorkspaceDiagnosticReport, error) {
+				return func() (*protocol.WorkspaceDiagnosticReport, error) {
+					return client.WorkspaceDiagnostic(identifier)
+				}
+			})
+
+			// Execute diagnostics across all clients in parallel
+			results, err := async.MapWithKeys(ctx, ops)
+			if err != nil {
+				logger.Error("workspace_diagnostics: async execution failed", err)
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to execute workspace diagnostics: %v", err)), nil
+			}
+
+			// Process results and extract core Diagnostic items
+			var allDiagnostics []protocol.Diagnostic
+			var languageResults []LanguageDiagnosticResult
+			var errors []DiagnosticError
+
+			for _, result := range results {
+				if result.Error != nil {
+					// Categorize the error for better user understanding
+					diagError := categorizeDiagnosticError(string(result.Key), result.Error)
+					errors = append(errors, diagError)
+					logger.Warn(fmt.Sprintf("Workspace diagnostics failed for %s: %v", result.Key, result.Error))
+				} else if result.Value != nil {
+					// Extract diagnostics from the workspace report
+					diagnostics := extractDiagnosticsFromWorkspaceReport(result.Value)
+					allDiagnostics = append(allDiagnostics, diagnostics...)
+					languageResults = append(languageResults, LanguageDiagnosticResult{
+						Language:    string(result.Key),
+						Diagnostics: diagnostics,
+					})
+				}
+			}
+
+			// Log errors for debugging
+			for _, err := range errors {
+				logger.Error("workspace_diagnostics: language server error", err.OriginalErr)
+			}
+
+			// Format results for user-friendly output
+			formattedResult := formatWorkspaceDiagnosticsByLanguage(languageResults, allDiagnostics, errors)
+
+			return mcp.NewToolResultText(formattedResult), nil
 		}
-
-		// Log errors for debugging
-		for _, err := range errors {
-			logger.Error("workspace_diagnostics: language server error", err.OriginalErr)
-		}
-
-		// Format results for user-friendly output
-		formattedResult := formatWorkspaceDiagnosticsByLanguage(languageResults, allDiagnostics, errors)
-
-		return mcp.NewToolResultText(formattedResult), nil
-	}
 }
 
 // LanguageDiagnosticResult holds diagnostics for a specific language
@@ -135,7 +135,7 @@ type DiagnosticError struct {
 // extractDiagnosticsFromWorkspaceReport extracts core Diagnostic items from a WorkspaceDiagnosticReport
 func extractDiagnosticsFromWorkspaceReport(report *protocol.WorkspaceDiagnosticReport) []protocol.Diagnostic {
 	var diagnostics []protocol.Diagnostic
-	
+
 	for _, item := range report.Items {
 		// Handle the union type - it can be either WorkspaceFullDocumentDiagnosticReport or WorkspaceUnchangedDocumentDiagnosticReport
 		switch v := item.Value.(type) {
@@ -147,7 +147,7 @@ func extractDiagnosticsFromWorkspaceReport(report *protocol.WorkspaceDiagnosticR
 			continue
 		}
 	}
-	
+
 	return diagnostics
 }
 
@@ -184,7 +184,7 @@ func categorizeDiagnosticError(language string, err error) DiagnosticError {
 // formatWorkspaceDiagnosticsByLanguage formats workspace diagnostics organized by language
 func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticResult, allDiagnostics []protocol.Diagnostic, errors []DiagnosticError) string {
 	var result strings.Builder
-	
+
 	// Header with summary
 	fmt.Fprintf(&result, "=== WORKSPACE DIAGNOSTICS ===\n")
 	fmt.Fprintf(&result, "Languages analyzed: %d\n", len(languageResults))
@@ -193,16 +193,16 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 		fmt.Fprintf(&result, "Errors: %d\n", len(errors))
 	}
 	fmt.Fprintf(&result, "\n")
-	
+
 	// Show errors if any with better categorization
 	if len(errors) > 0 {
 		fmt.Fprintf(&result, "=== ERRORS ===\n")
-		
+
 		// Group errors by category for better presentation
 		unsupportedMethods := []DiagnosticError{}
 		connectionErrors := []DiagnosticError{}
 		otherErrors := []DiagnosticError{}
-		
+
 		for _, err := range errors {
 			switch err.Category {
 			case "UNSUPPORTED_METHOD":
@@ -213,7 +213,7 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 				otherErrors = append(otherErrors, err)
 			}
 		}
-		
+
 		// Show unsupported methods with explanation
 		if len(unsupportedMethods) > 0 {
 			fmt.Fprintf(&result, "🚫 Unsupported Methods:\n")
@@ -223,7 +223,7 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 			fmt.Fprintf(&result, "\n💡 Note: These language servers need to be updated to support LSP 3.17+ workspace diagnostics.\n")
 			fmt.Fprintf(&result, "   Consider using individual file diagnostics or updating to newer language server versions.\n\n")
 		}
-		
+
 		// Show connection errors
 		if len(connectionErrors) > 0 {
 			fmt.Fprintf(&result, "🔌 Connection Errors:\n")
@@ -232,7 +232,7 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 			}
 			fmt.Fprintf(&result, "\n")
 		}
-		
+
 		// Show other errors
 		if len(otherErrors) > 0 {
 			fmt.Fprintf(&result, "❌ Other Errors:\n")
@@ -242,7 +242,7 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 			fmt.Fprintf(&result, "\n")
 		}
 	}
-	
+
 	// Group diagnostics by severity for summary
 	severityCounts := make(map[protocol.DiagnosticSeverity]int)
 	for _, diag := range allDiagnostics {
@@ -252,7 +252,7 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 			severityCounts[protocol.DiagnosticSeverityError]++ // Default to error if no severity
 		}
 	}
-	
+
 	// Show severity summary
 	if len(allDiagnostics) > 0 {
 		fmt.Fprintf(&result, "=== SUMMARY BY SEVERITY ===\n")
@@ -270,13 +270,13 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 		}
 		fmt.Fprintf(&result, "\n")
 	}
-	
+
 	// Show results by language
 	if len(languageResults) > 0 {
 		fmt.Fprintf(&result, "=== RESULTS BY LANGUAGE ===\n")
 		for i, langResult := range languageResults {
 			fmt.Fprintf(&result, "%d. %s: %d diagnostics\n", i+1, langResult.Language, len(langResult.Diagnostics))
-			
+
 			// Show a few sample diagnostics per language
 			sampleCount := min(3, len(langResult.Diagnostics))
 			for j := 0; j < sampleCount; j++ {
@@ -289,7 +289,7 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 				}
 				fmt.Fprintf(&result, "   %s %s: %s\n", icon, severity, diag.Message)
 			}
-			
+
 			if len(langResult.Diagnostics) > sampleCount {
 				fmt.Fprintf(&result, "   ... and %d more\n", len(langResult.Diagnostics)-sampleCount)
 			}
@@ -298,6 +298,6 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 	} else {
 		fmt.Fprintf(&result, "✅ No diagnostics found across all languages\n")
 	}
-	
+
 	return result.String()
 }

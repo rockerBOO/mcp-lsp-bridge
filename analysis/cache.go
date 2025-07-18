@@ -25,17 +25,17 @@ type CacheStats struct {
 
 // inMemoryCache is a thread-safe in-memory implementation of AnalysisCache
 type inMemoryCache struct {
-	mu       sync.RWMutex
-	items    map[string]cacheItem
-	stats    CacheStats
-	maxSize  int
-	ttl      time.Duration
+	mu      sync.RWMutex
+	items   map[string]cacheItem
+	stats   CacheStats
+	maxSize int
+	ttl     time.Duration
 }
 
 // cacheItem represents a single cached item with expiration
 type cacheItem struct {
-	value     interface{}
-	expiresAt time.Time
+	value      interface{}
+	expiresAt  time.Time
 	accessedAt time.Time
 }
 
@@ -46,10 +46,10 @@ func NewAnalysisCache(maxSize int, defaultTTL time.Duration) AnalysisCache {
 		maxSize: maxSize,
 		ttl:     defaultTTL,
 	}
-	
+
 	// Start cleanup goroutine
 	go cache.cleanup()
-	
+
 	return cache
 }
 
@@ -57,27 +57,27 @@ func NewAnalysisCache(maxSize int, defaultTTL time.Duration) AnalysisCache {
 func (c *inMemoryCache) Get(key string) (interface{}, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	item, exists := c.items[key]
 	if !exists {
 		c.stats.Misses++
 		return nil, false
 	}
-	
+
 	if time.Now().After(item.expiresAt) {
 		delete(c.items, key)
 		c.stats.Size = len(c.items)
 		c.stats.Misses++
 		return nil, false
 	}
-	
+
 	// Update access time
 	item.accessedAt = time.Now()
 	c.items[key] = item
-	
+
 	c.stats.Hits++
-	c.stats.HitRate = float64(c.stats.Hits) / float64(c.stats.Hits + c.stats.Misses)
-	
+	c.stats.HitRate = float64(c.stats.Hits) / float64(c.stats.Hits+c.stats.Misses)
+
 	return item.value, true
 }
 
@@ -85,22 +85,22 @@ func (c *inMemoryCache) Get(key string) (interface{}, bool) {
 func (c *inMemoryCache) Set(key string, value interface{}, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if ttl == 0 {
 		ttl = c.ttl
 	}
-	
+
 	// Evict if at max size
 	if len(c.items) >= c.maxSize {
 		c.evictLRU()
 	}
-	
+
 	c.items[key] = cacheItem{
-		value:     value,
-		expiresAt: time.Now().Add(ttl),
+		value:      value,
+		expiresAt:  time.Now().Add(ttl),
 		accessedAt: time.Now(),
 	}
-	
+
 	c.stats.Size = len(c.items)
 }
 
@@ -108,7 +108,7 @@ func (c *inMemoryCache) Set(key string, value interface{}, ttl time.Duration) {
 func (c *inMemoryCache) Delete(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	delete(c.items, key)
 	c.stats.Size = len(c.items)
 }
@@ -117,7 +117,7 @@ func (c *inMemoryCache) Delete(key string) {
 func (c *inMemoryCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.items = make(map[string]cacheItem)
 	c.stats.Size = 0
 }
@@ -126,7 +126,7 @@ func (c *inMemoryCache) Clear() {
 func (c *inMemoryCache) Stats() CacheStats {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	return c.stats
 }
 
@@ -134,14 +134,14 @@ func (c *inMemoryCache) Stats() CacheStats {
 func (c *inMemoryCache) evictLRU() {
 	var oldestKey string
 	var oldestTime time.Time
-	
+
 	for key, item := range c.items {
 		if oldestKey == "" || item.accessedAt.Before(oldestTime) {
 			oldestKey = key
 			oldestTime = item.accessedAt
 		}
 	}
-	
+
 	if oldestKey != "" {
 		delete(c.items, oldestKey)
 	}
@@ -151,7 +151,7 @@ func (c *inMemoryCache) evictLRU() {
 func (c *inMemoryCache) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		c.mu.Lock()
 		now := time.Now()

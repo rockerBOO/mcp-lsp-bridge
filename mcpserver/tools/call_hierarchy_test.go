@@ -1,15 +1,20 @@
 package tools
 
 import (
+	"context"
 	"errors"
-
+	"fmt"
+	"strings"
 	"testing"
 
 	"rockerboo/mcp-lsp-bridge/mocks"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/stretchr/testify/mock"
 
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/mcptest"
+	"github.com/mark3labs/mcp-go/server"
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
@@ -218,11 +223,11 @@ func TestCallHierarchyTool(t *testing.T) {
 				// Set up incoming/outgoing call expectations if items exist
 				if len(tc.mockItems) > 0 {
 					if tc.direction == "incoming" || tc.direction == "both" {
-						bridge.On("GetIncomingCalls", mock.Anything).Return(tc.mockIncoming, nil)
+						bridge.On("IncomingCalls", mock.Anything).Return(tc.mockIncoming, nil)
 					}
 
 					if tc.direction == "outgoing" || tc.direction == "both" {
-						bridge.On("GetOutgoingCalls", mock.Anything).Return(tc.mockOutgoing, nil)
+						bridge.On("OutgoingCalls", mock.Anything).Return(tc.mockOutgoing, nil)
 					}
 				}
 			}
@@ -257,7 +262,7 @@ func TestCallHierarchyTool(t *testing.T) {
 			// Test incoming calls if direction includes incoming
 			if tc.direction == "incoming" || tc.direction == "both" {
 				if len(items) > 0 {
-					incoming, err := bridge.GetIncomingCalls(items[0])
+					incoming, err := bridge.IncomingCalls(items[0])
 					if err != nil {
 						t.Errorf("Unexpected error getting incoming calls: %v", err)
 					}
@@ -271,7 +276,7 @@ func TestCallHierarchyTool(t *testing.T) {
 			// Test outgoing calls if direction includes outgoing
 			if tc.direction == "outgoing" || tc.direction == "both" {
 				if len(items) > 0 {
-					outgoing, err := bridge.GetOutgoingCalls(items[0])
+					outgoing, err := bridge.OutgoingCalls(items[0])
 					if err != nil {
 						t.Errorf("Unexpected error getting outgoing calls: %v", err)
 					}
@@ -370,9 +375,9 @@ func TestCallHierarchySymbolTypes(t *testing.T) {
 			// Setup mock expectations
 			bridge.On("PrepareCallHierarchy", "file:///test.go", uint32(10), uint32(5)).
 				Return([]protocol.CallHierarchyItem{mockItem}, nil)
-			bridge.On("GetIncomingCalls", mock.AnythingOfType("protocol.CallHierarchyItem")).
+			bridge.On("IncomingCalls", mock.AnythingOfType("protocol.CallHierarchyItem")).
 				Return([]protocol.CallHierarchyIncomingCall{mockIncomingCall}, nil)
-			bridge.On("GetOutgoingCalls", mock.AnythingOfType("protocol.CallHierarchyItem")).
+			bridge.On("OutgoingCalls", mock.AnythingOfType("protocol.CallHierarchyItem")).
 				Return([]protocol.CallHierarchyOutgoingCall{mockOutgoingCall}, nil)
 
 			// Test call hierarchy for this symbol type
@@ -388,7 +393,7 @@ func TestCallHierarchySymbolTypes(t *testing.T) {
 			}
 
 			// Test incoming calls
-			incoming, err := bridge.GetIncomingCalls(items[0])
+			incoming, err := bridge.IncomingCalls(items[0])
 			if err != nil {
 				t.Errorf("Error getting incoming calls for %s: %v", symbolType.description, err)
 			}
@@ -398,7 +403,7 @@ func TestCallHierarchySymbolTypes(t *testing.T) {
 			}
 
 			// Test outgoing calls
-			outgoing, err := bridge.GetOutgoingCalls(items[0])
+			outgoing, err := bridge.OutgoingCalls(items[0])
 			if err != nil {
 				t.Errorf("Error getting outgoing calls for %s: %v", symbolType.description, err)
 			}
@@ -416,6 +421,179 @@ func TestCallHierarchySymbolTypes(t *testing.T) {
 }
 
 func TestCallHierarchyEdgeCases(t *testing.T) {
+	t.Run("invalid direction parameter", func(t *testing.T) {
+		// Prepare MCP server and mock bridge
+		bridge := &mocks.MockBridge{}
+		tool, handler := CallHierarchyTool(bridge)
+		mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+			Tool:    tool,
+			Handler: handler,
+		})
+		if err != nil {
+			t.Errorf("Could not start the server: %v", err)
+		}
+
+		// Test tool with an invalid direction
+		ctx := context.Background()
+		result, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+			Request: mcp.Request{Method: "tools/call"},
+			Params: mcp.CallToolParams{
+				Name: "call_hierarchy",
+				Arguments: map[string]any{
+					"uri":       "file:///test.go",
+					"line":      10,
+					"character": 5,
+					"direction": "invalid",
+				},
+			},
+		})
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+
+		if result == nil || !result.IsError {
+			t.Error("Expected error result for invalid direction")
+		}
+	})
+
+	t.Run("missing required parameters", func(t *testing.T) {
+		bridge := &mocks.MockBridge{}
+		tool, handler := CallHierarchyTool(bridge)
+		mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+			Tool:    tool,
+			Handler: handler,
+		})
+		if err != nil {
+			t.Errorf("Could not start the server: %v", err)
+		}
+
+		ctx := context.Background()
+
+		// Test missing URI
+		result, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+			Request: mcp.Request{Method: "tools/call"},
+			Params: mcp.CallToolParams{
+				Name: "call_hierarchy",
+				Arguments: map[string]any{
+					"line":      10,
+					"character": 5,
+				},
+			},
+		})
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if result == nil || !result.IsError {
+			t.Error("Expected error result for missing URI")
+		}
+
+		// Test missing line
+		result, err = mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+			Request: mcp.Request{Method: "tools/call"},
+			Params: mcp.CallToolParams{
+				Name: "call_hierarchy",
+				Arguments: map[string]any{
+					"uri":       "file:///test.go",
+					"character": 5,
+				},
+			},
+		})
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if result == nil || !result.IsError {
+			t.Error("Expected error result for missing line")
+		}
+	})
+
+	t.Run("language inference failure", func(t *testing.T) {
+		bridge := &mocks.MockBridge{}
+		var lang *types.Language = nil
+		bridge.On("InferLanguage", "file:///unknown.xyz").Return(lang, errors.New("unknown file type"))
+
+		tool, handler := CallHierarchyTool(bridge)
+		mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+			Tool:    tool,
+			Handler: handler,
+		})
+		if err != nil {
+			t.Errorf("Could not start the server: %v", err)
+		}
+
+		ctx := context.Background()
+		result, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+			Request: mcp.Request{Method: "tools/call"},
+			Params: mcp.CallToolParams{
+				Name: "call_hierarchy",
+				Arguments: map[string]any{
+					"uri":       "file:///unknown.xyz",
+					"line":      10,
+					"character": 5,
+				},
+			},
+		})
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if result == nil || !result.IsError {
+			t.Error("Expected error result for language inference failure")
+		}
+
+		bridge.AssertExpectations(t)
+	})
+
+	t.Run("call hierarchy errors during direction processing", func(t *testing.T) {
+		bridge := &mocks.MockBridge{}
+
+		// Setup valid prepare call hierarchy
+		mockItem := protocol.CallHierarchyItem{
+			Name: "testFunc",
+			Kind: protocol.SymbolKindFunction,
+			Uri:  "file:///test.go",
+		}
+		goLang := types.Language("go")
+		bridge.On("InferLanguage", "file:///test.go").Return(&goLang, nil)
+		bridge.On("PrepareCallHierarchy", "file:///test.go", uint32(10), uint32(5)).Return([]protocol.CallHierarchyItem{mockItem}, nil)
+
+		// Mock error for incoming calls
+		bridge.On("IncomingCalls", mock.AnythingOfType("protocol.CallHierarchyItem")).Return([]protocol.CallHierarchyIncomingCall{}, errors.New("incoming calls failed"))
+		// Mock error for outgoing calls
+		bridge.On("OutgoingCalls", mock.AnythingOfType("protocol.CallHierarchyItem")).Return([]protocol.CallHierarchyOutgoingCall{}, errors.New("outgoing calls failed"))
+
+		tool, handler := CallHierarchyTool(bridge)
+		mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+			Tool:    tool,
+			Handler: handler,
+		})
+		if err != nil {
+			t.Errorf("Could not start the server: %v", err)
+		}
+
+		ctx := context.Background()
+		result, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+			Request: mcp.Request{Method: "tools/call"},
+			Params: mcp.CallToolParams{
+				Name: "call_hierarchy",
+				Arguments: map[string]any{
+					"uri":       "file:///test.go",
+					"line":      10,
+					"character": 5,
+					"direction": "both",
+				},
+			},
+		})
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if result == nil {
+			t.Error("Expected result even with call hierarchy errors")
+		}
+
+		bridge.AssertExpectations(t)
+	})
 	t.Run("recursive function calls", func(t *testing.T) {
 		bridge := &mocks.MockBridge{}
 
@@ -444,11 +622,11 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 
 		// Mock incoming calls
 		expectedIncoming := []protocol.CallHierarchyIncomingCall{{}, {}, {}} // 3 items
-		bridge.On("GetIncomingCalls", expectedItems[0]).Return(expectedIncoming, nil)
+		bridge.On("IncomingCalls", expectedItems[0]).Return(expectedIncoming, nil)
 
 		// Mock outgoing calls
 		expectedOutgoing := []protocol.CallHierarchyOutgoingCall{{}, {}, {}} // 3 items
-		bridge.On("GetOutgoingCalls", expectedItems[0]).Return(expectedOutgoing, nil)
+		bridge.On("OutgoingCalls", expectedItems[0]).Return(expectedOutgoing, nil)
 
 		items, err := bridge.PrepareCallHierarchy("file:///deep.go", 25, 10)
 		if err != nil {
@@ -460,7 +638,7 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 		}
 
 		// Test that we can get both incoming and outgoing calls
-		incoming, err := bridge.GetIncomingCalls(items[0])
+		incoming, err := bridge.IncomingCalls(items[0])
 		if err != nil {
 			t.Errorf("Error getting incoming calls: %v", err)
 		}
@@ -469,7 +647,7 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 			t.Errorf("Expected 3 incoming calls, got %d", len(incoming))
 		}
 
-		outgoing, err := bridge.GetOutgoingCalls(items[0])
+		outgoing, err := bridge.OutgoingCalls(items[0])
 		if err != nil {
 			t.Errorf("Error getting outgoing calls: %v", err)
 		}
@@ -480,4 +658,251 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 
 		bridge.AssertExpectations(t)
 	})
+}
+
+func TestFormatCallHierarchyResultsDetailed(t *testing.T) {
+	testCases := []struct {
+		name         string
+		items        []protocol.CallHierarchyItem
+		language     string
+		errors       []error
+		uri          string
+		line         int
+		character    int
+		direction    string
+		incoming     []protocol.CallHierarchyIncomingCall
+		outgoing     []protocol.CallHierarchyOutgoingCall
+		expectOutput string
+	}{
+		{
+			name:     "basic formatting with items",
+			language: "go",
+			items: []protocol.CallHierarchyItem{
+				{
+					Name: "testFunction",
+					Kind: protocol.SymbolKindFunction,
+					Uri:  "file:///test.go",
+					Range: protocol.Range{
+						Start: protocol.Position{Line: 10, Character: 0},
+						End:   protocol.Position{Line: 15, Character: 1},
+					},
+					SelectionRange: protocol.Range{
+						Start: protocol.Position{Line: 10, Character: 5},
+						End:   protocol.Position{Line: 10, Character: 17},
+					},
+					Detail: "Test function details",
+				},
+			},
+			uri:          "file:///test.go",
+			line:         10,
+			character:    5,
+			direction:    "both",
+			expectOutput: "CALL HIERARCHY",
+		},
+		{
+			name:         "formatting with errors",
+			language:     "go",
+			items:        []protocol.CallHierarchyItem{},
+			errors:       []error{errors.New("test error")},
+			uri:          "file:///test.go",
+			line:         10,
+			character:    5,
+			direction:    "both",
+			expectOutput: "ERRORS",
+		},
+		{
+			name:     "formatting with incoming calls and multiple ranges",
+			language: "go",
+			items: []protocol.CallHierarchyItem{
+				{
+					Name: "targetFunc",
+					Kind: protocol.SymbolKindFunction,
+				},
+			},
+			direction: "incoming",
+			incoming: []protocol.CallHierarchyIncomingCall{
+				{
+					From: protocol.CallHierarchyItem{
+						Name: "caller1",
+						Uri:  "file:///caller.go",
+					},
+					FromRanges: []protocol.Range{
+						{Start: protocol.Position{Line: 5, Character: 0}, End: protocol.Position{Line: 5, Character: 10}},
+						{Start: protocol.Position{Line: 8, Character: 2}, End: protocol.Position{Line: 8, Character: 12}},
+						{Start: protocol.Position{Line: 12, Character: 4}, End: protocol.Position{Line: 12, Character: 14}},
+						{Start: protocol.Position{Line: 15, Character: 1}, End: protocol.Position{Line: 15, Character: 11}},
+					},
+				},
+			},
+			expectOutput: "INCOMING CALLS",
+		},
+		{
+			name:     "formatting with outgoing calls",
+			language: "typescript",
+			items: []protocol.CallHierarchyItem{
+				{
+					Name: "sourceFunc",
+					Kind: protocol.SymbolKindMethod,
+				},
+			},
+			direction: "outgoing",
+			outgoing: []protocol.CallHierarchyOutgoingCall{
+				{
+					To: protocol.CallHierarchyItem{
+						Name: "callee1",
+						Uri:  "file:///callee.ts",
+					},
+					FromRanges: []protocol.Range{
+						{Start: protocol.Position{Line: 20, Character: 8}, End: protocol.Position{Line: 20, Character: 16}},
+					},
+				},
+			},
+			expectOutput: "OUTGOING CALLS",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := formatCallHierarchyResults(
+				tc.items,
+				tc.language,
+				tc.errors,
+				tc.uri,
+				tc.line,
+				tc.character,
+				tc.direction,
+				tc.incoming,
+				tc.outgoing,
+			)
+
+			if tc.expectOutput != "" && !strings.Contains(result, tc.expectOutput) {
+				t.Errorf("Expected output to contain '%s', but got: %s", tc.expectOutput, result)
+			}
+
+			// Verify line number conversion (0-based to 1-based)
+			if len(tc.incoming) > 0 && len(tc.incoming[0].FromRanges) > 0 {
+				firstRange := tc.incoming[0].FromRanges[0]
+				expectedLine := fmt.Sprintf("Line %d:%d", firstRange.Start.Line+1, firstRange.Start.Character+1)
+				if !strings.Contains(result, expectedLine) {
+					t.Errorf("Expected 1-based line numbering with '%s', but got: %s", expectedLine, result)
+				}
+			}
+
+			// Verify range limiting (should show max 3 ranges)
+			if len(tc.incoming) > 0 && len(tc.incoming[0].FromRanges) > 3 {
+				if !strings.Contains(result, "and 1 more ranges") {
+					t.Errorf("Expected range limiting message for excess ranges, but got: %s", result)
+				}
+			}
+		})
+	}
+}
+
+func TestCallHierarchyToolParameterValidation(t *testing.T) {
+	testCases := []struct {
+		name        string
+		params      map[string]any
+		expectError bool
+		description string
+	}{
+		{
+			name: "valid parameters",
+			params: map[string]any{
+				"uri":       "file:///test.go",
+				"line":      10,
+				"character": 5,
+				"direction": "both",
+			},
+			expectError: false,
+			description: "Should accept valid parameters",
+		},
+		{
+			name: "invalid line parameter - negative",
+			params: map[string]any{
+				"uri":       "file:///test.go",
+				"line":      -1,
+				"character": 5,
+			},
+			expectError: true,
+			description: "Should reject negative line numbers",
+		},
+		{
+			name: "invalid character parameter - negative",
+			params: map[string]any{
+				"uri":       "file:///test.go",
+				"line":      10,
+				"character": -1,
+			},
+			expectError: true,
+			description: "Should reject negative character positions",
+		},
+		{
+			name: "default direction when not specified",
+			params: map[string]any{
+				"uri":       "file:///test.go",
+				"line":      10,
+				"character": 5,
+			},
+			expectError: false,
+			description: "Should default to 'both' direction when not specified",
+		},
+		{
+			name: "case insensitive direction",
+			params: map[string]any{
+				"uri":       "file:///test.go",
+				"line":      10,
+				"character": 5,
+				"direction": "INCOMING",
+			},
+			expectError: false,
+			description: "Should accept uppercase direction parameters",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			bridge := &mocks.MockBridge{}
+
+			// Setup expectations for valid cases
+			if !tc.expectError {
+				if uri, ok := tc.params["uri"].(string); ok {
+					goLang := types.Language("go")
+					bridge.On("InferLanguage", uri).Return(&goLang, nil)
+					bridge.On("PrepareCallHierarchy", mock.Anything, mock.Anything, mock.Anything).Return([]protocol.CallHierarchyItem{}, nil)
+				}
+			}
+
+			tool, handler := CallHierarchyTool(bridge)
+			mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+				Tool:    tool,
+				Handler: handler,
+			})
+			if err != nil {
+				t.Errorf("Could not start the server: %v", err)
+			}
+
+			ctx := context.Background()
+			result, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+				Request: mcp.Request{Method: "tools/call"},
+				Params: mcp.CallToolParams{
+					Name:      "call_hierarchy",
+					Arguments: tc.params,
+				},
+			})
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if tc.expectError && (result == nil || !result.IsError) {
+				t.Errorf("Expected error for %s, but got success", tc.description)
+			}
+
+			if !tc.expectError && result != nil && result.IsError {
+				t.Errorf("Expected success for %s, but got error: %v", tc.description, result)
+			}
+
+			bridge.AssertExpectations(t)
+		})
+	}
 }

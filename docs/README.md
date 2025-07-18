@@ -7,6 +7,7 @@ Complete documentation for the MCP-LSP Bridge project.
 - **[../README.md](../README.md)** - Main project documentation and setup
 - **[configuration.md](configuration.md)** - Detailed configuration guide
 - **[analysis-overview.md](analysis-overview.md)** - Quick start for analysis tools
+- **[codebase-guide.md](codebase-guide.md)** - 🆕 Codebase architecture and structure overview
 
 ## 🛠️ Tools Documentation
 
@@ -20,6 +21,7 @@ Complete documentation for the MCP-LSP Bridge project.
 ```
 docs/
 ├── README.md                    # This file - documentation index
+├── codebase-guide.md            # 🆕 Architecture & structure overview
 ├── configuration.md             # Setup and configuration
 ├── analysis-overview.md         # Quick start guide
 ├── tools/                       # Tool-specific documentation
@@ -35,6 +37,7 @@ docs/
 
 ### I want to...
 
+- **Understand the codebase** → [codebase-guide.md](codebase-guide.md) 🆕
 - **Get started quickly** → [analysis-overview.md](analysis-overview.md)
 - **See all available tools** → [tools/tools-reference.md](tools/tools-reference.md)
 - **Configure the bridge** → [configuration.md](configuration.md)

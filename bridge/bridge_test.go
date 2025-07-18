@@ -827,17 +827,36 @@ func TestPrepareCallHierarchy(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
-// Test GetIncomingCalls and GetOutgoingCalls (currently return empty)
-func TestGetIncomingOutgoingCalls(t *testing.T) {
+// Test IncomingCalls and OutgoingCalls with proper CallHierarchyItem
+func TestIncomingOutgoingCalls(t *testing.T) {
 	bridge := createTestBridge([]string{"/"})
 
-	incoming, err := bridge.GetIncomingCalls(protocol.CallHierarchyItem{})
-	require.NoError(t, err)
-	assert.Empty(t, incoming)
+	// Create a test call hierarchy item with a valid Go URI
+	testItem := protocol.CallHierarchyItem{
+		Name: "testFunction",
+		Kind: protocol.SymbolKindFunction,
+		Uri:  "file:///test/main.go",
+		Range: protocol.Range{
+			Start: protocol.Position{Line: 10, Character: 0},
+			End:   protocol.Position{Line: 10, Character: 10},
+		},
+		SelectionRange: protocol.Range{
+			Start: protocol.Position{Line: 10, Character: 0},
+			End:   protocol.Position{Line: 10, Character: 10},
+		},
+	}
 
-	outgoing, err := bridge.GetOutgoingCalls(protocol.CallHierarchyItem{})
-	require.NoError(t, err)
-	assert.Empty(t, outgoing)
+	// Test IncomingCalls - should fail because the test file doesn't exist
+	incoming, err := bridge.IncomingCalls(testItem)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "incoming calls request failed")
+	assert.Nil(t, incoming)
+
+	// Test OutgoingCalls - should fail because the test file doesn't exist
+	outgoing, err := bridge.OutgoingCalls(testItem)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "outgoing calls request failed")
+	assert.Nil(t, outgoing)
 }
 
 // Test GetClientForLanguageInterface

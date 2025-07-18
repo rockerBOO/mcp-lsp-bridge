@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"rockerboo/mcp-lsp-bridge/lsp"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -627,6 +629,155 @@ func TestMCPToolRegistration(t *testing.T) {
 }
 
 // TestMCPToolParameterValidation tests parameter validation across tools
+func TestCallHierarchyIntegration(t *testing.T) {
+	testCases := []struct {
+		name            string
+		direction       string
+		expectedContent string
+		expectError     bool
+	}{
+		{
+			name:            "valid both direction",
+			direction:       "both",
+			expectedContent: "CALL HIERARCHY",
+			expectError:     false,
+		},
+		{
+			name:            "valid incoming direction",
+			direction:       "incoming",
+			expectedContent: "INCOMING CALLS",
+			expectError:     false,
+		},
+		{
+			name:            "valid outgoing direction",
+			direction:       "outgoing",
+			expectedContent: "OUTGOING CALLS",
+			expectError:     false,
+		},
+		{
+			name:            "invalid direction",
+			direction:       "invalid",
+			expectedContent: "Invalid direction",
+			expectError:     true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockBridge := new(mocks.MockBridge)
+			language := types.Language("go")
+
+			// Mock language inference (only for valid directions)
+			if tc.direction != "invalid" {
+				mockBridge.On("InferLanguage", "file:///test.go").Return(&language, nil).Once()
+			}
+
+			// Create mock call hierarchy items
+			mockItems := []protocol.CallHierarchyItem{
+				{
+					Name: "testFunction",
+					Kind: protocol.SymbolKindFunction,
+					Uri:  "file:///test.go",
+					Range: protocol.Range{
+						Start: protocol.Position{Line: 10, Character: 0},
+						End:   protocol.Position{Line: 10, Character: 10},
+					},
+				},
+			}
+
+			// Mock incoming and outgoing calls
+			mockIncoming := []protocol.CallHierarchyIncomingCall{
+				{
+					From: protocol.CallHierarchyItem{
+						Name: "callerFunction",
+						Kind: protocol.SymbolKindFunction,
+					},
+					FromRanges: []protocol.Range{
+						{Start: protocol.Position{Line: 5, Character: 0}},
+					},
+				},
+			}
+
+			mockOutgoing := []protocol.CallHierarchyOutgoingCall{
+				{
+					To: protocol.CallHierarchyItem{
+						Name: "calleeFunction",
+						Kind: protocol.SymbolKindFunction,
+					},
+					FromRanges: []protocol.Range{
+						{Start: protocol.Position{Line: 15, Character: 0}},
+					},
+				},
+			}
+
+			// Expectations based on direction
+			if tc.direction != "invalid" {
+				mockBridge.On("PrepareCallHierarchy", "file:///test.go", uint32(10), uint32(5)).Return(mockItems, nil).Once()
+
+				if tc.direction == "incoming" || tc.direction == "both" {
+					mockBridge.On("IncomingCalls", mock.AnythingOfType("protocol.CallHierarchyItem")).Return(mockIncoming, nil).Once()
+				}
+
+				if tc.direction == "outgoing" || tc.direction == "both" {
+					mockBridge.On("OutgoingCalls", mock.AnythingOfType("protocol.CallHierarchyItem")).Return(mockOutgoing, nil).Once()
+				}
+			}
+
+			// Initialize tool and handler
+			tool, handler := CallHierarchyTool(mockBridge)
+			mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+				Tool:    tool,
+				Handler: handler,
+			})
+			require.NoError(t, err, "Could not start server")
+			defer mcpServer.Close()
+
+			// Call the tool
+			ctx := context.Background()
+			result, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+				Request: mcp.Request{Method: "tools/call"},
+				Params: mcp.CallToolParams{
+					Name: "call_hierarchy",
+					Arguments: map[string]any{
+						"uri":       "file:///test.go",
+						"line":      10,
+						"character": 5,
+						"direction": tc.direction,
+					},
+				},
+			})
+
+			require.NoError(t, err, "Unexpected error from CallTool")
+			assert.NotNil(t, result, "Expected result but got nil")
+
+			if tc.expectError {
+				// Check for error result
+				assert.True(t, result.IsError, "Expected error result for invalid direction")
+			} else {
+				// Check successful result
+				assert.False(t, result.IsError, "Expected successful result")
+
+				// Validate content
+				assert.NotEmpty(t, result.Content, "Expected non-empty result content")
+
+				// Check for expected content in result
+				found := false
+				for _, content := range result.Content {
+					textContent, ok := content.(mcp.TextContent)
+					if ok && strings.Contains(textContent.Text, tc.expectedContent) {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "Expected content '%s' not found in result", tc.expectedContent)
+			}
+
+			// Verify all expectations were met
+			mockBridge.AssertExpectations(t)
+		})
+	}
+}
+
 func TestMCPToolParameterValidation(t *testing.T) {
 	testCases := []struct {
 		name        string

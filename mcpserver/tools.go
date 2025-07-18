@@ -8,7 +8,7 @@ import (
 // Registers all MCP tools with the server
 func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterface) {
 	// Core analysis tools
-	
+
 	// New unified symbol exploration tool
 	tools.RegisterSymbolExploreTool(mcpServer, bridge)
 
@@ -40,8 +40,8 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 	tools.RegisterRenameTool(mcpServer, bridge)
 	tools.RegisterImplementationTool(mcpServer, bridge)
 
-	// Disabling lesser used tools
-	// tools.RegisterCallHierarchyTool(mcpServer, bridge)
+	// Call hierarchy tool
+	tools.RegisterCallHierarchyTool(mcpServer, bridge)
 
 	// Workspace analysis
 	tools.RegisterWorkspaceDiagnosticsTool(mcpServer, bridge)

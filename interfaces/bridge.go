@@ -26,8 +26,8 @@ type InformationProvider interface {
 }
 type CallHierarchyProvider interface {
 	PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error)
-	GetIncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error)
-	GetOutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error)
+	IncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error)
+	OutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error)
 }
 
 type CodeInspector interface {

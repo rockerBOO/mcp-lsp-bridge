@@ -21,23 +21,23 @@ import (
 // SymbolMatch represents a symbol found during exploration
 // This is our internal representation that extends LSP WorkspaceSymbol with additional metadata
 type SymbolMatch struct {
-	Name           string               // Symbol name (e.g., "calculateTotal")
-	Kind           protocol.SymbolKind  // Symbol type (function, class, variable, etc.)
-	Location       protocol.Location    // File location with line/character range
-	ContainerName  string               // Parent container (e.g., package, class name)
-	Documentation  string               // Symbol documentation (populated on demand)
-	Signature      string               // Function/method signature (populated on demand)
-	ReferenceCount int                  // Number of references (populated on demand)
-	Preview        string               // Code preview (populated on demand)
+	Name           string              // Symbol name (e.g., "calculateTotal")
+	Kind           protocol.SymbolKind // Symbol type (function, class, variable, etc.)
+	Location       protocol.Location   // File location with line/character range
+	ContainerName  string              // Parent container (e.g., package, class name)
+	Documentation  string              // Symbol documentation (populated on demand)
+	Signature      string              // Function/method signature (populated on demand)
+	ReferenceCount int                 // Number of references (populated on demand)
+	Preview        string              // Code preview (populated on demand)
 }
 
 // SymbolSessionData stores session-specific symbol exploration state
 // NOTE: Currently not fully implemented - sessions are not persistent in MCP
 // This is prepared for future session support
 type SymbolSessionData struct {
-	LastQuery     string         // Last search query executed
-	SearchResults []SymbolMatch  // Cached search results
-	ActiveSymbol  *SymbolMatch   // Currently selected symbol for detailed view
+	LastQuery     string        // Last search query executed
+	SearchResults []SymbolMatch // Cached search results
+	ActiveSymbol  *SymbolMatch  // Currently selected symbol for detailed view
 }
 
 func SymbolExploreTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
@@ -216,7 +216,7 @@ func convertWorkspaceSymbolToMatch(symbol protocol.WorkspaceSymbol) SymbolMatch 
 // filterSymbolsByFileContext applies fuzzy file filtering with scoring
 // Filters symbols based on file context using a scoring system:
 // - Exact filename match: 100 points
-// - Directory name match: 50 points  
+// - Directory name match: 50 points
 // - Path component match: 25 points
 // - File extension match: 10 points
 // Only symbols with score > 0 are included in results
@@ -428,37 +428,38 @@ func generateDetailedMultipleSymbols(bridge interfaces.BridgeInterface, symbols 
 }
 
 // generateSymbolSummary creates a summary of multiple symbol matches
-// func generateSymbolSummary(symbols []SymbolMatch, query, fileContext string) (*mcp.CallToolResult, error) {
-// 	var summary strings.Builder
 //
-// 	summary.WriteString(fmt.Sprintf("Found %d matches for \"%s\"", len(symbols), query))
-// 	if fileContext != "" {
-// 		summary.WriteString(fmt.Sprintf(" in files containing \"%s\"", fileContext))
-// 	}
-// 	summary.WriteString(":\n\n")
+//	func generateSymbolSummary(symbols []SymbolMatch, query, fileContext string) (*mcp.CallToolResult, error) {
+//		var summary strings.Builder
 //
-// 	for i, symbol := range symbols {
-// 		uri := string(symbol.Location.Uri)
-// 		line := symbol.Location.Range.Start.Line
+//		summary.WriteString(fmt.Sprintf("Found %d matches for \"%s\"", len(symbols), query))
+//		if fileContext != "" {
+//			summary.WriteString(fmt.Sprintf(" in files containing \"%s\"", fileContext))
+//		}
+//		summary.WriteString(":\n\n")
 //
-// 		summary.WriteString(fmt.Sprintf("%d. %s (%s)\n", i+1, symbol.Name, symbolKindToString(symbol.Kind)))
-// 		summary.WriteString(fmt.Sprintf("   File: %s:%d\n", filepath.Base(uri), line+1))
-// 		if symbol.ContainerName != "" {
-// 			summary.WriteString(fmt.Sprintf("   Container: %s\n", symbol.ContainerName))
-// 		}
-// 		summary.WriteString("\n")
-// 	}
+//		for i, symbol := range symbols {
+//			uri := string(symbol.Location.Uri)
+//			line := symbol.Location.Range.Start.Line
 //
-// 	summary.WriteString("Use file_context parameter to filter results, or specify detail_level=\"full\" for more information.")
+//			summary.WriteString(fmt.Sprintf("%d. %s (%s)\n", i+1, symbol.Name, symbolKindToString(symbol.Kind)))
+//			summary.WriteString(fmt.Sprintf("   File: %s:%d\n", filepath.Base(uri), line+1))
+//			if symbol.ContainerName != "" {
+//				summary.WriteString(fmt.Sprintf("   Container: %s\n", symbol.ContainerName))
+//			}
+//			summary.WriteString("\n")
+//		}
 //
-// 	return mcp.NewToolResultText(summary.String()), nil
-// }
+//		summary.WriteString("Use file_context parameter to filter results, or specify detail_level=\"full\" for more information.")
+//
+//		return mcp.NewToolResultText(summary.String()), nil
+//	}
 //
 // generateTableOfContents creates a table of contents listing for symbol matches
 // Returns a formatted string containing numbered list of symbols with their locations
 func generateTableOfContents(symbols []SymbolMatch) string {
 	var tableOfContents strings.Builder
-	
+
 	for i, symbol := range symbols {
 		uri := string(symbol.Location.Uri)
 		line := symbol.Location.Range.Start.Line
@@ -466,13 +467,13 @@ func generateTableOfContents(symbols []SymbolMatch) string {
 		tableOfContents.WriteString(fmt.Sprintf("%d. %s (%s) - %s:%d",
 			i+1, symbol.Name, symbolKindToString(symbol.Kind),
 			filepath.Base(uri), line+1))
-		
+
 		if symbol.ContainerName != "" {
 			tableOfContents.WriteString(fmt.Sprintf(" [%s]", symbol.ContainerName))
 		}
 		tableOfContents.WriteString("\n")
 	}
-	
+
 	return tableOfContents.String()
 }
 
@@ -498,7 +499,7 @@ func generateTableOfContentsResponse(bridge interfaces.BridgeInterface, symbols 
 
 	// Determine which symbols to show in detail
 	detailStart := offset
-	detailEnd := min(offset + limit, len(symbols))
+	detailEnd := min(offset+limit, len(symbols))
 
 	if detailStart >= len(symbols) {
 		result.WriteString(fmt.Sprintf("\nOffset %d is beyond available results (total: %d)", offset, len(symbols)))
@@ -719,33 +720,34 @@ func getSemanticTokenRange(bridge interfaces.BridgeInterface, uri string, symbol
 }
 
 // symbolNamesMatch checks if symbol names match, handling different formats
-// func symbolNamesMatch(docSymbolName, workspaceSymbolName string) bool {
-// 	// Direct match
-// 	if docSymbolName == workspaceSymbolName {
-// 		return true
-// 	}
 //
-// 	// Handle Go method receiver syntax: "(*Type).Method" vs "Type.Method"
-// 	if strings.HasPrefix(docSymbolName, "(*") && strings.HasSuffix(docSymbolName, ")") {
-// 		// Extract "Type.Method" from "(*Type).Method"
-// 		simplified := strings.TrimPrefix(docSymbolName, "(*")
-// 		simplified = strings.TrimSuffix(simplified, ")")
-// 		if simplified == workspaceSymbolName {
-// 			return true
-// 		}
-// 	}
+//	func symbolNamesMatch(docSymbolName, workspaceSymbolName string) bool {
+//		// Direct match
+//		if docSymbolName == workspaceSymbolName {
+//			return true
+//		}
 //
-// 	// Handle case where workspace symbol might have receiver syntax
-// 	if strings.HasPrefix(workspaceSymbolName, "(*") && strings.HasSuffix(workspaceSymbolName, ")") {
-// 		simplified := strings.TrimPrefix(workspaceSymbolName, "(*")
-// 		simplified = strings.TrimSuffix(simplified, ")")
-// 		if simplified == docSymbolName {
-// 			return true
-// 		}
-// 	}
+//		// Handle Go method receiver syntax: "(*Type).Method" vs "Type.Method"
+//		if strings.HasPrefix(docSymbolName, "(*") && strings.HasSuffix(docSymbolName, ")") {
+//			// Extract "Type.Method" from "(*Type).Method"
+//			simplified := strings.TrimPrefix(docSymbolName, "(*")
+//			simplified = strings.TrimSuffix(simplified, ")")
+//			if simplified == workspaceSymbolName {
+//				return true
+//			}
+//		}
 //
-// 	return false
-// }
+//		// Handle case where workspace symbol might have receiver syntax
+//		if strings.HasPrefix(workspaceSymbolName, "(*") && strings.HasSuffix(workspaceSymbolName, ")") {
+//			simplified := strings.TrimPrefix(workspaceSymbolName, "(*")
+//			simplified = strings.TrimSuffix(simplified, ")")
+//			if simplified == docSymbolName {
+//				return true
+//			}
+//		}
+//
+//		return false
+//	}
 //
 // searchChildSymbols recursively searches for a matching symbol in children
 // Used as fallback when semantic tokens fail - searches document symbol hierarchy

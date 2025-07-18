@@ -188,6 +188,16 @@ func (m *MockLanguageClient) PrepareCallHierarchy(uri string, line, character ui
 	return args.Get(0).([]protocol.CallHierarchyItem), args.Error(1)
 }
 
+func (m *MockLanguageClient) IncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error) {
+	args := m.Called(item)
+	return args.Get(0).([]protocol.CallHierarchyIncomingCall), args.Error(1)
+}
+
+func (m *MockLanguageClient) OutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error) {
+	args := m.Called(item)
+	return args.Get(0).([]protocol.CallHierarchyOutgoingCall), args.Error(1)
+}
+
 func (m *MockLanguageClient) SignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error) {
 	args := m.Called(uri, line, character)
 	return args.Get(0).(*protocol.SignatureHelp), args.Error(1)

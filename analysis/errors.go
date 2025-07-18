@@ -6,7 +6,7 @@ import (
 
 // AnalysisErrorHandler manages errors during project analysis
 type AnalysisErrorHandler struct {
-	maxErrors      int
+	maxErrors       int
 	continueOnError bool
 	errorThreshold  float64 // % of failed operations before stopping
 }
@@ -14,7 +14,7 @@ type AnalysisErrorHandler struct {
 // NewErrorHandler creates a new error handler with specified configurations
 func NewErrorHandler(maxErrors int, continueOnError bool, threshold float64) *AnalysisErrorHandler {
 	return &AnalysisErrorHandler{
-		maxErrors:      maxErrors,
+		maxErrors:       maxErrors,
 		continueOnError: continueOnError,
 		errorThreshold:  threshold,
 	}
@@ -26,21 +26,21 @@ func (h *AnalysisErrorHandler) HandleError(err error, context string, metadata *
 		Message: err.Error(),
 		Type:    "error",
 	}
-	
+
 	// Extract language from context if possible
 	if strings.Contains(context, "language:") {
 		// TODO: Implement language parsing from context
 		// This is a placeholder for future implementation
 		_ = context
 	}
-	
+
 	metadata.Errors = append(metadata.Errors, analysisErr)
-	
+
 	// Check if we should continue
 	if len(metadata.Errors) >= h.maxErrors {
 		return false
 	}
-	
+
 	// Check error threshold
 	totalOps := metadata.FilesScanned + len(metadata.Errors)
 	if totalOps > 0 {
@@ -49,7 +49,7 @@ func (h *AnalysisErrorHandler) HandleError(err error, context string, metadata *
 			return false
 		}
 	}
-	
+
 	return h.continueOnError
 }
 

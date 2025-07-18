@@ -8,11 +8,11 @@ import (
 
 // LSPBridgeSession implements the ClientSession interface for MCP
 type LSPBridgeSession struct {
-	id              string
-	notifChannel    chan mcp.JSONRPCNotification
-	isInitialized   bool
-	createdAt       time.Time
-	lastAccessed    time.Time
+	id            string
+	notifChannel  chan mcp.JSONRPCNotification
+	isInitialized bool
+	createdAt     time.Time
+	lastAccessed  time.Time
 }
 
 // NewLSPBridgeSession creates a new session instance
@@ -45,7 +45,6 @@ func (s *LSPBridgeSession) Initialize() {
 func (s *LSPBridgeSession) Initialized() bool {
 	return s.isInitialized
 }
-
 
 // GetLastAccessed returns when the session was last accessed
 func (s *LSPBridgeSession) GetLastAccessed() time.Time {

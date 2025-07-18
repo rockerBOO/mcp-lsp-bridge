@@ -16,11 +16,11 @@ import (
 // Test the handleFileAnalysis function directly
 func TestHandleFileAnalysis(t *testing.T) {
 	testCases := []struct {
-		name           string
-		query          string
-		setupMocks     func() map[types.Language]types.LanguageClientInterface
+		name            string
+		query           string
+		setupMocks      func() map[types.Language]types.LanguageClientInterface
 		expectedContent string
-		expectSuccess  bool
+		expectSuccess   bool
 	}{
 		{
 			name:  "successful file analysis",
@@ -39,7 +39,7 @@ func TestHandleFileAnalysis(t *testing.T) {
 						},
 					},
 				}, nil)
-				
+
 				return map[types.Language]types.LanguageClientInterface{
 					"go": mockClient,
 				}
@@ -55,7 +55,7 @@ func TestHandleFileAnalysis(t *testing.T) {
 				// Use NormalizeURI to get the expected path
 				expectedURI := utils.NormalizeURI("empty.go")
 				mockClient.On("DocumentSymbols", expectedURI).Return([]protocol.DocumentSymbol{}, nil)
-				
+
 				return map[types.Language]types.LanguageClientInterface{
 					"go": mockClient,
 				}
@@ -70,22 +70,22 @@ func TestHandleFileAnalysis(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 			clients := tc.setupMocks()
 			options := make(map[string]interface{})
-			
+
 			var response strings.Builder
-			
+
 			result, err := handleFileAnalysis(bridge, clients, tc.query, options, &response)
-			
+
 			if tc.expectSuccess {
 				require.NoError(t, err)
 				assert.NotNil(t, result)
 			} else {
 				require.Error(t, err)
 			}
-			
+
 			if tc.expectedContent != "" {
 				assert.Contains(t, response.String(), tc.expectedContent)
 			}
-			
+
 			// Assert mock expectations
 			for _, client := range clients {
 				if mockClient, ok := client.(*mocks.MockLanguageClient); ok {
@@ -134,7 +134,7 @@ func TestHandlePatternAnalysis(t *testing.T) {
 			expectSuccess:   true,
 		},
 		{
-			name: "pattern type from options",
+			name:  "pattern type from options",
 			query: "some_query",
 			options: map[string]interface{}{
 				"pattern_type": "error_handling",
@@ -148,18 +148,18 @@ func TestHandlePatternAnalysis(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 			clients := make(map[types.Language]types.LanguageClientInterface)
-			
+
 			var response strings.Builder
-			
+
 			result, err := handlePatternAnalysis(bridge, clients, tc.query, tc.options, &response)
-			
+
 			if tc.expectSuccess {
 				require.NoError(t, err)
 				assert.NotNil(t, result)
 			} else {
 				require.Error(t, err)
 			}
-			
+
 			if tc.expectedContent != "" {
 				assert.Contains(t, response.String(), tc.expectedContent)
 			}
@@ -207,7 +207,7 @@ func TestComplexityMetrics(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				symbols := []protocol.DocumentSymbol{}
-				
+
 				// Add functions
 				for i := 0; i < tc.functions; i++ {
 					symbols = append(symbols, protocol.DocumentSymbol{
@@ -219,7 +219,7 @@ func TestComplexityMetrics(t *testing.T) {
 						},
 					})
 				}
-				
+
 				// Add classes
 				for i := 0; i < tc.classes; i++ {
 					symbols = append(symbols, protocol.DocumentSymbol{
@@ -231,7 +231,7 @@ func TestComplexityMetrics(t *testing.T) {
 						},
 					})
 				}
-				
+
 				// Add variables
 				for i := 0; i < tc.variables; i++ {
 					symbols = append(symbols, protocol.DocumentSymbol{
@@ -243,9 +243,9 @@ func TestComplexityMetrics(t *testing.T) {
 						},
 					})
 				}
-				
+
 				metrics := calculateFileComplexityFromSymbols(symbols)
-				
+
 				assert.Equal(t, tc.functions, metrics.FunctionCount)
 				assert.Equal(t, tc.classes, metrics.ClassCount)
 				assert.Equal(t, tc.variables, metrics.VariableCount)
@@ -262,33 +262,33 @@ func TestAnalysisEdgeCases(t *testing.T) {
 		bridge := &mocks.MockBridge{}
 		clients := make(map[types.Language]types.LanguageClientInterface)
 		options := make(map[string]interface{})
-		
+
 		var response strings.Builder
-		
+
 		result, err := handleFileAnalysis(bridge, clients, "test.go", options, &response)
-		
+
 		require.NoError(t, err) // Should handle gracefully
 		assert.NotNil(t, result)
 		assert.Contains(t, response.String(), "could not determine language for file")
 	})
-	
+
 	t.Run("pattern analysis with empty query", func(t *testing.T) {
 		bridge := &mocks.MockBridge{}
 		clients := make(map[types.Language]types.LanguageClientInterface)
 		options := make(map[string]interface{})
-		
+
 		var response strings.Builder
-		
+
 		result, err := handlePatternAnalysis(bridge, clients, "", options, &response)
-		
+
 		require.NoError(t, err) // Should handle gracefully
 		assert.NotNil(t, result)
 		assert.Contains(t, response.String(), "unsupported pattern type")
 	})
-	
+
 	t.Run("complexity calculation with nil symbols", func(t *testing.T) {
 		metrics := calculateFileComplexityFromSymbols(nil)
-		
+
 		assert.Equal(t, 0, metrics.FunctionCount)
 		assert.Equal(t, 0, metrics.ClassCount)
 		assert.Equal(t, 0, metrics.VariableCount)

@@ -98,6 +98,8 @@ type LanguageClientInterface interface {
 	Definition(uri string, line, character uint32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error)
 	WorkspaceDiagnostic(identifier string) (*protocol.WorkspaceDiagnosticReport, error)
 	PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error)
+	IncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error)
+	OutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error)
 	References(uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error)
 	Hover(uri string, line, character uint32) (*protocol.Hover, error)
 	DocumentSymbols(uri string) ([]protocol.DocumentSymbol, error)

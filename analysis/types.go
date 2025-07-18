@@ -1,9 +1,9 @@
 package analysis
 
 import (
-	"time"
-	"rockerboo/mcp-lsp-bridge/types"
 	"github.com/myleshyson/lsprotocol-go/protocol"
+	"rockerboo/mcp-lsp-bridge/types"
+	"time"
 )
 
 // Analysis types for project-wide analysis
@@ -70,22 +70,22 @@ type WorkspaceAnalysisData struct {
 
 // DependencyPattern represents a dependency relationship in the project
 type DependencyPattern struct {
-	Type        string
-	Source      string
-	Target      string
-	Frequency   int
-	IsCircular  bool
-	Depth       int
+	Type       string
+	Source     string
+	Target     string
+	Frequency  int
+	IsCircular bool
+	Depth      int
 }
 
 // ArchitecturalHealthMetrics provides an overview of the project's architectural health
 type ArchitecturalHealthMetrics struct {
-	CodeOrganization   HealthScore
-	NamingConsistency  HealthScore
-	ErrorHandling      HealthScore
-	TestCoverage       HealthScore
-	Documentation      HealthScore
-	OverallScore       HealthScore
+	CodeOrganization  HealthScore
+	NamingConsistency HealthScore
+	ErrorHandling     HealthScore
+	TestCoverage      HealthScore
+	Documentation     HealthScore
+	OverallScore      HealthScore
 }
 
 // HealthScore represents the quality of a specific aspect of the project
@@ -98,129 +98,131 @@ type HealthScore struct {
 
 // SymbolRelationshipsData provides details about symbol interactions and dependencies
 type SymbolRelationshipsData struct {
-	Symbol             protocol.WorkspaceSymbol
-	Language          types.Language
-	References        []protocol.Location
-	Definitions       []protocol.Location
-	CallHierarchy     []protocol.CallHierarchyItem
-	Implementations   []protocol.Location
-	TypeHierarchy     []protocol.Location
-	UsagePatterns     UsagePatternAnalysis
-	RelatedSymbols    []RelatedSymbol
-	ImpactAnalysis    ImpactAnalysisData
+	Symbol          protocol.WorkspaceSymbol
+	Language        types.Language
+	References      []protocol.Location
+	Definitions     []protocol.Location
+	CallHierarchy   []protocol.CallHierarchyItem
+	IncomingCalls   []protocol.CallHierarchyIncomingCall
+	OutgoingCalls   []protocol.CallHierarchyOutgoingCall
+	Implementations []protocol.Location
+	TypeHierarchy   []protocol.Location
+	UsagePatterns   UsagePatternAnalysis
+	RelatedSymbols  []RelatedSymbol
+	ImpactAnalysis  ImpactAnalysisData
 }
 
 // RelatedSymbol represents a symbol with potential relationships
 type RelatedSymbol struct {
-	Symbol         protocol.WorkspaceSymbol
-	Relationship   string // "multi_location", "inheritance", etc.
-	Strength       float64 // 0-1 coupling strength
+	Symbol       protocol.WorkspaceSymbol
+	Relationship string  // "multi_location", "inheritance", etc.
+	Strength     float64 // 0-1 coupling strength
 }
 
 // UsagePatternAnalysis provides insights into how a symbol is used
 type UsagePatternAnalysis struct {
-	PrimaryUsage    string
-	SecondaryUsage  string
-	UsageFrequency  int
-	CallerPatterns  []CallerPattern
-	FileUsageMap    map[string]int
-	UsageContexts   map[string]int
+	PrimaryUsage   string
+	SecondaryUsage string
+	UsageFrequency int
+	CallerPatterns []CallerPattern
+	FileUsageMap   map[string]int
+	UsageContexts  map[string]int
 }
 
 // CallerPattern describes how a symbol is called
 type CallerPattern struct {
-	CallerType     string
-	CallFrequency  int
-	CallContexts   []string
+	CallerType    string
+	CallFrequency int
+	CallContexts  []string
 }
 
 // ImpactAnalysisData provides details about potential impacts of changing a symbol
 type ImpactAnalysisData struct {
-	FilesAffected           int
-	AffectedFiles           []string
-	CriticalPaths          []string
-	BreakingChanges        []BreakingChange
-	Dependencies           []string
-	Dependents             []string
-	RefactoringComplexity  string
+	FilesAffected         int
+	AffectedFiles         []string
+	CriticalPaths         []string
+	BreakingChanges       []BreakingChange
+	Dependencies          []string
+	Dependents            []string
+	RefactoringComplexity string
 }
 
 // BreakingChange represents a potential breaking change when modifying a symbol
 type BreakingChange struct {
-	Type        string
-	Description string
+	Type          string
+	Description   string
 	AffectedFiles []string
-	Severity    string
+	Severity      string
 }
 
 // FileAnalysisData provides detailed analysis of a specific file
 type FileAnalysisData struct {
-	Uri                 string
-	Language            types.Language
-	Symbols             []protocol.DocumentSymbol
-	Complexity          ComplexityMetrics
-	ImportExport        ImportExportAnalysis
-	CrossFileRelations  []CrossFileRelation
-	CodeQuality         CodeQualityMetrics
-	Recommendations     []Recommendation
+	Uri                string
+	Language           types.Language
+	Symbols            []protocol.DocumentSymbol
+	Complexity         ComplexityMetrics
+	ImportExport       ImportExportAnalysis
+	CrossFileRelations []CrossFileRelation
+	CodeQuality        CodeQualityMetrics
+	Recommendations    []Recommendation
 }
 
 // ComplexityMetrics provides metrics about code complexity
 type ComplexityMetrics struct {
-	TotalLines       int
-	FunctionCount    int
-	ClassCount       int
-	VariableCount    int
-	ComplexityScore  float64
-	ComplexityLevel  string
+	TotalLines      int
+	FunctionCount   int
+	ClassCount      int
+	VariableCount   int
+	ComplexityScore float64
+	ComplexityLevel string
 }
 
 // ImportExportAnalysis provides details about import and export dependencies
 type ImportExportAnalysis struct {
-	Imports          []ImportInfo
-	Exports          []ExportInfo
-	ExternalDeps     []ExternalDependency
-	InternalDeps     []InternalDependency
-	CircularDeps     []CircularDependency
-	UnusedImports    []string
+	Imports       []ImportInfo
+	Exports       []ExportInfo
+	ExternalDeps  []ExternalDependency
+	InternalDeps  []InternalDependency
+	CircularDeps  []CircularDependency
+	UnusedImports []string
 }
 
 // ImportInfo details information about an import
 type ImportInfo struct {
-	Module      string
-	ImportType  string // "default" | "named" | "namespace"
-	Usage       []UsageLocation
-	IsExternal  bool
+	Module     string
+	ImportType string // "default" | "named" | "namespace"
+	Usage      []UsageLocation
+	IsExternal bool
 }
 
 // ExportInfo details information about an export
 type ExportInfo struct {
-	Name        string
-	ExportType  string // "default" | "named"
-	UsedBy      []string
-	IsPublic    bool
+	Name       string
+	ExportType string // "default" | "named"
+	UsedBy     []string
+	IsPublic   bool
 }
 
 // ExternalDependency represents an external package dependency
 type ExternalDependency struct {
-	Package     string
-	Version     string
-	Usage       []UsageLocation
+	Package         string
+	Version         string
+	Usage           []UsageLocation
 	UpdateAvailable bool
 }
 
 // InternalDependency represents a dependency on another file in the project
 type InternalDependency struct {
-	File        string
-	Symbols     []string
+	File         string
+	Symbols      []string
 	Relationship string // "imports" | "extends" | "uses"
 }
 
 // CircularDependency represents a circular import or dependency
 type CircularDependency struct {
-	Files       []string
-	Cycle       []string
-	Severity    string // "warning" | "error"
+	Files    []string
+	Cycle    []string
+	Severity string // "warning" | "error"
 }
 
 // CrossFileRelation describes how files interact
@@ -241,9 +243,9 @@ type UsageLocation struct {
 
 // PatternAnalysisData provides insights into code patterns and consistency
 type PatternAnalysisData struct {
-	PatternType       string
-	Scope             string
-	ConsistencyScore  float64
+	PatternType      string
+	Scope            string
+	ConsistencyScore float64
 	PatternInstances []PatternInstance
 	Violations       []PatternViolation
 	TrendAnalysis    TrendAnalysis
@@ -251,11 +253,11 @@ type PatternAnalysisData struct {
 
 // PatternInstance represents a specific occurrence of a code pattern
 type PatternInstance struct {
-	Pattern     string
-	Location    protocol.Location
-	Confidence  float64
-	Variations  []string
-	Quality     string
+	Pattern    string
+	Location   protocol.Location
+	Confidence float64
+	Variations []string
+	Quality    string
 }
 
 // PatternViolation represents a deviation from expected code patterns

@@ -437,7 +437,6 @@ func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[types.La
 	return clients, nil
 }
 
-
 // GetHoverInformation gets hover information for a symbol at a specific position
 func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character uint32) (*protocol.Hover, error) {
 	// Extensive debug logging
@@ -1005,31 +1004,31 @@ func (b *MCPLSPBridge) SemanticTokens(uri string, targetTypes []string, startLin
 	logger.Debug(fmt.Sprintf("SemanticTokens: Got token parser: %v", parser != nil))
 
 	if parser == nil {
-		// If no token parser exists but the LSP request succeeded, 
+		// If no token parser exists but the LSP request succeeded,
 		// the server supports semantic tokens but didn't advertise capabilities properly.
 		// This is common with some language servers like gopls.
 		serverCommand := client.GetMetrics().GetCommand()
 		logger.Debug(fmt.Sprintf("SemanticTokens: %s server for %s files supports semantic tokens but didn't advertise capabilities - creating fallback parser", serverCommand, *language))
-		
+
 		// Create a fallback parser with common token types
 		fallbackTokenTypes := []string{
-			"keyword", "class", "interface", "enum", "function", "method", "macro", "variable", 
-			"parameter", "property", "label", "comment", "string", "number", "regexp", 
-			"operator", "decorator", "type", "typeParameter", "namespace", "struct", 
+			"keyword", "class", "interface", "enum", "function", "method", "macro", "variable",
+			"parameter", "property", "label", "comment", "string", "number", "regexp",
+			"operator", "decorator", "type", "typeParameter", "namespace", "struct",
 			"event", "operator", "modifier", "punctuation", "bracket", "delimiter",
 		}
 		fallbackTokenModifiers := []string{
-			"declaration", "definition", "readonly", "static", "deprecated", "abstract", 
+			"declaration", "definition", "readonly", "static", "deprecated", "abstract",
 			"async", "modification", "documentation", "defaultLibrary",
 		}
-		
+
 		// Use the semantic token parser constructor directly
 		parser = lsp.NewSemanticTokenParser(fallbackTokenTypes, fallbackTokenModifiers)
-		
+
 		if parser == nil {
 			return nil, errors.New("failed to create fallback token parser")
 		}
-		
+
 		logger.Debug("SemanticTokens: Created fallback token parser successfully")
 	}
 
@@ -1076,18 +1075,40 @@ func (b *MCPLSPBridge) PrepareCallHierarchy(uri string, line, character uint32) 
 	return result, nil
 }
 
-// GetIncomingCalls gets incoming calls for a call hierarchy item
-func (b *MCPLSPBridge) GetIncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error) {
-	// For now, return empty since we need to handle the protocol.CallHierarchyItem properly
-	// TODO: Implement proper call hierarchy item handling
-	return []protocol.CallHierarchyIncomingCall{}, nil
+// IncomingCalls gets incoming calls for a call hierarchy item
+func (b *MCPLSPBridge) IncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error) {
+	// Infer language from the URI in the call hierarchy item
+	language, err := b.InferLanguage(string(item.Uri))
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language from URI %s: %w", item.Uri, err)
+	}
+
+	// Get the language client for the inferred language
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get language client for %s: %w", *language, err)
+	}
+
+	// Call the language client's IncomingCalls method
+	return client.IncomingCalls(item)
 }
 
-// GetOutgoingCalls gets outgoing calls for a call hierarchy item
-func (b *MCPLSPBridge) GetOutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error) {
-	// For now, return empty since we need to handle the protocol.CallHierarchyItem properly
-	// TODO: Implement proper call hierarchy item handling
-	return []protocol.CallHierarchyOutgoingCall{}, nil
+// OutgoingCalls gets outgoing calls for a call hierarchy item
+func (b *MCPLSPBridge) OutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error) {
+	// Infer language from the URI in the call hierarchy item
+	language, err := b.InferLanguage(string(item.Uri))
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language from URI %s: %w", item.Uri, err)
+	}
+
+	// Get the language client for the inferred language
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get language client for %s: %w", *language, err)
+	}
+
+	// Call the language client's OutgoingCalls method
+	return client.OutgoingCalls(item)
 }
 
 // GetWorkspaceDiagnostics gets diagnostics for entire workspace

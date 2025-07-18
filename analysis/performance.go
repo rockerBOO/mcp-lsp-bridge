@@ -7,11 +7,11 @@ import (
 
 // PerformanceConfig defines performance-related settings for analysis
 type PerformanceConfig struct {
-	MaxGoroutines    int
-	Timeout          time.Duration
-	MemoryLimit      int64 // bytes
-	EnableProfiling  bool
-	BatchSize        int
+	MaxGoroutines   int
+	Timeout         time.Duration
+	MemoryLimit     int64 // bytes
+	EnableProfiling bool
+	BatchSize       int
 }
 
 // DefaultPerformanceConfig creates a default configuration optimized for most systems
@@ -24,4 +24,3 @@ func DefaultPerformanceConfig() *PerformanceConfig {
 		BatchSize:       50,
 	}
 }
-

@@ -159,12 +159,12 @@ func (m *MockBridge) PrepareCallHierarchy(uri string, line, character uint32) ([
 	return args.Get(0).([]protocol.CallHierarchyItem), args.Error(1)
 }
 
-func (m *MockBridge) GetIncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error) {
+func (m *MockBridge) IncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error) {
 	args := m.Called(item)
 	return args.Get(0).([]protocol.CallHierarchyIncomingCall), args.Error(1)
 }
 
-func (m *MockBridge) GetOutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error) {
+func (m *MockBridge) OutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error) {
 	args := m.Called(item)
 	return args.Get(0).([]protocol.CallHierarchyOutgoingCall), args.Error(1)
 }

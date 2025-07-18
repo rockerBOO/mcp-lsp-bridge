@@ -180,6 +180,13 @@ class MCPToolRunner:
 
             logger.info(f"Raw Response: {response_data}")
 
+            # Print process stdout and stderr
+            stdout, stderr = self.mcp_process.communicate()
+            if stdout:
+                logger.info(f"Process STDOUT: {stdout}")
+            if stderr:
+                logger.error(f"Process STDERR: {stderr}")
+
             # Validate response is a non-empty JSON
             if not response_data:
                 logger.error("Received empty response")
@@ -200,7 +207,16 @@ class MCPToolRunner:
 
             # Print result if exists
             if "result" in response:
-                print(json.dumps(response["result"], indent=2))
+                result = response["result"]
+                print(json.dumps(result, indent=2))
+
+                # Try to find call hierarchy details
+                if isinstance(result, str):
+                    call_details_match = re.search(r'(Incoming|Outgoing) CALLS', result, re.IGNORECASE)
+                    if call_details_match:
+                        print(f"Call hierarchy details found: {result}")
+                    else:
+                        print(f"Call hierarchy full result: {result}")
 
             return True
 

@@ -5,11 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"rockerboo/mcp-lsp-bridge/async"
-	"rockerboo/mcp-lsp-bridge/collections"
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
-	"rockerboo/mcp-lsp-bridge/types"
 	"rockerboo/mcp-lsp-bridge/utils"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -50,11 +47,17 @@ func CallHierarchyTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			// Optional direction parameter - for future use
-			_ = "both" // Default direction (unused for now)
-			if direction, err := request.RequireString("direction"); err == nil {
-				// Direction parameter exists but not used in current implementation
-				_ = direction // TODO: Use direction when implementing call hierarchy filtering
+			// Determine call hierarchy direction
+			direction := "both" // Default to both directions
+			if dirParam, err := request.RequireString("direction"); err == nil {
+				// Validate direction parameter
+				switch strings.ToLower(dirParam) {
+				case "incoming", "outgoing", "both":
+					direction = strings.ToLower(dirParam)
+				default:
+					logger.Error("call_hierarchy: Invalid direction parameter", fmt.Errorf("invalid direction: %s", dirParam))
+					return mcp.NewToolResultError("Invalid direction. Must be 'incoming', 'outgoing', or 'both', got: " + dirParam), nil
+				}
 			}
 
 			// Validate parameters
@@ -77,66 +80,84 @@ func CallHierarchyTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to infer language from URI: %v", err)), nil
 			}
 
-			// Get the specific language client for this file
-			client, err := bridge.GetClientForLanguage(string(*language))
+			// Use bridge to prepare call hierarchy (consistent with IncomingCalls/OutgoingCalls)
+			allPrepItems, err := bridge.PrepareCallHierarchy(normalizedURI, lineUint32, characterUint32)
 			if err != nil {
-				logger.Error("call_hierarchy: failed to get language client", err)
-				return mcp.NewToolResultError(fmt.Sprintf("No LSP client available for language %s", *language)), nil
+				logger.Error("call_hierarchy: prepare call hierarchy failed", err)
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to prepare call hierarchy: %v", err)), nil
 			}
 
-			// For call hierarchy, we primarily use the file's specific language client
-			// But we could extend this to search across related languages in the future
-			clients := map[types.Language]types.LanguageClientInterface{
-				*language: client,
-			}
+			// Set successful language for output formatting
+			successfulLanguage := string(*language)
+			var prepErrors []error
 
-			// Convert clients to async operations
-			ops := collections.TransformMap(clients, func(client types.LanguageClientInterface) func() ([]protocol.CallHierarchyItem, error) {
-				return func() ([]protocol.CallHierarchyItem, error) {
-					return client.PrepareCallHierarchy(normalizedURI, lineUint32, characterUint32)
-				}
-			})
-
-			// Execute call hierarchy preparation for the specific language
-			results, err := async.MapWithKeys(ctx, ops)
-			if err != nil {
-				logger.Error("call_hierarchy: async execution failed", err)
-				return mcp.NewToolResultError(fmt.Sprintf("Failed to execute call hierarchy preparation: %v", err)), nil
-			}
-
-			// Process results (should only be one result for the specific language)
-			var allItems []protocol.CallHierarchyItem
-			var errors []error
-			var successfulLanguage string
-
-			for _, result := range results {
-				if result.Error != nil {
-					errors = append(errors, fmt.Errorf("language %s: %w", result.Key, result.Error))
-					logger.Error("call_hierarchy: language server error", fmt.Errorf("language %s: %w", result.Key, result.Error))
-				} else {
-					allItems = append(allItems, result.Value...)
-					successfulLanguage = string(result.Key)
-				}
-			}
-
-			if len(allItems) == 0 {
+			if len(allPrepItems) == 0 {
 				var errorMsg strings.Builder
 				fmt.Fprintf(&errorMsg, "No call hierarchy items found on line %d, character %d for language %s\n", line, character, *language)
-				if len(errors) > 0 {
-					fmt.Fprintf(&errorMsg, "\nError: %v\n", errors[0])
+				if len(prepErrors) > 0 {
+					fmt.Fprintf(&errorMsg, "\nError: %v\n", prepErrors[0])
 				}
 				return mcp.NewToolResultText(errorMsg.String()), nil
 			}
 
+			// Collect call details based on direction
+			var incomingCalls []protocol.CallHierarchyIncomingCall
+			var outgoingCalls []protocol.CallHierarchyOutgoingCall
+			var callErrors []error
+
+			for _, item := range allPrepItems {
+				switch direction {
+				case "incoming":
+					calls, err := bridge.IncomingCalls(item)
+					if err != nil {
+						callErrors = append(callErrors, fmt.Errorf("incoming calls for %s: %w", item.Name, err))
+					} else {
+						incomingCalls = append(incomingCalls, calls...)
+					}
+				case "outgoing":
+					calls, err := bridge.OutgoingCalls(item)
+					if err != nil {
+						callErrors = append(callErrors, fmt.Errorf("outgoing calls for %s: %w", item.Name, err))
+					} else {
+						outgoingCalls = append(outgoingCalls, calls...)
+					}
+				case "both":
+					inCalls, inErr := bridge.IncomingCalls(item)
+					outCalls, outErr := bridge.OutgoingCalls(item)
+
+					if inErr != nil {
+						callErrors = append(callErrors, fmt.Errorf("incoming calls for %s: %w", item.Name, inErr))
+					} else {
+						incomingCalls = append(incomingCalls, inCalls...)
+					}
+
+					if outErr != nil {
+						callErrors = append(callErrors, fmt.Errorf("outgoing calls for %s: %w", item.Name, outErr))
+					} else {
+						outgoingCalls = append(outgoingCalls, outCalls...)
+					}
+				}
+			}
+
 			// Format results
-			result := formatCallHierarchyResults(allItems, successfulLanguage, errors, uri, line, character)
+			result := formatCallHierarchyResults(
+				allPrepItems,
+				successfulLanguage,
+				append(prepErrors, callErrors...),
+				uri,
+				line,
+				character,
+				direction,
+				incomingCalls,
+				outgoingCalls,
+			)
 
 			return mcp.NewToolResultText(result), nil
 		}
 }
 
 // formatCallHierarchyResults formats call hierarchy results for user-friendly output
-func formatCallHierarchyResults(items []protocol.CallHierarchyItem, successfulLanguage string, errors []error, uri string, line, character int) string {
+func formatCallHierarchyResults(items []protocol.CallHierarchyItem, successfulLanguage string, errors []error, uri string, line, character int, direction string, incomingCalls []protocol.CallHierarchyIncomingCall, outgoingCalls []protocol.CallHierarchyOutgoingCall) string {
 	var result strings.Builder
 
 	// Header with summary
@@ -165,10 +186,10 @@ func formatCallHierarchyResults(items []protocol.CallHierarchyItem, successfulLa
 			fmt.Fprintf(&result, "%d. %s\n", i+1, item.Name)
 			fmt.Fprintf(&result, "   Kind: %s\n", symbolKindToString(item.Kind))
 			fmt.Fprintf(&result, "   URI: %s\n", item.Uri)
-			fmt.Fprintf(&result, "   Range: %d:%d-%d:%d\n", 
+			fmt.Fprintf(&result, "   Range: %d:%d-%d:%d\n",
 				item.Range.Start.Line, item.Range.Start.Character,
 				item.Range.End.Line, item.Range.End.Character)
-			fmt.Fprintf(&result, "   Selection Range: %d:%d-%d:%d\n", 
+			fmt.Fprintf(&result, "   Selection Range: %d:%d-%d:%d\n",
 				item.SelectionRange.Start.Line, item.SelectionRange.Start.Character,
 				item.SelectionRange.End.Line, item.SelectionRange.End.Character)
 			if item.Detail != "" {
@@ -181,8 +202,72 @@ func formatCallHierarchyResults(items []protocol.CallHierarchyItem, successfulLa
 		}
 	}
 
-	fmt.Fprintf(&result, "Note: Full incoming/outgoing call analysis requires implementation in the bridge layer.\n")
-	fmt.Fprintf(&result, "The above items can be used to query for incoming/outgoing calls when that feature is complete.\n")
+	// Display call details based on direction
+	switch direction {
+	case "incoming":
+		fmt.Fprintf(&result, "=== INCOMING CALLS (%d) ===\n", len(incomingCalls))
+		for _, call := range incomingCalls {
+			fmt.Fprintf(&result, "Caller: %s\n", call.From.Name)
+			fmt.Fprintf(&result, "   From: %s\n", call.From.Uri)
+			fmt.Fprintf(&result, "   Call Ranges: %d\n", len(call.FromRanges))
+			for i, callRange := range call.FromRanges {
+				if i >= 3 { // Limit to first 3 ranges to avoid overwhelming output
+					fmt.Fprintf(&result, "   ... and %d more ranges\n", len(call.FromRanges)-3)
+					break
+				}
+				fmt.Fprintf(&result, "     - Line %d:%d-%d:%d\n",
+					callRange.Start.Line+1, callRange.Start.Character+1,
+					callRange.End.Line+1, callRange.End.Character+1)
+			}
+		}
+	case "outgoing":
+		fmt.Fprintf(&result, "=== OUTGOING CALLS (%d) ===\n", len(outgoingCalls))
+		for _, call := range outgoingCalls {
+			fmt.Fprintf(&result, "Callee: %s\n", call.To.Name)
+			fmt.Fprintf(&result, "   To: %s\n", call.To.Uri)
+			fmt.Fprintf(&result, "   Call Ranges: %d\n", len(call.FromRanges))
+			for i, callRange := range call.FromRanges {
+				if i >= 3 { // Limit to first 3 ranges to avoid overwhelming output
+					fmt.Fprintf(&result, "   ... and %d more ranges\n", len(call.FromRanges)-3)
+					break
+				}
+				fmt.Fprintf(&result, "     - Line %d:%d-%d:%d\n",
+					callRange.Start.Line+1, callRange.Start.Character+1,
+					callRange.End.Line+1, callRange.End.Character+1)
+			}
+		}
+	case "both":
+		fmt.Fprintf(&result, "=== INCOMING CALLS (%d) ===\n", len(incomingCalls))
+		for _, call := range incomingCalls {
+			fmt.Fprintf(&result, "Caller: %s\n", call.From.Name)
+			fmt.Fprintf(&result, "   From: %s\n", call.From.Uri)
+			fmt.Fprintf(&result, "   Call Ranges: %d\n", len(call.FromRanges))
+			for i, callRange := range call.FromRanges {
+				if i >= 3 { // Limit to first 3 ranges to avoid overwhelming output
+					fmt.Fprintf(&result, "   ... and %d more ranges\n", len(call.FromRanges)-3)
+					break
+				}
+				fmt.Fprintf(&result, "     - Line %d:%d-%d:%d\n",
+					callRange.Start.Line+1, callRange.Start.Character+1,
+					callRange.End.Line+1, callRange.End.Character+1)
+			}
+		}
+		fmt.Fprintf(&result, "\n=== OUTGOING CALLS (%d) ===\n", len(outgoingCalls))
+		for _, call := range outgoingCalls {
+			fmt.Fprintf(&result, "Callee: %s\n", call.To.Name)
+			fmt.Fprintf(&result, "   To: %s\n", call.To.Uri)
+			fmt.Fprintf(&result, "   Call Ranges: %d\n", len(call.FromRanges))
+			for i, callRange := range call.FromRanges {
+				if i >= 3 { // Limit to first 3 ranges to avoid overwhelming output
+					fmt.Fprintf(&result, "   ... and %d more ranges\n", len(call.FromRanges)-3)
+					break
+				}
+				fmt.Fprintf(&result, "     - Line %d:%d-%d:%d\n",
+					callRange.Start.Line+1, callRange.Start.Character+1,
+					callRange.End.Line+1, callRange.End.Character+1)
+			}
+		}
+	}
 
 	return result.String()
 }

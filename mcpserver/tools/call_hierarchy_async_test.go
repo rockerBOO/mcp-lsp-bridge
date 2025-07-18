@@ -13,15 +13,15 @@ import (
 // TestFormatCallHierarchyResults tests the formatting of call hierarchy results
 func TestFormatCallHierarchyResults(t *testing.T) {
 	tests := []struct {
-		name              string
-		items             []protocol.CallHierarchyItem
+		name               string
+		items              []protocol.CallHierarchyItem
 		successfulLanguage string
-		errors            []error
-		uri               string
-		line              int
-		character         int
-		expectedContent   []string
-		description       string
+		errors             []error
+		uri                string
+		line               int
+		character          int
+		expectedContent    []string
+		description        string
 	}{
 		{
 			name: "single function item",
@@ -133,6 +133,9 @@ func TestFormatCallHierarchyResults(t *testing.T) {
 				tt.uri,
 				tt.line,
 				tt.character,
+				"both",                                 // direction parameter
+				[]protocol.CallHierarchyIncomingCall{}, // empty incoming calls
+				[]protocol.CallHierarchyOutgoingCall{}, // empty outgoing calls
 			)
 
 			// Check that expected content is in the formatted result
@@ -156,7 +159,7 @@ func TestCallHierarchySingleLanguageApproach(t *testing.T) {
 	// 3. Not search across multiple languages
 
 	testLanguage := types.Language("go")
-	
+
 	// Verify language type conversion
 	languageStr := string(testLanguage)
 	if languageStr != "go" {
