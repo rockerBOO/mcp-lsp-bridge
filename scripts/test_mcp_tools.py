@@ -96,7 +96,7 @@ class MCPToolRunner:
             # More flexible regex to handle various parameter types including lists
             # Uses ast.literal_eval for safe parsing of complex types
             import ast
-            
+
             # Split params by commas, but handle nested structures
             def split_complex_params(s):
                 params = []
@@ -128,14 +128,14 @@ class MCPToolRunner:
                     key, value = param.split('=', 1)
                     key = key.strip()
                     value = value.strip()
-                    
+
                     # Use ast.literal_eval for safe parsing of lists, dicts, etc.
                     try:
                         parsed_value = ast.literal_eval(value)
                     except (ValueError, SyntaxError):
                         # If literal_eval fails, keep as string
                         parsed_value = value.strip('"\'')
-                    
+
                     params[key] = parsed_value
             except Exception as e:
                 logger.warning(f"Could not parse parameters: {e}")

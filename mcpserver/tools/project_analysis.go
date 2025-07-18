@@ -31,7 +31,7 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 
 COMMON EXAMPLES:
 • Find functions/classes: analysis_type="workspace_symbols", query="calculateTotal"
-• Explore file structure: analysis_type="document_symbols", query="src/utils.py"  
+• Explore file structure: analysis_type="document_symbols", query="src/utils.py"
 • Find symbol usage: analysis_type="references", query="UserModel"
 • Find definition: analysis_type="definitions", query="processPayment"
 • Search text: analysis_type="text_search", query="TODO: fix"
@@ -44,7 +44,7 @@ ANALYSIS TYPES:
 • workspace_symbols: Find symbols across project
 • document_symbols: List symbols in specific file
 • references: Find all symbol usages
-• definitions: Locate symbol definitions  
+• definitions: Locate symbol definitions
 • text_search: Search project text
 • workspace_analysis: Comprehensive workspace analysis with language distribution, complexity metrics, and architectural health
 • symbol_relationships: Analyze symbol dependencies, usage patterns, and impact

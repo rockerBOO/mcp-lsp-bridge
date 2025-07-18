@@ -127,7 +127,7 @@ Comprehensive overview of the MCP-LSP Bridge codebase structure and functionalit
 
 ## 🔄 Key Data Flow
 
-1. **MCP Request** → `mcpserver/tools/*.go` 
+1. **MCP Request** → `mcpserver/tools/*.go`
 2. **Tool Processing** → `bridge/bridge.go`
 3. **LSP Communication** → `lsp/client.go`
 4. **Analysis (if needed)** → `analysis/engine.go`

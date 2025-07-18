@@ -8,7 +8,7 @@ Quick overview of the main analysis and exploration tools in MCP-LSP Bridge.
 The most powerful analysis tool with 9 different analysis types:
 
 - **File Analysis**: Complexity metrics, code quality, recommendations
-- **Pattern Analysis**: Error handling, naming conventions, architecture patterns  
+- **Pattern Analysis**: Error handling, naming conventions, architecture patterns
 - **Workspace Analysis**: Project-wide overview and health metrics
 - **Symbol Analysis**: References, definitions, relationships
 - **Text Search**: Find patterns across codebase

@@ -59,7 +59,7 @@ test-mcp-memory:
 .PHONY: security-scan gosec
 security-scan: gosec nancy
 
-gosec: 
+gosec:
 	docker run --rm -w /mcp-lsp-bridge/ -v $$(pwd):/mcp-lsp-bridge securego/gosec /mcp-lsp-bridge/...
 nancy:
 	go list -json -deps ./... | docker run --rm -i sonatypecommunity/nancy:latest sleuth
@@ -93,22 +93,22 @@ vet:
 build-all: clean
 	@echo "Building for multiple platforms..."
 	@mkdir -p $(DIST_DIR)
-	
+
 	# Linux amd64
 	GOOS=linux GOARCH=amd64 go build -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 -ldflags "-X main.version=$(VERSION)" .
-	
+
 	# Linux arm64
 	GOOS=linux GOARCH=arm64 go build -o $(DIST_DIR)/$(BINARY_NAME)-linux-arm64 -ldflags "-X main.version=$(VERSION)" .
-	
+
 	# macOS amd64
 	GOOS=darwin GOARCH=amd64 go build -o $(DIST_DIR)/$(BINARY_NAME)-darwin-amd64 -ldflags "-X main.version=$(VERSION)" .
-	
+
 	# macOS arm64
 	GOOS=darwin GOARCH=arm64 go build -o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 -ldflags "-X main.version=$(VERSION)" .
-	
+
 	# Windows amd64
 	GOOS=windows GOARCH=amd64 go build -o $(DIST_DIR)/$(BINARY_NAME)-windows-amd64.exe -ldflags "-X main.version=$(VERSION)" .
-	
+
 	# Windows arm64
 	GOOS=windows GOARCH=arm64 go build -o $(DIST_DIR)/$(BINARY_NAME)-windows-arm64.exe -ldflags "-X main.version=$(VERSION)" .
 
@@ -117,7 +117,7 @@ build-all: clean
 dist: build-all
 	@echo "Creating distribution packages..."
 	@mkdir -p $(DIST_DIR)/packages
-	
+
 	# Create tar.gz for Linux and macOS
 	for binary in $(DIST_DIR)/$(BINARY_NAME)-linux-* $(DIST_DIR)/$(BINARY_NAME)-darwin-*; do \
 		if [ -f "$$binary" ]; then \
@@ -125,7 +125,7 @@ dist: build-all
 			tar -czf $(DIST_DIR)/packages/$$basename.tar.gz -C $(DIST_DIR) $$basename; \
 		fi \
 	done
-	
+
 	# Create zip for Windows
 	for binary in $(DIST_DIR)/$(BINARY_NAME)-windows-*.exe; do \
 		if [ -f "$$binary" ]; then \

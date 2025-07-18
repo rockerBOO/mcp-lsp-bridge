@@ -5,7 +5,7 @@
 A valid `lsp_config.json` file is required for the bridge to function. The bridge needs:
 
 - Language server definitions (gopls, pyright-langserver, etc.)
-- File extension to language mappings  
+- File extension to language mappings
 - LSP server connection parameters
 
 ## Command-Line Options

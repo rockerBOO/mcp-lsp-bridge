@@ -16,7 +16,7 @@ Complete documentation for all MCP-LSP Bridge tools.
 - Symbol relationships and impact analysis
 - Complete examples and sample outputs
 
-**[symbol-exploration-guide.md](symbol-exploration-guide.md)** - Guide for the `symbol_explore` tool  
+**[symbol-exploration-guide.md](symbol-exploration-guide.md)** - Guide for the `symbol_explore` tool
 - Intelligent symbol search
 - Context-aware filtering
 - Progressive detail levels
@@ -33,7 +33,7 @@ New to the tools? Start here:
 ## 🏗️ Tool Categories
 
 - **Analysis & Discovery**: `project_analysis`, `symbol_explore`, `get_range_content`, `analyze_code`
-- **Language Detection**: `detect_project_languages`, `infer_language`  
+- **Language Detection**: `detect_project_languages`, `infer_language`
 - **Connection Management**: `lsp_connect`, `lsp_disconnect`
 - **Code Intelligence**: `hover`, `signature_help`, `semantic_tokens`, `workspace_diagnostics`
 - **Safe Refactoring**: `code_actions`, `format_document`, `rename` (with preview/apply modes)
