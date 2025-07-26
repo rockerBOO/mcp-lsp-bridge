@@ -1,404 +1,354 @@
 {
-    "language_servers": {
-        "go": {
-            "command": "gopls",
-            "args": [],
-            "languages": ["go"],
-            "filetypes": [".go"],
-            "initialization_options": {
-                "usePlaceholders": true,
-                "staticcheck": true,
-                "gofumpt": true,
-                "analyses": {
-                    "unusedparams": true,
-                    "shadow": true
-                }
+  "language_servers": {
+    "gopls": {
+      "command": "gopls",
+      "args": ["serve"],
+      "initialization_options": { "verboseOutput": true }
+    },
+    "pyright-langserver": {
+      "command": "pyright-langserver",
+      "args": ["--stdio"],
+      "initialization_options": {
+        "settings": {
+          "python": {
+            "analysis": {
+              "typeCheckingMode": "basic",
+              "diagnosticSeverityOverrides": {
+                "reportMissingImports": "warning",
+                "reportOptionalMemberAccess": "warning"
+              }
             }
-        },
-        "python": {
-            "command": "pyright-langserver",
-            "args": ["--stdio"],
-            "languages": ["python"],
-            "filetypes": [".py", ".pyw"],
-            "initialization_options": {
-                "settings": {
-                    "python": {
-                        "analysis": {
-                            "typeCheckingMode": "basic",
-                            "diagnosticSeverityOverrides": {
-                                "reportMissingImports": "warning",
-                                "reportOptionalMemberAccess": "warning"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "typescript": {
-            "command": "typescript-language-server",
-            "args": ["--stdio"],
-            "languages": ["typescript", "javascript"],
-            "filetypes": [".ts", ".tsx", ".js", ".jsx", ".mjs"],
-            "initialization_options": {
-                "preferences": {
-                    "importModuleSpecifierEnding": "minimal",
-                    "includeInlayParameterNameHints": "all",
-                    "includeInlayVariableTypeHints": true,
-                    "includeInlayFunctionParameterTypeHints": true
-                }
-            }
-        },
-        "rust": {
-            "command": "rust-analyzer",
-            "args": [],
-            "languages": ["rust"],
-            "filetypes": [".rs"],
-            "initialization_options": {
-                "checkOnSave": {
-                    "command": "clippy"
-                },
-                "cargo": {
-                    "buildScripts": {
-                        "enable": true
-                    }
-                },
-                "procMacro": {
-                    "enable": true
-                }
-            }
-        },
-        "java": {
-            "command": "jdtls",
-            "args": [
-                "-configuration", "/path/to/config",
-                "-data", "/path/to/workspace"
-            ],
-            "languages": ["java"],
-            "filetypes": [".java"],
-            "initialization_options": {
-                "settings": {
-                    "java": {
-                        "configuration": {
-                            "updateBuildConfiguration": "automatic"
-                        },
-                        "completion": {
-                            "favoriteStaticMembers": [
-                                "org.junit.Assert.*",
-                                "org.junit.Assume.*",
-                                "org.junit.jupiter.api.Assertions.*"
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "cpp": {
-            "command": "clangd",
-            "args": ["--background-index", "--clang-tidy"],
-            "languages": ["cpp", "c"],
-            "filetypes": [".cpp", ".cc", ".cxx", ".c++", ".c", ".h", ".hpp", ".hxx"],
-            "initialization_options": {
-                "clangdFileStatus": true,
-                "usePlaceholders": true,
-                "completeUnimported": true,
-                "semanticHighlighting": true
-            }
-        },
-        "csharp": {
-            "command": "omnisharp",
-            "args": ["--languageserver", "--hostPID", "1"],
-            "languages": ["csharp"],
-            "filetypes": [".cs", ".csx"],
-            "initialization_options": {
-                "FormattingOptions": {
-                    "EnableEditorConfigSupport": true,
-                    "OrganizeImports": true
-                },
-                "RoslynExtensionsOptions": {
-                    "EnableAnalyzersSupport": true,
-                    "EnableImportCompletion": true
-                }
-            }
-        },
-        "lua": {
-            "command": "lua-language-server",
-            "args": [],
-            "languages": ["lua"],
-            "filetypes": [".lua"],
-            "initialization_options": {
-                "Lua": {
-                    "runtime": {
-                        "version": "LuaJIT"
-                    },
-                    "diagnostics": {
-                        "globals": ["vim"]
-                    },
-                    "workspace": {
-                        "library": {
-                            "/usr/share/lua/5.1": true,
-                            "/usr/share/lua/5.3": true
-                        }
-                    }
-                }
-            }
-        },
-        "ruby": {
-            "command": "solargraph",
-            "args": ["stdio"],
-            "languages": ["ruby"],
-            "filetypes": [".rb", ".rake", ".gemspec"],
-            "initialization_options": {
-                "diagnostics": true,
-                "completion": true,
-                "hover": true,
-                "symbols": true,
-                "definitions": true,
-                "rename": true,
-                "references": true,
-                "autoformat": false,
-                "folding": true
-            }
-        },
-        "php": {
-            "command": "phpactor",
-            "args": ["language-server"],
-            "languages": ["php"],
-            "filetypes": [".php", ".phtml"],
-            "initialization_options": {
-                "language_server_phpstan.enabled": true,
-                "language_server_psalm.enabled": true,
-                "code_transform.import_name": true
-            }
-        },
-        "swift": {
-            "command": "sourcekit-lsp",
-            "args": [],
-            "languages": ["swift"],
-            "filetypes": [".swift"],
-            "initialization_options": {}
-        },
-        "kotlin": {
-            "command": "kotlin-language-server",
-            "args": [],
-            "languages": ["kotlin"],
-            "filetypes": [".kt", ".kts"],
-            "initialization_options": {
-                "storagePath": "/tmp/kotlin-language-server"
-            }
-        },
-        "scala": {
-            "command": "metals",
-            "args": [],
-            "languages": ["scala"],
-            "filetypes": [".scala", ".sc", ".sbt"],
-            "initialization_options": {
-                "isHttpEnabled": true,
-                "compilerOptions": {
-                    "snippetAutoIndent": false
-                }
-            }
-        },
-        "haskell": {
-            "command": "haskell-language-server-wrapper",
-            "args": ["--lsp"],
-            "languages": ["haskell"],
-            "filetypes": [".hs", ".lhs"],
-            "initialization_options": {
-                "haskell": {
-                    "checkParents": "CheckOnSave",
-                    "checkProject": true,
-                    "maxCompletions": 40
-                }
-            }
-        },
-        "elm": {
-            "command": "elm-language-server",
-            "args": [],
-            "languages": ["elm"],
-            "filetypes": [".elm"],
-            "initialization_options": {
-                "elmPath": "elm",
-                "elmFormatPath": "elm-format",
-                "elmTestPath": "elm-test"
-            }
-        },
-        "ocaml": {
-            "command": "ocamllsp",
-            "args": [],
-            "languages": ["ocaml"],
-            "filetypes": [".ml", ".mli", ".ocaml"],
-            "initialization_options": {}
-        },
-        "zig": {
-            "command": "zls",
-            "args": [],
-            "languages": ["zig"],
-            "filetypes": [".zig"],
-            "initialization_options": {
-                "enable_snippets": true,
-                "enable_ast_check_diagnostics": true,
-                "enable_build_on_save": true
-            }
-        },
-        "dockerfile": {
-            "command": "docker-langserver",
-            "args": ["--stdio"],
-            "languages": ["dockerfile"],
-            "filetypes": [".dockerfile", "Dockerfile"],
-            "initialization_options": {}
-        },
-        "yaml": {
-            "command": "yaml-language-server",
-            "args": ["--stdio"],
-            "languages": ["yaml"],
-            "filetypes": [".yaml", ".yml"],
-            "initialization_options": {
-                "yaml": {
-                    "schemas": {
-                        "https://json.schemastore.org/github-workflow.json": "/.github/workflows/*",
-                        "https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json": "/docker-compose*.yml"
-                    },
-                    "validate": true,
-                    "hover": true,
-                    "completion": true
-                }
-            }
-        },
-        "json": {
-            "command": "vscode-json-language-server",
-            "args": ["--stdio"],
-            "languages": ["json"],
-            "filetypes": [".json", ".jsonc"],
-            "initialization_options": {
-                "provideFormatter": true,
-                "json": {
-                    "schemas": [
-                        {
-                            "fileMatch": ["package.json"],
-                            "url": "https://json.schemastore.org/package.json"
-                        },
-                        {
-                            "fileMatch": ["tsconfig*.json"],
-                            "url": "https://json.schemastore.org/tsconfig.json"
-                        }
-                    ]
-                }
-            }
-        },
-        "html": {
-            "command": "vscode-html-language-server",
-            "args": ["--stdio"],
-            "languages": ["html"],
-            "filetypes": [".html", ".htm"],
-            "initialization_options": {
-                "configurationSection": ["html", "css", "javascript"],
-                "embeddedLanguages": {
-                    "css": true,
-                    "javascript": true
-                }
-            }
-        },
-        "css": {
-            "command": "vscode-css-language-server",
-            "args": ["--stdio"],
-            "languages": ["css", "scss", "less"],
-            "filetypes": [".css", ".scss", ".sass", ".less"],
-            "initialization_options": {
-                "provideFormatter": true,
-                "css": {
-                    "validate": true
-                },
-                "scss": {
-                    "validate": true
-                },
-                "less": {
-                    "validate": true
-                }
-            }
+          }
         }
+      }
     },
-    "global": {
-        "log_level": "info",
-        "log_file_path": "bridge.log",
-        "max_log_files": 5,
-        "max_restart_attempts": 3,
-        "restart_delay_ms": 1000
+    "typescript-language-server": {
+      "command": "typescript-language-server",
+      "args": ["--stdio"],
+      "initialization_options": {
+        "hostInfo": "mcp-lsp-bridge",
+        "preferences": {
+          "importModuleSpecifierEnding": "minimal",
+          "includeInlayParameterNameHints": "all",
+          "includeInlayVariableTypeHints": true,
+          "includeInlayFunctionParameterTypeHints": true
+        },
+        "tsserver": {
+          "logLevel": "verbose",
+          "logToFile": true
+        }
+      }
     },
-    "language_extension_map": {
-        "go": [".go"],
-        "python": [".py", ".pyw"],
-        "typescript": [".ts", ".tsx", ".js", ".jsx", ".mjs"],
-        "rust": [".rs"],
-        "java": [".java"],
-        "cpp": [".cpp", ".cc", ".cxx", ".c++", ".c", ".h", ".hpp", ".hxx"],
-        "csharp": [".cs", ".csx"],
-        "lua": [".lua"],
-        "ruby": [".rb", ".rake", ".gemspec"],
-        "php": [".php", ".phtml"],
-        "swift": [".swift"],
-        "kotlin": [".kt", ".kts"],
-        "scala": [".scala", ".sc", ".sbt"],
-        "haskell": [".hs", ".lhs"],
-        "elm": [".elm"],
-        "ocaml": [".ml", ".mli", ".ocaml"],
-        "zig": [".zig"],
-        "dockerfile": [".dockerfile", "Dockerfile"],
-        "yaml": [".yaml", ".yml"],
-        "json": [".json", ".jsonc"],
-        "html": [".html", ".htm"],
-        "css": [".css", ".scss", ".sass", ".less"]
+    "rust-analyzer": {
+      "command": "rust-analyzer",
+      "args": [],
+      "initialization_options": {
+        "checkOnSave": {
+          "command": "clippy"
+        },
+        "cargo": {
+          "buildScripts": {
+            "enable": true
+          }
+        },
+        "procMacro": {
+          "enable": true
+        }
+      }
     },
-    "extension_language_map": {
-        ".go": "go",
-        ".py": "python",
-        ".pyw": "python",
-        ".ts": "typescript",
-        ".tsx": "typescript",
-        ".js": "typescript",
-        ".jsx": "typescript",
-        ".mjs": "typescript",
-        ".rs": "rust",
-        ".java": "java",
-        ".cpp": "cpp",
-        ".cc": "cpp",
-        ".cxx": "cpp",
-        ".c++": "cpp",
-        ".c": "cpp",
-        ".h": "cpp",
-        ".hpp": "cpp",
-        ".hxx": "cpp",
-        ".cs": "csharp",
-        ".csx": "csharp",
-        ".lua": "lua",
-        ".rb": "ruby",
-        ".rake": "ruby",
-        ".gemspec": "ruby",
-        ".php": "php",
-        ".phtml": "php",
-        ".swift": "swift",
-        ".kt": "kotlin",
-        ".kts": "kotlin",
-        ".scala": "scala",
-        ".sc": "scala",
-        ".sbt": "scala",
-        ".hs": "haskell",
-        ".lhs": "haskell",
-        ".elm": "elm",
-        ".ml": "ocaml",
-        ".mli": "ocaml",
-        ".ocaml": "ocaml",
-        ".zig": "zig",
-        ".dockerfile": "dockerfile",
-        "Dockerfile": "dockerfile",
-        ".yaml": "yaml",
-        ".yml": "yaml",
-        ".json": "json",
-        ".jsonc": "json",
-        ".html": "html",
-        ".htm": "html",
-        ".css": "css",
-        ".scss": "css",
-        ".sass": "css",
-        ".less": "css"
+    "jdtls": {
+      "command": "jdtls",
+      "args": [
+        "-configuration",
+        "/path/to/config",
+        "-data",
+        "/path/to/workspace"
+      ],
+      "initialization_options": {
+        "settings": {
+          "java": {
+            "configuration": {
+              "updateBuildConfiguration": "automatic"
+            },
+            "completion": {
+              "favoriteStaticMembers": [
+                "org.junit.Assert.*",
+                "org.junit.Assume.*",
+                "org.junit.jupiter.api.Assertions.*"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "clangd": {
+      "command": "clangd",
+      "args": ["--background-index", "--clang-tidy"],
+      "initialization_options": {
+        "clangdFileStatus": true,
+        "usePlaceholders": true,
+        "completeUnimported": true,
+        "semanticHighlighting": true
+      }
+    },
+    "omnisharp": {
+      "command": "omnisharp",
+      "args": ["--languageserver", "--hostPID", "1"],
+      "initialization_options": {
+        "FormattingOptions": {
+          "EnableEditorConfigSupport": true,
+          "OrganizeImports": true
+        },
+        "RoslynExtensionsOptions": {
+          "EnableAnalyzersSupport": true,
+          "EnableImportCompletion": true
+        }
+      }
+    },
+    "lua-language-server": {
+      "command": "lua-language-server",
+      "args": [],
+      "initialization_options": {
+        "Lua": {
+          "runtime": {
+            "version": "LuaJIT"
+          },
+          "diagnostics": {
+            "globals": ["vim"]
+          },
+          "workspace": {
+            "library": {
+              "/usr/share/lua/5.1": true,
+              "/usr/share/lua/5.3": true
+            }
+          }
+        }
+      }
+    },
+    "solargraph": {
+      "command": "solargraph",
+      "args": ["stdio"],
+      "initialization_options": {
+        "diagnostics": true,
+        "completion": true,
+        "hover": true,
+        "symbols": true,
+        "definitions": true,
+        "rename": true,
+        "references": true,
+        "autoformat": false,
+        "folding": true
+      }
+    },
+    "phpactor": {
+      "command": "phpactor",
+      "args": ["language-server"],
+      "initialization_options": {
+        "language_server_phpstan.enabled": true,
+        "language_server_psalm.enabled": true,
+        "code_transform.import_name": true
+      }
+    },
+    "sourcekit-lsp": {
+      "command": "sourcekit-lsp",
+      "args": [],
+      "initialization_options": {}
+    },
+    "kotlin-language-server": {
+      "command": "kotlin-language-server",
+      "args": [],
+      "initialization_options": {
+        "storagePath": "/tmp/kotlin-language-server"
+      }
+    },
+    "metals": {
+      "command": "metals",
+      "args": [],
+      "initialization_options": {
+        "isHttpEnabled": true,
+        "compilerOptions": {
+          "snippetAutoIndent": false
+        }
+      }
+    },
+    "haskell-language-server-wrapper": {
+      "command": "haskell-language-server-wrapper",
+      "args": ["--lsp"],
+      "initialization_options": {
+        "haskell": {
+          "checkParents": "CheckOnSave",
+          "checkProject": true,
+          "maxCompletions": 40
+        }
+      }
+    },
+    "elm-language-server": {
+      "command": "elm-language-server",
+      "args": [],
+      "initialization_options": {
+        "elmPath": "elm",
+        "elmFormatPath": "elm-format",
+        "elmTestPath": "elm-test"
+      }
+    },
+    "ocamllsp": {
+      "command": "ocamllsp",
+      "args": [],
+      "initialization_options": {}
+    },
+    "zls": {
+      "command": "zls",
+      "args": [],
+      "initialization_options": {
+        "enable_snippets": true,
+        "enable_ast_check_diagnostics": true,
+        "enable_build_on_save": true
+      }
+    },
+    "docker-langserver": {
+      "command": "docker-langserver",
+      "args": ["--stdio"],
+      "languages": ["dockerfile"],
+      "initialization_options": {}
+    },
+    "yaml-language-server": {
+      "command": "yaml-language-server",
+      "args": ["--stdio"],
+      "initialization_options": {
+        "yaml": {
+          "schemas": {
+            "https://json.schemastore.org/github-workflow.json": "/.github/workflows/*",
+            "https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json": "/docker-compose*.yml"
+          },
+          "validate": true,
+          "hover": true,
+          "completion": true
+        }
+      }
+    },
+    "vscode-json-language-server": {
+      "command": "vscode-json-language-server",
+      "args": ["--stdio"],
+      "initialization_options": {
+        "provideFormatter": true,
+        "json": {
+          "schemas": [
+            {
+              "fileMatch": ["package.json"],
+              "url": "https://json.schemastore.org/package.json"
+            },
+            {
+              "fileMatch": ["tsconfig*.json"],
+              "url": "https://json.schemastore.org/tsconfig.json"
+            }
+          ]
+        }
+      }
+    },
+    "vscode-html-language-server": {
+      "command": "vscode-html-language-server",
+      "args": ["--stdio"],
+      "initialization_options": {
+        "configurationSection": ["html", "css", "javascript"],
+        "embeddedLanguages": {
+          "css": true,
+          "javascript": true
+        }
+      }
+    },
+    "vscode-css-language-server": {
+      "command": "vscode-css-language-server",
+      "args": ["--stdio"],
+      "initialization_options": {
+        "provideFormatter": true,
+        "css": {
+          "validate": true
+        },
+        "scss": {
+          "validate": true
+        },
+        "less": {
+          "validate": true
+        }
+      }
     }
+  },
+  "language_extension_map": {
+    "go": [".go"],
+    "python": [".py", ".pyw"],
+    "typescript": [".ts", ".tsx", ".js", ".jsx", ".mjs"],
+    "rust": [".rs"],
+    "java": [".java"],
+    "cpp": [".cpp", ".cc", ".cxx", ".c++", ".c", ".h", ".hpp", ".hxx"],
+    "csharp": [".cs", ".csx"],
+    "lua": [".lua"],
+    "ruby": [".rb", ".rake", ".gemspec"],
+    "php": [".php", ".phtml"],
+    "swift": [".swift"],
+    "kotlin": [".kt", ".kts"],
+    "scala": [".scala", ".sc", ".sbt"],
+    "haskell": [".hs", ".lhs"],
+    "elm": [".elm"],
+    "ocaml": [".ml", ".mli", ".ocaml"],
+    "zig": [".zig"],
+    "dockerfile": [".dockerfile", "Dockerfile"],
+    "yaml": [".yaml", ".yml"],
+    "json": [".json", ".jsonc"],
+    "html": [".html", ".htm"],
+    "css": [".css", ".scss", ".sass", ".less"]
+  },
+  "extension_language_map": {
+    ".go": "go",
+    ".py": "python",
+    ".pyw": "python",
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    ".js": "typescript",
+    ".jsx": "typescript",
+    ".mjs": "typescript",
+    ".cjs": "typescript",
+    ".rs": "rust",
+    ".java": "java",
+    ".cpp": "cpp",
+    ".cc": "cpp",
+    ".cxx": "cpp",
+    ".c++": "cpp",
+    ".c": "cpp",
+    ".h": "cpp",
+    ".hpp": "cpp",
+    ".hxx": "cpp",
+    ".cs": "csharp",
+    ".csx": "csharp",
+    ".lua": "lua",
+    ".rb": "ruby",
+    ".rake": "ruby",
+    ".gemspec": "ruby",
+    ".php": "php",
+    ".phtml": "php",
+    ".swift": "swift",
+    ".kt": "kotlin",
+    ".kts": "kotlin",
+    ".scala": "scala",
+    ".sc": "scala",
+    ".sbt": "scala",
+    ".hs": "haskell",
+    ".lhs": "haskell",
+    ".elm": "elm",
+    ".ml": "ocaml",
+    ".mli": "ocaml",
+    ".ocaml": "ocaml",
+    ".zig": "zig",
+    ".dockerfile": "dockerfile",
+    "Dockerfile": "dockerfile",
+    ".yaml": "yaml",
+    ".yml": "yaml",
+    ".json": "json",
+    ".jsonc": "json",
+    ".html": "html",
+    ".htm": "html",
+    ".css": "css",
+    ".scss": "css",
+    ".sass": "css",
+    ".less": "css"
+  }
 }

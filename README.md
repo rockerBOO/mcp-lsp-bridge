@@ -22,7 +22,9 @@ Brings Language Server Protocol capabilities to MCP-compatible agents like Claud
      }
    }
    ```
-3. **Use**: Access LSP tools through your MCP client
+3. Configure LSP servers with lsp_config.json in your configuration location: [default-directory-locations](/docs/configuration.md#default-directory-locations)
+  - or with `mcp-lsp-bridge --config /path/to/my-config.json` inside your MCP client configuration.
+4. **Use**: Access LSP tools through your MCP client
 
 See [docs/configuration.md](docs/configuration.md) for detailed setup.
 
