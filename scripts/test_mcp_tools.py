@@ -31,7 +31,7 @@ class MCPToolRunner:
         logger.info("Starting MCP server...")
 
         # Build command to start MCP server
-        cmd = custom_cmd or ["go", "run", "/home/rockerboo/code/mcp-lsp-bridge/main.go"]
+        cmd = custom_cmd or ["go", "run", "main.go"]
 
         # Start the server process
         self.mcp_process = subprocess.Popen(
