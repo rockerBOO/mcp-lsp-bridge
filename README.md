@@ -49,14 +49,27 @@ Supports 20+ languages including Go, Python, TypeScript, Rust, Java, C#, C++.
 
 ## Configuration
 
-Requires an `lsp_config.json` file to define language servers.
+Requires an `lsp_config.json` file to define language servers. See [configuration.md](docs/configuration.md) for where to place it.
 
-Basic example:
+Basic example with passing your configuration (useful if you want a specific configuration for a project):
 
 ```bash
-# Build and run
-go build -o mcp-lsp-bridge
-./mcp-lsp-bridge --config lsp_config.json
+mcp-lsp-bridge --config lsp_config.json
+```
+
+In your .mcp.json or other MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "lsp": {
+      "type": "stdio",
+      "command": "mcp-lsp-bridge",
+      "args": ["--config", "lsp_config.json"],
+      "env": {}
+    }
+  }
+}
 ```
 
 See [docs/configuration.md](docs/configuration.md) for complete setup instructions.
