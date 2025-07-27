@@ -137,22 +137,26 @@ func TestLSPConnectTool(t *testing.T) {
 func TestLSPConnectValidation(t *testing.T) {
 	t.Run("validate language server configuration", func(t *testing.T) {
 		config := &lsp.LSPServerConfig{
-			LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-				"go": {
+			LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+				"gopls": {
 					Command:   "gopls",
 					Args:      []string{"serve"},
 					Filetypes: []string{".go"},
 				},
-				"invalid": {
+				"invalid-server": {
 					// Missing command
 					Args:      []string{"--stdio"},
 					Filetypes: []string{".invalid"},
 				},
 			},
+			LanguageServerMap: map[types.LanguageServer][]types.Language{
+				"gopls":          {"go"},
+				"invalid-server": {"invalid"},
+			},
 		}
 
 		// Test valid configuration
-		goConfig, exists := config.LanguageServers["go"]
+		goConfig, exists := config.LanguageServers["gopls"]
 		if !exists {
 			t.Error("Expected Go language server config")
 		}
@@ -166,7 +170,7 @@ func TestLSPConnectValidation(t *testing.T) {
 		}
 
 		// Test invalid configuration
-		invalidConfig, exists := config.LanguageServers["invalid"]
+		invalidConfig, exists := config.LanguageServers["invalid-server"]
 		if !exists {
 			t.Error("Expected invalid language server config for testing")
 		}
@@ -178,40 +182,46 @@ func TestLSPConnectValidation(t *testing.T) {
 
 	t.Run("multiple language server support", func(t *testing.T) {
 		config := &lsp.LSPServerConfig{
-			LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-				"go": {
+			LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+				"gopls": {
 					Command:   "gopls",
 					Filetypes: []string{".go"},
 				},
-				"python": {
+				"pyright-langserver": {
 					Command:   "pyright-langserver",
 					Filetypes: []string{".py"},
 				},
-				"typescript": {
+				"typescript-language-server": {
 					Command:   "typescript-language-server",
 					Filetypes: []string{".ts", ".tsx"},
 				},
-				"rust": {
+				"rust-analyzer": {
 					Command:   "rust-analyzer",
 					Filetypes: []string{".rs"},
 				},
 			},
+			LanguageServerMap: map[types.LanguageServer][]types.Language{
+				"gopls":                      {"go"},
+				"pyright-langserver":         {"python"},
+				"typescript-language-server": {"typescript"},
+				"rust-analyzer":              {"rust"},
+			},
 		}
 
-		expectedLanguages := []string{"go", "python", "typescript", "rust"}
-		for _, lang := range expectedLanguages {
-			serverConfig, exists := config.LanguageServers[types.Language(lang)]
+		expectedServers := []string{"gopls", "pyright-langserver", "typescript-language-server", "rust-analyzer"}
+		for _, serverName := range expectedServers {
+			serverConfig, exists := config.LanguageServers[types.LanguageServer(serverName)]
 			if !exists {
-				t.Errorf("Expected %s language server config", lang)
+				t.Errorf("Expected %s language server config", serverName)
 				continue
 			}
 
 			if serverConfig.Command == "" {
-				t.Errorf("Expected %s language server to have command", lang)
+				t.Errorf("Expected %s language server to have command", serverName)
 			}
 
 			if len(serverConfig.Filetypes) == 0 {
-				t.Errorf("Expected %s language server to have filetypes", lang)
+				t.Errorf("Expected %s language server to have filetypes", serverName)
 			}
 		}
 	})

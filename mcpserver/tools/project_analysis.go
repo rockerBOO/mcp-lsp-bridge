@@ -27,37 +27,17 @@ func RegisterProjectAnalysisTool(mcpServer ToolServer, bridge interfaces.BridgeI
 func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool(
 			"project_analysis",
-			mcp.WithDescription(`Multi-purpose code analysis tool.
+			mcp.WithDescription(`Multi-purpose code analysis with 9 analysis types for symbols, files, and workspace patterns.
 
-COMMON EXAMPLES:
-• Find functions/classes: analysis_type="workspace_symbols", query="calculateTotal"
-• Explore file structure: analysis_type="document_symbols", query="src/utils.py"
-• Find symbol usage: analysis_type="references", query="UserModel"
-• Find definition: analysis_type="definitions", query="processPayment"
-• Search text: analysis_type="text_search", query="TODO: fix"
-• Analyze workspace: analysis_type="workspace_analysis", query="payment_module"
-• Analyze symbol relationships: analysis_type="symbol_relationships", query="UserAuth"
-• Analyze file complexity: analysis_type="file_analysis", query="src/auth/handler.go"
-• Analyze code patterns: analysis_type="pattern_analysis", query="error_handling"
+USAGE:
+- Find symbols: analysis_type="workspace_symbols", query="calculateTotal"
+- Analyze files: analysis_type="file_analysis", query="src/auth.go"
+- Workspace overview: analysis_type="workspace_analysis", query="entire_project"
 
 ANALYSIS TYPES:
-• workspace_symbols: Find symbols across project
-• document_symbols: List symbols in specific file
-• references: Find all symbol usages
-• definitions: Locate symbol definitions
-• text_search: Search project text
-• workspace_analysis: Comprehensive workspace analysis with language distribution, complexity metrics, and architectural health
-• symbol_relationships: Analyze symbol dependencies, usage patterns, and impact
-• file_analysis: Detailed file complexity, imports/exports, and code quality metrics
-• pattern_analysis: Detect code patterns, consistency, and architectural patterns
+workspace_symbols, document_symbols, references, definitions, text_search, workspace_analysis, symbol_relationships, file_analysis, pattern_analysis
 
-QUERY GUIDANCE:
-• For symbols: Use exact symbol names
-• For files: Use relative paths like "src/file.py"
-• For workspace analysis: Use module name or "entire_project"
-• For pattern analysis: Use "error_handling", "naming_conventions", or "architecture_patterns"
-• workspace_uri defaults to project root
-• offset/limit optional (defaults: 0, 20)`),
+PARAMETERS: analysis_type (required), query (required), limit (default: 20)`),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("workspace_uri", mcp.Description("Project root URI (optional, defaults to detected project root).")),
 			mcp.WithString("query", mcp.Description("Symbol name OR file path OR text pattern (see examples above)."), mcp.Required()),
@@ -171,8 +151,17 @@ func handleWorkspaceSymbols(lspClient types.LanguageClientInterface, query strin
 	symbols, err := lspClient.WorkspaceSymbols(query)
 	if err != nil {
 		logger.Error("Workspace symbols query failed", fmt.Sprintf("Language: %s, Query: %s, Error: %v", activeLanguage, query, err))
-		response.WriteString("=== WORKSPACE SYMBOLS ===\n")
-		fmt.Fprintf(response, "Error: Failed to get workspace symbols for language '%s': %v\n", activeLanguage, err)
+		response.WriteString("WORKSPACE SYMBOLS:\n")
+
+		// Check for unhandled method error and provide helpful message
+		errorMsg := err.Error()
+		if strings.Contains(errorMsg, "Unhandled method workspace/symbol") {
+			fmt.Fprintf(response, "Warning: The %s language server does not support workspace symbol search.\n", activeLanguage)
+			fmt.Fprintf(response, "This is a known limitation of some language servers.\n")
+			fmt.Fprintf(response, "Try using 'document_symbols' analysis type with a specific file path instead.\n")
+		} else {
+			fmt.Fprintf(response, "Error: Failed to get workspace symbols for language '%s': %v\n", activeLanguage, err)
+		}
 
 		return mcp.NewToolResultText(response.String()), nil
 	}
@@ -356,9 +345,14 @@ func handleReferences(bridge interfaces.BridgeInterface, clients map[types.Langu
 	flattened := utils.FlattenKeyedResults(results)
 	allSymbols := flattened.Values
 
-	// Log any errors from individual clients
+	// Log any errors from individual clients with helpful context
 	for _, err := range flattened.Errors {
-		logger.Warn(fmt.Sprintf("Workspace symbols search failed: %v", err))
+		errorMsg := err.Error()
+		if strings.Contains(errorMsg, "Unhandled method workspace/symbol") {
+			logger.Warn(fmt.Sprintf("Language server does not support workspace/symbol method: %v", err))
+		} else {
+			logger.Warn(fmt.Sprintf("Workspace symbols search failed: %v", err))
+		}
 	}
 
 	if len(allSymbols) == 0 {
@@ -444,13 +438,22 @@ func handleDefinitions(bridge interfaces.BridgeInterface, lspClient types.Langua
 	// For definitions, search for the symbol first
 	symbols, err := lspClient.WorkspaceSymbols(query)
 	if err != nil {
-		response.WriteString("=== DEFINITIONS ===\n")
-		fmt.Fprintf(response, "Error: Cannot find definitions - workspace symbols search failed: %v\n", err)
+		response.WriteString("DEFINITIONS:\n")
+
+		// Check for unhandled method error and provide helpful message
+		errorMsg := err.Error()
+		if strings.Contains(errorMsg, "Unhandled method workspace/symbol") {
+			fmt.Fprintf(response, "Warning: The %s language server does not support workspace symbol search.\n", activeLanguage)
+			fmt.Fprintf(response, "This is a known limitation of some language servers.\n")
+			fmt.Fprintf(response, "Try using 'document_symbols' analysis type with a specific file path instead.\n")
+		} else {
+			fmt.Fprintf(response, "Error: Cannot find definitions - workspace symbols search failed: %v\n", err)
+		}
 
 		return mcp.NewToolResultText(response.String()), nil
 	}
 
-	response.WriteString("=== DEFINITIONS ===\n")
+	response.WriteString("DEFINITIONS:\n")
 
 	if len(symbols) == 0 {
 		fmt.Fprintf(response, "No symbols found matching the query '%s'.\n", query)
@@ -547,7 +550,7 @@ func handleDefinitions(bridge interfaces.BridgeInterface, lspClient types.Langua
 
 // handleTextSearch handles the 'text_search' analysis type
 func handleTextSearch(bridge interfaces.BridgeInterface, query string, offset, limit int, activeLanguage types.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
-	response.WriteString("=== TEXT SEARCH ===\n")
+	response.WriteString("TEXT SEARCH:\n")
 
 	searchResults, err := bridge.SearchTextInWorkspace(string(activeLanguage), query)
 	if err != nil {
@@ -607,7 +610,7 @@ type ComplexityMetrics struct {
 
 // handleFileAnalysis handles the 'file_analysis' analysis type
 func handleFileAnalysis(bridge interfaces.BridgeInterface, clients map[types.Language]types.LanguageClientInterface, query string, options map[string]interface{}, response *strings.Builder) (*mcp.CallToolResult, error) {
-	response.WriteString("=== FILE ANALYSIS ===\n")
+	response.WriteString("FILE ANALYSIS:\n")
 
 	// For file analysis, the query should be a file URI
 	fileUri := query
@@ -692,9 +695,19 @@ func handleFileAnalysis(bridge interfaces.BridgeInterface, clients map[types.Lan
 		fmt.Fprintf(response, "  Duration: %v\n", result.Metadata.Duration)
 		fmt.Fprintf(response, "  Languages used: %v\n", result.Metadata.LanguagesUsed)
 		if len(result.Metadata.Errors) > 0 {
-			fmt.Fprintf(response, "  Errors: %d\n", len(result.Metadata.Errors))
+			fmt.Fprintf(response, "- Errors: %d\n", len(result.Metadata.Errors))
 			for _, err := range result.Metadata.Errors {
-				fmt.Fprintf(response, "    - %s: %s\n", err.Language, err.Message)
+				languageInfo := "unknown"
+				if err.Language != "" {
+					languageInfo = string(err.Language)
+				} else {
+					// Try to find the language from the metadata
+					for _, lang := range result.Metadata.LanguagesUsed {
+						languageInfo = string(lang)
+						break
+					}
+				}
+				fmt.Fprintf(response, "  - [%s] %s\n", languageInfo, err.Message)
 			}
 		}
 	}
@@ -704,7 +717,7 @@ func handleFileAnalysis(bridge interfaces.BridgeInterface, clients map[types.Lan
 
 // handlePatternAnalysis handles the 'pattern_analysis' analysis type
 func handlePatternAnalysis(bridge interfaces.BridgeInterface, clients map[types.Language]types.LanguageClientInterface, query string, options map[string]interface{}, response *strings.Builder) (*mcp.CallToolResult, error) {
-	response.WriteString("=== PATTERN ANALYSIS ===\n")
+	response.WriteString("PATTERN ANALYSIS:\n")
 
 	// Determine pattern type from options or use query as pattern type
 	patternType := query
@@ -785,9 +798,19 @@ func handlePatternAnalysis(bridge interfaces.BridgeInterface, clients map[types.
 		fmt.Fprintf(response, "  Duration: %v\n", result.Metadata.Duration)
 		fmt.Fprintf(response, "  Languages used: %v\n", result.Metadata.LanguagesUsed)
 		if len(result.Metadata.Errors) > 0 {
-			fmt.Fprintf(response, "  Errors: %d\n", len(result.Metadata.Errors))
+			fmt.Fprintf(response, "- Errors: %d\n", len(result.Metadata.Errors))
 			for _, err := range result.Metadata.Errors {
-				fmt.Fprintf(response, "    - %s: %s\n", err.Language, err.Message)
+				languageInfo := "unknown"
+				if err.Language != "" {
+					languageInfo = string(err.Language)
+				} else {
+					// Try to find the language from the metadata
+					for _, lang := range result.Metadata.LanguagesUsed {
+						languageInfo = string(lang)
+						break
+					}
+				}
+				fmt.Fprintf(response, "  - [%s] %s\n", languageInfo, err.Message)
 			}
 		}
 	}
@@ -797,7 +820,7 @@ func handlePatternAnalysis(bridge interfaces.BridgeInterface, clients map[types.
 
 // handleWorkspaceAnalysis handles the 'workspace_analysis' analysis type
 func handleWorkspaceAnalysis(bridge interfaces.BridgeInterface, clients map[types.Language]types.LanguageClientInterface, query string, options map[string]interface{}, response *strings.Builder) (*mcp.CallToolResult, error) {
-	response.WriteString("=== WORKSPACE ANALYSIS ===\n")
+	response.WriteString("WORKSPACE ANALYSIS:\n")
 
 	fmt.Fprintf(response, "Analyzing workspace for: %s\n\n", query)
 
@@ -824,14 +847,14 @@ func handleWorkspaceAnalysis(bridge interfaces.BridgeInterface, clients map[type
 	if workspaceData, ok := result.Data.(analysis.WorkspaceAnalysisData); ok {
 		fmt.Fprintf(response, "LANGUAGE DISTRIBUTION:\n")
 		for lang, stats := range workspaceData.LanguageDistribution {
-			fmt.Fprintf(response, "• %s: %d files (%.1f%%), %d symbols, avg complexity: %.2f\n",
+			fmt.Fprintf(response, "- %s: %d files (%.1f%%), %d symbols, avg complexity: %.2f\n",
 				lang, stats.FileCount, stats.Percentage, stats.SymbolCount, stats.ComplexityAvg)
 		}
 
 		fmt.Fprintf(response, "\nPROJECT OVERVIEW:\n")
-		fmt.Fprintf(response, "• Total symbols: %d\n", workspaceData.TotalSymbols)
-		fmt.Fprintf(response, "• Total files: %d\n", workspaceData.TotalFiles)
-		fmt.Fprintf(response, "• Dependency patterns: %d\n", len(workspaceData.DependencyPatterns))
+		fmt.Fprintf(response, "- Total symbols: %d\n", workspaceData.TotalSymbols)
+		fmt.Fprintf(response, "- Total files: %d\n", workspaceData.TotalFiles)
+		fmt.Fprintf(response, "- Dependency patterns: %d\n", len(workspaceData.DependencyPatterns))
 
 		// Dependency patterns
 		if len(workspaceData.DependencyPatterns) > 0 {
@@ -845,7 +868,7 @@ func handleWorkspaceAnalysis(bridge interfaces.BridgeInterface, clients map[type
 				if pattern.IsCircular {
 					circular = " (circular)"
 				}
-				fmt.Fprintf(response, "• %s → %s (%s, freq: %d, depth: %d)%s\n",
+				fmt.Fprintf(response, "- %s → %s (%s, freq: %d, depth: %d)%s\n",
 					pattern.Source, pattern.Target, pattern.Type, pattern.Frequency, pattern.Depth, circular)
 			}
 		}
@@ -853,29 +876,39 @@ func handleWorkspaceAnalysis(bridge interfaces.BridgeInterface, clients map[type
 		// Architectural health
 		health := workspaceData.ArchitecturalHealth
 		fmt.Fprintf(response, "\nARCHITECTURAL HEALTH:\n")
-		fmt.Fprintf(response, "• Code Organization: %.1f%% (%s)\n", health.CodeOrganization.Score, health.CodeOrganization.Level)
-		fmt.Fprintf(response, "• Naming Consistency: %.1f%% (%s)\n", health.NamingConsistency.Score, health.NamingConsistency.Level)
-		fmt.Fprintf(response, "• Error Handling: %.1f%% (%s)\n", health.ErrorHandling.Score, health.ErrorHandling.Level)
-		fmt.Fprintf(response, "• Test Coverage: %.1f%% (%s)\n", health.TestCoverage.Score, health.TestCoverage.Level)
-		fmt.Fprintf(response, "• Documentation: %.1f%% (%s)\n", health.Documentation.Score, health.Documentation.Level)
-		fmt.Fprintf(response, "• Overall Score: %.1f%% (%s)\n", health.OverallScore.Score, health.OverallScore.Level)
+		fmt.Fprintf(response, "- Code Organization: %.1f%% (%s)\n", health.CodeOrganization.Score, health.CodeOrganization.Level)
+		fmt.Fprintf(response, "- Naming Consistency: %.1f%% (%s)\n", health.NamingConsistency.Score, health.NamingConsistency.Level)
+		fmt.Fprintf(response, "- Error Handling: %.1f%% (%s)\n", health.ErrorHandling.Score, health.ErrorHandling.Level)
+		fmt.Fprintf(response, "- Test Coverage: %.1f%% (%s)\n", health.TestCoverage.Score, health.TestCoverage.Level)
+		fmt.Fprintf(response, "- Documentation: %.1f%% (%s)\n", health.Documentation.Score, health.Documentation.Level)
+		fmt.Fprintf(response, "- Overall Score: %.1f%% (%s)\n", health.OverallScore.Score, health.OverallScore.Level)
 
 		// Suggestions
 		if len(health.OverallScore.Suggestions) > 0 {
 			fmt.Fprintf(response, "\nSUGGESTIONS:\n")
 			for _, suggestion := range health.OverallScore.Suggestions {
-				fmt.Fprintf(response, "• %s\n", suggestion)
+				fmt.Fprintf(response, "- %s\n", suggestion)
 			}
 		}
 
 		// Analysis metadata
 		fmt.Fprintf(response, "\nANALYSIS METADATA:\n")
-		fmt.Fprintf(response, "• Duration: %v\n", result.Metadata.Duration)
-		fmt.Fprintf(response, "• Languages used: %v\n", result.Metadata.LanguagesUsed)
+		fmt.Fprintf(response, "- Duration: %v\n", result.Metadata.Duration)
+		fmt.Fprintf(response, "- Languages used: %v\n", result.Metadata.LanguagesUsed)
 		if len(result.Metadata.Errors) > 0 {
-			fmt.Fprintf(response, "• Errors: %d\n", len(result.Metadata.Errors))
+			fmt.Fprintf(response, "- Errors: %d\n", len(result.Metadata.Errors))
 			for _, err := range result.Metadata.Errors {
-				fmt.Fprintf(response, "  - %s: %s\n", err.Language, err.Message)
+				languageInfo := "unknown"
+				if err.Language != "" {
+					languageInfo = string(err.Language)
+				} else {
+					// Try to find the language from the metadata
+					for _, lang := range result.Metadata.LanguagesUsed {
+						languageInfo = string(lang)
+						break
+					}
+				}
+				fmt.Fprintf(response, "  - [%s] %s\n", languageInfo, err.Message)
 			}
 		}
 	}
@@ -885,7 +918,7 @@ func handleWorkspaceAnalysis(bridge interfaces.BridgeInterface, clients map[type
 
 // handleSymbolRelationships handles the 'symbol_relationships' analysis type
 func handleSymbolRelationships(bridge interfaces.BridgeInterface, clients map[types.Language]types.LanguageClientInterface, query string, options map[string]interface{}, response *strings.Builder) (*mcp.CallToolResult, error) {
-	response.WriteString("=== SYMBOL RELATIONSHIPS ===\n")
+	response.WriteString("SYMBOL RELATIONSHIPS:\n")
 
 	fmt.Fprintf(response, "Analyzing symbol: %s\n\n", query)
 
@@ -911,25 +944,25 @@ func handleSymbolRelationships(bridge interfaces.BridgeInterface, clients map[ty
 	// Format results
 	if symbolData, ok := result.Data.(analysis.SymbolRelationshipsData); ok {
 		fmt.Fprintf(response, "SYMBOL INFORMATION:\n")
-		fmt.Fprintf(response, "• Name: %s\n", symbolData.Symbol.Name)
-		fmt.Fprintf(response, "• Language: %s\n", symbolData.Language)
-		fmt.Fprintf(response, "• Kind: %s\n", symbolKindToString(symbolData.Symbol.Kind))
+		fmt.Fprintf(response, "- Name: %s\n", symbolData.Symbol.Name)
+		fmt.Fprintf(response, "- Language: %s\n", symbolData.Language)
+		fmt.Fprintf(response, "- Kind: %s\n", symbolKindToString(symbolData.Symbol.Kind))
 
 		fmt.Fprintf(response, "\nRELATIONSHIPS:\n")
-		fmt.Fprintf(response, "• References: %d\n", len(symbolData.References))
-		fmt.Fprintf(response, "• Definitions: %d\n", len(symbolData.Definitions))
-		fmt.Fprintf(response, "• Call hierarchy items: %d\n", len(symbolData.CallHierarchy))
-		fmt.Fprintf(response, "• Incoming calls: %d\n", len(symbolData.IncomingCalls))
-		fmt.Fprintf(response, "• Outgoing calls: %d\n", len(symbolData.OutgoingCalls))
-		fmt.Fprintf(response, "• Implementations: %d\n", len(symbolData.Implementations))
-		fmt.Fprintf(response, "• Type hierarchy: %d\n", len(symbolData.TypeHierarchy))
+		fmt.Fprintf(response, "- References: %d\n", len(symbolData.References))
+		fmt.Fprintf(response, "- Definitions: %d\n", len(symbolData.Definitions))
+		fmt.Fprintf(response, "- Call hierarchy items: %d\n", len(symbolData.CallHierarchy))
+		fmt.Fprintf(response, "- Incoming calls: %d\n", len(symbolData.IncomingCalls))
+		fmt.Fprintf(response, "- Outgoing calls: %d\n", len(symbolData.OutgoingCalls))
+		fmt.Fprintf(response, "- Implementations: %d\n", len(symbolData.Implementations))
+		fmt.Fprintf(response, "- Type hierarchy: %d\n", len(symbolData.TypeHierarchy))
 
 		// Show detailed call hierarchy if present
 		if len(symbolData.IncomingCalls) > 0 || len(symbolData.OutgoingCalls) > 0 {
 			fmt.Fprintf(response, "\nCALL HIERARCHY DETAILS:\n")
 
 			if len(symbolData.IncomingCalls) > 0 {
-				fmt.Fprintf(response, "• Incoming calls:\n")
+				fmt.Fprintf(response, "- Incoming calls:\n")
 				for i, call := range symbolData.IncomingCalls {
 					if i >= 5 { // Limit to first 5 to avoid overwhelming output
 						fmt.Fprintf(response, "  ... and %d more\n", len(symbolData.IncomingCalls)-5)
@@ -950,7 +983,7 @@ func handleSymbolRelationships(bridge interfaces.BridgeInterface, clients map[ty
 			}
 
 			if len(symbolData.OutgoingCalls) > 0 {
-				fmt.Fprintf(response, "• Outgoing calls:\n")
+				fmt.Fprintf(response, "- Outgoing calls:\n")
 				for i, call := range symbolData.OutgoingCalls {
 					if i >= 5 { // Limit to first 5 to avoid overwhelming output
 						fmt.Fprintf(response, "  ... and %d more\n", len(symbolData.OutgoingCalls)-5)
@@ -974,13 +1007,13 @@ func handleSymbolRelationships(bridge interfaces.BridgeInterface, clients map[ty
 		// Usage patterns
 		usage := symbolData.UsagePatterns
 		fmt.Fprintf(response, "\nUSAGE PATTERNS:\n")
-		fmt.Fprintf(response, "• Primary usage: %s\n", usage.PrimaryUsage)
-		fmt.Fprintf(response, "• Secondary usage: %s\n", usage.SecondaryUsage)
-		fmt.Fprintf(response, "• Usage frequency: %d\n", usage.UsageFrequency)
+		fmt.Fprintf(response, "- Primary usage: %s\n", usage.PrimaryUsage)
+		fmt.Fprintf(response, "- Secondary usage: %s\n", usage.SecondaryUsage)
+		fmt.Fprintf(response, "- Usage frequency: %d\n", usage.UsageFrequency)
 
 		// Caller patterns
 		if len(usage.CallerPatterns) > 0 {
-			fmt.Fprintf(response, "• Caller patterns:\n")
+			fmt.Fprintf(response, "- Caller patterns:\n")
 			for _, pattern := range usage.CallerPatterns {
 				fmt.Fprintf(response, "  - %s: %d calls\n", pattern.CallerType, pattern.CallFrequency)
 			}
@@ -990,7 +1023,7 @@ func handleSymbolRelationships(bridge interfaces.BridgeInterface, clients map[ty
 		if len(symbolData.RelatedSymbols) > 0 {
 			fmt.Fprintf(response, "\nRELATED SYMBOLS:\n")
 			for _, related := range symbolData.RelatedSymbols {
-				fmt.Fprintf(response, "• %s (%s, strength: %.2f)\n",
+				fmt.Fprintf(response, "- %s (%s, strength: %.2f)\n",
 					related.Symbol.Name, related.Relationship, related.Strength)
 			}
 		}
@@ -998,14 +1031,14 @@ func handleSymbolRelationships(bridge interfaces.BridgeInterface, clients map[ty
 		// Impact analysis
 		impact := symbolData.ImpactAnalysis
 		fmt.Fprintf(response, "\nIMPACT ANALYSIS:\n")
-		fmt.Fprintf(response, "• Files affected: %d\n", impact.FilesAffected)
-		fmt.Fprintf(response, "• Critical paths: %d\n", len(impact.CriticalPaths))
-		fmt.Fprintf(response, "• Dependencies: %d\n", len(impact.Dependencies))
-		fmt.Fprintf(response, "• Refactoring complexity: %s\n", impact.RefactoringComplexity)
+		fmt.Fprintf(response, "- Files affected: %d\n", impact.FilesAffected)
+		fmt.Fprintf(response, "- Critical paths: %d\n", len(impact.CriticalPaths))
+		fmt.Fprintf(response, "- Dependencies: %d\n", len(impact.Dependencies))
+		fmt.Fprintf(response, "- Refactoring complexity: %s\n", impact.RefactoringComplexity)
 
 		// Breaking changes
 		if len(impact.BreakingChanges) > 0 {
-			fmt.Fprintf(response, "• Potential breaking changes:\n")
+			fmt.Fprintf(response, "- Potential breaking changes:\n")
 			for _, change := range impact.BreakingChanges {
 				fmt.Fprintf(response, "  - [%s] %s: %s\n", change.Severity, change.Type, change.Description)
 			}
@@ -1013,12 +1046,22 @@ func handleSymbolRelationships(bridge interfaces.BridgeInterface, clients map[ty
 
 		// Analysis metadata
 		fmt.Fprintf(response, "\nANALYSIS METADATA:\n")
-		fmt.Fprintf(response, "• Duration: %v\n", result.Metadata.Duration)
-		fmt.Fprintf(response, "• Languages used: %v\n", result.Metadata.LanguagesUsed)
+		fmt.Fprintf(response, "- Duration: %v\n", result.Metadata.Duration)
+		fmt.Fprintf(response, "- Languages used: %v\n", result.Metadata.LanguagesUsed)
 		if len(result.Metadata.Errors) > 0 {
-			fmt.Fprintf(response, "• Errors: %d\n", len(result.Metadata.Errors))
+			fmt.Fprintf(response, "- Errors: %d\n", len(result.Metadata.Errors))
 			for _, err := range result.Metadata.Errors {
-				fmt.Fprintf(response, "  - %s: %s\n", err.Language, err.Message)
+				languageInfo := "unknown"
+				if err.Language != "" {
+					languageInfo = string(err.Language)
+				} else {
+					// Try to find the language from the metadata
+					for _, lang := range result.Metadata.LanguagesUsed {
+						languageInfo = string(lang)
+						break
+					}
+				}
+				fmt.Fprintf(response, "  - [%s] %s\n", languageInfo, err.Message)
 			}
 		}
 	}

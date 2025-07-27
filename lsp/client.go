@@ -21,7 +21,7 @@ import (
 // JSONRPCLogger implements jsonrpc2.Logger interface
 type JSONRPCLogger struct{}
 
-func (l *JSONRPCLogger) Printf(format string, args ...interface{}) {
+func (l *JSONRPCLogger) Printf(format string, args ...any) {
 	logger.Debug(fmt.Sprintf("JSONRPC: "+format, args...))
 }
 

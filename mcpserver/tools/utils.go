@@ -276,7 +276,7 @@ func formatCodeActions(actions []protocol.CodeAction) string {
 func formatTextEdits(edits []protocol.TextEdit) string {
 	var result strings.Builder
 
-	result.WriteString("=== DOCUMENT FORMATTING ===\n")
+	result.WriteString("DOCUMENT FORMATTING:\n")
 
 	if len(edits) == 0 {
 		result.WriteString("Document is already properly formatted")
@@ -532,15 +532,15 @@ func formatWorkspaceDiagnostics(diagnostics []protocol.WorkspaceDiagnosticReport
 	}
 
 	// Summary
-	result.WriteString("=== Summary ===\n")
+	result.WriteString("SUMMARY:\n")
 	result.WriteString(fmt.Sprintf("Total Issues: %d\n", totalIssues))
-	result.WriteString(fmt.Sprintf("🔴 Errors: %d\n", errorCount))
-	result.WriteString(fmt.Sprintf("🟡 Warnings: %d\n", warningCount))
-	result.WriteString(fmt.Sprintf("🔵 Info: %d\n", infoCount))
-	result.WriteString(fmt.Sprintf("💡 Hints: %d\n", hintCount))
+	result.WriteString(fmt.Sprintf("Errors: %d\n", errorCount))
+	result.WriteString(fmt.Sprintf("Warnings: %d\n", warningCount))
+	result.WriteString(fmt.Sprintf("Info: %d\n", infoCount))
+	result.WriteString(fmt.Sprintf("Hints: %d\n", hintCount))
 
 	if totalIssues == 0 {
-		result.WriteString("\n✅ No issues found in workspace")
+		result.WriteString("\nNo issues found in workspace")
 	}
 
 	return result.String()
@@ -566,19 +566,19 @@ func getDiagnosticSeverityString(severity *protocol.DiagnosticSeverity) string {
 	}
 }
 
-// getSeverityIcon returns appropriate icon for diagnostic severity
+// getSeverityIcon returns appropriate prefix for diagnostic severity
 func getSeverityIcon(severity string) string {
 	switch severity {
 	case "Error":
-		return "🔴"
+		return "[ERROR]"
 	case "Warning":
-		return "🟡"
+		return "[WARN]"
 	case "Information":
-		return "🔵"
+		return "[INFO]"
 	case "Hint":
-		return "💡"
+		return "[HINT]"
 	default:
-		return "❓"
+		return "[UNKNOWN]"
 	}
 }
 

@@ -2,31 +2,46 @@
 
 Complete reference for all MCP tools provided by the LSP bridge.
 
+## Quick Reference
+
+**Analysis**: `project_analysis`, `symbol_explore`, `workspace_diagnostics`
+**Navigation**: `hover`, `implementation`, `call_hierarchy`
+**Refactoring**: `rename`, `format_document`, `code_actions`
+**Utilities**: `detect_project_languages`, `get_range_content`, `infer_language`
+
 ## Core Analysis Tools
 
 ### `project_analysis`
-Multi-purpose code analysis tool with 9 different analysis types.
+Multi-purpose code analysis with 9 analysis types for symbols, files, and workspace patterns.
 
-**Quick Examples:**
-- File analysis: `analysis_type="file_analysis"`, `query="path/to/file.go"`
+**Common Usage:**
 - Find symbols: `analysis_type="workspace_symbols"`, `query="calculateTotal"`
-- Pattern analysis: `analysis_type="pattern_analysis"`, `query="error_handling"`
+- Analyze files: `analysis_type="file_analysis"`, `query="src/auth.go"`
 - Workspace overview: `analysis_type="workspace_analysis"`, `query="entire_project"`
 
-**📖 See [project-analysis-guide.md](project-analysis-guide.md) for complete documentation with examples and sample outputs.**
+**Key Parameters**: analysis_type (required), query (required), limit (default: 20)
+**Output**: Structured analysis results with metadata and suggestions
 
 ### `symbol_explore`
-Intelligent code symbol search with context-aware filtering and progressive detail levels.
+Intelligent symbol search with contextual filtering and detailed code information.
 
-**Quick Examples:**
-- Basic search: `query="getUserData"`
-- Context filtering: `query="validateUser"`, `file_context="auth"`
-- Full details: `query="connectDB"`, `detail_level="full"`
+**Common Usage:**
+- Find symbols: `query="getUserData"`
+- Filter by context: `query="validateUser"`, `file_context="auth"`
+- Detailed view: `query="connectDB"`, `detail_level="full"`
 
-**📖 See [symbol-exploration-guide.md](symbol-exploration-guide.md) for complete usage guide.**
+**Key Parameters**: query (required), file_context (optional), detail_level (auto/basic/full)
+**Output**: Symbol matches with documentation, implementation, and references
 
 ### `get_range_content`
-Get text content from file range. Efficient for specific code blocks. Range parameters should be precise, typically from `project_analysis` (`definitions` or `document_symbols` modes).
+Extract text content from specific file ranges with precise line/character positioning.
+
+**Common Usage:**
+- Extract function: `uri="file://path"`, `start_line=10`, `end_line=25`
+- Get code block: Use coordinates from `project_analysis` definitions
+
+**Key Parameters**: uri (required), start_line/end_line (required), strict (default: false)
+**Output**: Exact text content from specified range
 
 ### `analyze_code`
 Analyze code for completion suggestions and insights.
@@ -50,7 +65,14 @@ Disconnect all active language server clients.
 ## Code Intelligence Tools
 
 ### `hover`
-Get detailed symbol information (signatures, documentation, types).
+Get detailed symbol information including signatures, documentation, and type details.
+
+**Common Usage:**
+- Symbol info: `uri="file://path"`, `line=15`, `character=10`
+- Type details: Position cursor on variable/function name
+
+**Key Parameters**: uri (required), line/character (required, 0-based)
+**Output**: Formatted documentation with code examples and pkg.go.dev links
 
 ### `signature_help`
 Get function parameter information at call sites. Use when positioned inside function calls (between parentheses) to see parameter details and overloads.
@@ -59,30 +81,46 @@ Get function parameter information at call sites. Use when positioned inside fun
 Get semantic tokens for a specific range of a file.
 
 ### `workspace_diagnostics`
-Get comprehensive diagnostics for entire workspace.
+Analyze entire workspace for errors, warnings, and code issues across all languages.
+
+**Common Usage:**
+- Full scan: `workspace_uri="file://project/root"`
+- Check health: Review error categories and language-specific issues
+
+**Key Parameters**: workspace_uri (required)
+**Output**: Categorized diagnostics by language with error explanations and suggestions
 
 ## Code Improvement & Refactoring Tools
 
 ### `code_actions`
-Get intelligent code actions including quick fixes, refactoring suggestions, and automated improvements for a code range. Returns language server suggested actions like import fixes, error corrections, extract method, add missing imports, implement interfaces, and other context-aware improvements. Use at error locations for fixes or at any code location for refactoring suggestions.
+Get intelligent quick fixes, refactoring suggestions, and automated code improvements.
+
+**Common Usage:**
+- Fix errors: Position at error location for import fixes, syntax corrections
+- Refactor: Position at symbol for extract method, implement interface options
+
+**Key Parameters**: uri (required), line/character (required)
+**Output**: Available actions with descriptions and edit previews
 
 ### `format_document`
-**ACTIONABLE**: Format a document according to language conventions with dual-mode operation.
+Format documents with language-specific rules. Preview changes before applying.
 
-**PREVIEW MODE** (`apply='false'`, default): Shows detailed formatting changes without modifying files - displays line-by-line changes, whitespace adjustments, and content modifications.
+**Common Usage:**
+- Preview: `uri="file://path"`, `apply="false"` (default) - shows changes
+- Apply: `uri="file://path"`, `apply="true"` - formats file
 
-**APPLY MODE** (`apply='true'`): Actually applies all formatting changes to the file.
-
-Supports customizable indentation and language-specific formatting rules. Always preview first for safety.
+**Key Parameters**: uri (required), apply (default: false), tab_size (default: 4)
+**Output**: Formatting changes with line-by-line diffs
 
 ### `rename`
-**ACTIONABLE**: Rename a symbol across the entire codebase with LSP precision and cross-file support.
+Rename symbols across entire codebase with cross-file precision. Always preview first.
 
-**PREVIEW MODE** (`apply='false'`, default): Shows all files and exact locations that would be modified, with line numbers and replacement text.
+**Common Usage:**
+- Preview: `uri="file://path"`, `line=10`, `character=5`, `new_name="newFunc"`, `apply="false"`
+- Apply: Same parameters with `apply="true"`
 
-**APPLY MODE** (`apply='true'`): Actually performs the rename across all affected files in the codebase.
-
-Requires precise coordinates from definitions or hover for accurate targeting. Supports functions, variables, types, and other symbols. Always preview first to verify scope.
+**Key Parameters**: uri (required), line/character (required), new_name (required), apply (default: false)
+**Output**: All affected files with exact change locations
 
 ## Advanced Navigation Tools
 
@@ -91,6 +129,13 @@ Find implementations of a symbol (interfaces, abstract methods).
 
 ### `call_hierarchy`
 Show call hierarchy (callers and callees) for a symbol.
+
+## Common Workflows
+
+**Code Analysis**: `detect_project_languages` → `project_analysis` → `symbol_explore`
+**Navigation**: `hover` → `implementation` → `call_hierarchy`
+**Refactoring**: `hover` (get coordinates) → `rename` (preview) → `rename` (apply)
+**Code Quality**: `workspace_diagnostics` → `code_actions` → `format_document`
 
 ## System Tools
 

@@ -121,7 +121,7 @@ func formatMultiLanguageImplementations(implementations []protocol.Location, err
 	var result strings.Builder
 
 	// Header with summary
-	fmt.Fprintf(&result, "=== IMPLEMENTATIONS ===\n")
+	fmt.Fprintf(&result, "IMPLEMENTATIONS:\n")
 	fmt.Fprintf(&result, "Position: %s:%d:%d\n", uri, line, character)
 	fmt.Fprintf(&result, "Languages searched: %v\n", languages)
 	fmt.Fprintf(&result, "Implementations found: %d\n", len(implementations))
@@ -132,7 +132,7 @@ func formatMultiLanguageImplementations(implementations []protocol.Location, err
 
 	// Show errors if any
 	if len(errors) > 0 {
-		fmt.Fprintf(&result, "=== ERRORS ===\n")
+		fmt.Fprintf(&result, "ERRORS:\n")
 		for i, err := range errors {
 			fmt.Fprintf(&result, "%d. %v\n", i+1, err)
 		}
@@ -149,7 +149,7 @@ func formatMultiLanguageImplementations(implementations []protocol.Location, err
 			fmt.Fprintf(&result, "- The position does not correspond to a valid symbol\n")
 		}
 	} else {
-		fmt.Fprintf(&result, "=== IMPLEMENTATIONS ===\n")
+		fmt.Fprintf(&result, "IMPLEMENTATIONS:\n")
 		for i, impl := range implementations {
 			uri := string(impl.Uri)
 			filename := filepath.Base(strings.TrimPrefix(uri, "file://"))

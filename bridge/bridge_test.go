@@ -29,19 +29,24 @@ import (
 // Test helper functions
 func createTestBridge(allowedDirs []string) *MCPLSPBridge {
 	config := &lsp.LSPServerConfig{
-		LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-			"go": {
+		LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+			"gopls": {
 				Command: "gopls",
 				Args:    []string{},
 			},
-			"typescript": {
+			"typescript-language-server": {
 				Command: "typescript-language-server",
 				Args:    []string{"--stdio"},
 			},
-			"python": {
+			"pyright-langserver": {
 				Command: "pyright-langserver",
 				Args:    []string{},
 			},
+		},
+		LanguageServerMap: map[types.LanguageServer][]types.Language{
+			"gopls":                      {"go"},
+			"typescript-language-server": {"typescript", "javascript"},
+			"pyright-langserver":         {"python"},
 		},
 		ExtensionLanguageMap: map[string]types.Language{
 			".go": "go",
@@ -66,8 +71,11 @@ func createTempFile(t *testing.T, name, content string) string {
 // Test NewMCPLSPBridge
 func TestNewMCPLSPBridge(t *testing.T) {
 	config := &lsp.LSPServerConfig{
-		LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-			"go": {Command: "gopls"},
+		LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+			"gopls": {Command: "gopls"},
+		},
+		LanguageServerMap: map[types.LanguageServer][]types.Language{
+			"gopls": {"go"},
 		},
 	}
 
@@ -170,8 +178,8 @@ func TestCloseAllClients(t *testing.T) {
 	mockClient1.On("Close").Return(nil)
 	mockClient2.On("Close").Return(nil)
 
-	bridge.clients["go"] = mockClient1
-	bridge.clients["typescript"] = mockClient2
+	bridge.clients["gopls"] = mockClient1
+	bridge.clients["typescript-language-server"] = mockClient2
 
 	bridge.CloseAllClients()
 
@@ -227,7 +235,7 @@ func TestFindSymbolReferences(t *testing.T) {
 	mockClient.On("Context").Return(ctx)
 	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 
-	bridge.clients["go"] = mockClient
+	bridge.clients["gopls"] = mockClient
 
 	expectedRefs := []protocol.Location{
 		{
@@ -257,7 +265,7 @@ func TestFindSymbolDefinitions(t *testing.T) {
 	mockClient.On("Context").Return(ctx)
 	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 
-	bridge.clients["go"] = mockClient
+	bridge.clients["gopls"] = mockClient
 
 	expectedDefs := []protocol.Or2[protocol.LocationLink, protocol.Location]{{
 		Value: protocol.Location{
@@ -288,7 +296,7 @@ func TestFindSymbolDefinitionsWithError(t *testing.T) {
 	mockClient.On("Context").Return(ctx)
 	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 
-	bridge.clients["go"] = mockClient
+	bridge.clients["gopls"] = mockClient
 
 	mockClient.On("Definition", "file:///test.go", uint32(10), uint32(5)).Return([]protocol.Or2[protocol.LocationLink, protocol.Location]{}, errors.New("definition failed"))
 
@@ -308,7 +316,7 @@ func TestSearchTextInWorkspace(t *testing.T) {
 	mockClient.On("Context").Return(ctx)
 	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 
-	bridge.clients["go"] = mockClient
+	bridge.clients["gopls"] = mockClient
 
 	expectedSymbols := []protocol.WorkspaceSymbol{
 		{
@@ -346,7 +354,7 @@ func TestGetDocumentSymbols(t *testing.T) {
 
 	mockClient.SetProjectRoots([]string{"."})
 
-	bridge.clients["go"] = mockClient
+	bridge.clients["gopls"] = mockClient
 
 	// Create temp file for the test
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
@@ -386,7 +394,7 @@ func TestGetSignatureHelp(t *testing.T) {
 	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 
-	bridge.clients["go"] = mockClient
+	bridge.clients["gopls"] = mockClient
 
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
 	testURI := "file://" + testFile
@@ -424,7 +432,7 @@ func TestGetHoverInformation(t *testing.T) {
 	mockClient.On("Context").Return(ctx)
 	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
-	bridge.clients["go"] = mockClient
+	bridge.clients["gopls"] = mockClient
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
 	testURI := "file://" + testFile
 
@@ -505,7 +513,7 @@ func TestRenameSymbol(t *testing.T) {
 		mockClient.On("Context").Return(ctx)
 		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
-		bridge.clients["go"] = mockClient
+		bridge.clients["gopls"] = mockClient
 
 		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
 		testURI := "file://" + testFile
@@ -566,7 +574,7 @@ func TestRenameSymbol(t *testing.T) {
 		mockClient.On("Context").Return(ctx)
 		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
-		bridge.clients["go"] = mockClient
+		bridge.clients["gopls"] = mockClient
 
 		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
 		testURI := "file://" + testFile
@@ -605,7 +613,7 @@ func TestRenameSymbol(t *testing.T) {
 		mockClient.On("Context").Return(ctx)
 		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
-		bridge.clients["go"] = mockClient
+		bridge.clients["gopls"] = mockClient
 
 		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
 		testURI := "file://" + testFile
@@ -630,7 +638,7 @@ func TestRenameSymbol(t *testing.T) {
 		mockClient.On("Context").Return(ctx)
 		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
-		bridge.clients["go"] = mockClient
+		bridge.clients["gopls"] = mockClient
 
 		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
 		testURI := "file://" + testFile
@@ -649,7 +657,7 @@ func TestRenameSymbol(t *testing.T) {
 	t.Run("URI normalization edge cases", func(t *testing.T) {
 		bridge := createTestBridge([]string{"/"})
 		mockClient := &mocks.MockLanguageClient{}
-		bridge.clients["go"] = mockClient
+		bridge.clients["gopls"] = mockClient
 
 		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
 
@@ -719,7 +727,19 @@ func TestRenameSymbol(t *testing.T) {
 					mockClient.On("Context").Return(ctx)
 					mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 					mockClient.On("ProjectRoots").Return([]string{"/tmp"})
-					bridge.clients[types.Language(tc.language)] = mockClient
+					// Use the real server name for this language
+					var serverName types.LanguageServer
+					switch tc.language {
+					case "go":
+						serverName = "gopls"
+					case "python":
+						serverName = "pyright-langserver"
+					case "javascript":
+						serverName = "typescript-language-server"
+					default:
+						serverName = types.LanguageServer(tc.language + "-server")
+					}
+					bridge.clients[serverName] = mockClient
 
 					testFile := createTempFile(t, tc.filename, tc.content)
 					testURI := "file://" + testFile
@@ -770,7 +790,7 @@ func TestFindImplementations(t *testing.T) {
 	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 
-	bridge.clients["go"] = mockClient
+	bridge.clients["gopls"] = mockClient
 
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
 	testURI := "file://" + testFile
@@ -802,7 +822,7 @@ func TestPrepareCallHierarchy(t *testing.T) {
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
 	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
-	bridge.clients["go"] = mockClient
+	bridge.clients["gopls"] = mockClient
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
 	testURI := "file://" + testFile
 	expectedItems := []protocol.CallHierarchyItem{
@@ -874,7 +894,7 @@ func TestGetClientForLanguageInterface(t *testing.T) {
 	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 
-	bridge.clients["go"] = mockClient
+	bridge.clients["gopls"] = mockClient
 
 	result, err := bridge.GetClientForLanguage("go")
 
@@ -891,7 +911,7 @@ func TestFindSymbolReferencesError(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "no server configuration found")
+	assert.Contains(t, err.Error(), "no server found for language")
 }
 
 func TestGetHoverInformationInvalidLanguage(t *testing.T) {
@@ -1201,11 +1221,14 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 		{
 			name: "successful code actions",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-					"go": {
+				LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+					"gopls": {
 						Command: "gopls",
 						Args:    []string{},
 					},
+				},
+				LanguageServerMap: map[types.LanguageServer][]types.Language{
+					"gopls": {"go"},
 				},
 				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
@@ -1236,11 +1259,14 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 		{
 			name: "no code actions",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-					"go": {
+				LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+					"gopls": {
 						Command: "gopls",
 						Args:    []string{},
 					},
+				},
+				LanguageServerMap: map[types.LanguageServer][]types.Language{
+					"gopls": {"go"},
 				},
 				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
@@ -1261,11 +1287,14 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 		{
 			name: "error - failed to infer language",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-					"go": {
+				LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+					"gopls": {
 						Command: "gopls",
 						Args:    []string{},
 					},
+				},
+				LanguageServerMap: map[types.LanguageServer][]types.Language{
+					"gopls": {"go"},
 				},
 				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
@@ -1286,8 +1315,11 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 		{
 			name: "error - failed to get client for language",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
 					// No language server configured for Go
+				},
+				LanguageServerMap: map[types.LanguageServer][]types.Language{
+					// No language server mappings
 				},
 				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
@@ -1308,11 +1340,14 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 		{
 			name: "error - client code actions failed",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-					"go": {
+				LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+					"gopls": {
 						Command: "gopls",
 						Args:    []string{},
 					},
+				},
+				LanguageServerMap: map[types.LanguageServer][]types.Language{
+					"gopls": {"go"},
 				},
 				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
@@ -1338,7 +1373,7 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 			// Only set up mock client if needed for this test
 			if tt.setupClients {
 				mockClient := &mocks.MockLanguageClient{}
-				b.clients["go"] = mockClient
+				b.clients["gopls"] = mockClient
 
 				// Set up mock expectations
 				mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
@@ -1398,11 +1433,14 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		{
 			name: "successful workspace diagnostics - single language",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-					"go": {
+				LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+					"gopls": {
 						Command: "gopls",
 						Args:    []string{},
 					},
+				},
+				LanguageServerMap: map[types.LanguageServer][]types.Language{
+					"gopls": {"go"},
 				},
 				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
@@ -1469,15 +1507,19 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		{
 			name: "successful workspace diagnostics - multiple languages",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-					"go": {
+				LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+					"gopls": {
 						Command: "gopls",
 						Args:    []string{},
 					},
-					"typescript": {
+					"typescript-language-server": {
 						Command: "typescript-language-server",
 						Args:    []string{"--stdio"},
 					},
+				},
+				LanguageServerMap: map[types.LanguageServer][]types.Language{
+					"gopls":                      {"go"},
+					"typescript-language-server": {"typescript"},
 				},
 				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
@@ -1551,11 +1593,14 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		{
 			name: "no languages detected",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-					"go": {
+				LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+					"gopls": {
 						Command: "gopls",
 						Args:    []string{},
 					},
+				},
+				LanguageServerMap: map[types.LanguageServer][]types.Language{
+					"gopls": {"go"},
 				},
 				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
@@ -1576,11 +1621,14 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		{
 			name: "error - failed to detect project languages",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-					"go": {
+				LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+					"gopls": {
 						Command: "gopls",
 						Args:    []string{},
 					},
+				},
+				LanguageServerMap: map[types.LanguageServer][]types.Language{
+					"gopls": {"go"},
 				},
 				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
@@ -1601,8 +1649,11 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		{
 			name: "error - failed to get language clients",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
 					// No language servers configured
+				},
+				LanguageServerMap: map[types.LanguageServer][]types.Language{
+					// No language server mappings
 				},
 				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
@@ -1625,15 +1676,19 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		{
 			name: "partial success - one client fails, one succeeds",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-					"go": {
+				LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+					"gopls": {
 						Command: "gopls",
 						Args:    []string{},
 					},
-					"typescript": {
+					"typescript-language-server": {
 						Command: "typescript-language-server",
 						Args:    []string{"--stdio"},
 					},
+				},
+				LanguageServerMap: map[types.LanguageServer][]types.Language{
+					"gopls":                      {"go"},
+					"typescript-language-server": {"typescript"},
 				},
 				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
@@ -1700,10 +1755,19 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 				mockConfig.On("DetectProjectLanguages", tt.workspaceUri).Return(tt.mockDetectedLanguages, tt.mockDetectError)
 			}
 
+			// Set up GetServerNameFromLanguage expectations for all detected languages
+			for _, language := range tt.mockDetectedLanguages {
+				serverName := types.LanguageServer(string(language) + "-server")
+				mockConfig.On("GetServerNameFromLanguage", language).Return(serverName)
+			}
+
 			// Set up mock clients if needed
 			if tt.setupClients {
 				for language, mockClient := range tt.mockClientsSetup {
-					b.clients[types.Language(language)] = mockClient
+					// Set up mock expectation for GetServerNameFromLanguage
+					serverName := types.LanguageServer(language + "-server") // Use a predictable server name
+					mockConfig.On("GetServerNameFromLanguage", types.Language(language)).Return(serverName)
+					b.clients[serverName] = mockClient
 
 					// Set up mock expectations
 					mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})

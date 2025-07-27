@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"rockerboo/mcp-lsp-bridge/logger"
@@ -37,22 +38,13 @@ func LoadLSPConfig(path string, allowedDirectories []string) (config *LSPServerC
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	// Compute extension to language mapping if not provided
+	// Validate that we have the required mappings
 	if config.ExtensionLanguageMap == nil {
-		config.ExtensionLanguageMap = make(map[string]types.Language)
-		for language, serverConfig := range config.LanguageServers {
-			for _, ext := range serverConfig.Filetypes {
-				config.ExtensionLanguageMap[ext] = language
-			}
-		}
+		return nil, errors.New("extension_language_map is required in configuration")
 	}
 
-	// Compute language to extensions mapping if not provided
-	if config.LanguageExtensionMap == nil {
-		config.LanguageExtensionMap = make(map[types.Language][]string)
-		for language, serverConfig := range config.LanguageServers {
-			config.LanguageExtensionMap[language] = serverConfig.Filetypes
-		}
+	if config.LanguageServerMap == nil {
+		return nil, errors.New("language_server_map is required in configuration")
 	}
 
 	return config, nil
@@ -74,13 +66,20 @@ func (c *LSPServerConfig) FindExtLanguage(ext string) (*types.Language, error) {
 }
 
 func (c LSPServerConfig) FindServerConfig(language string) (types.LanguageServerConfigProvider, error) {
-	for lang, serverConfig := range c.LanguageServers {
-		if lang == types.Language(language) {
-			return &serverConfig, nil
+	// Find which server handles this language
+	for serverName, languages := range c.LanguageServerMap {
+		for _, lang := range languages {
+			if string(lang) == language {
+				// Found the server, now get its config
+				if serverConfig, exists := c.LanguageServers[serverName]; exists {
+					return &serverConfig, nil
+				}
+				return nil, fmt.Errorf("server config not found for server '%s'", string(serverName))
+			}
 		}
 	}
 
-	return nil, fmt.Errorf("failed to find langauge config for '%s'", language)
+	return nil, fmt.Errorf("no server found for language '%s'", language)
 }
 
 // ProjectRootMarker represents a project root identifier
@@ -211,12 +210,23 @@ func (c LSPServerConfig) GetGlobalConfig() types.GlobalConfig {
 	return types.GlobalConfig(c.Global)
 }
 
-func (c LSPServerConfig) GetLanguageServers() map[types.Language]types.LanguageServerConfigProvider {
-	result := make(map[types.Language]types.LanguageServerConfigProvider)
-	for lang, config := range c.LanguageServers {
-		result[types.Language(lang)] = &config
+func (c LSPServerConfig) GetLanguageServers() map[types.LanguageServer]types.LanguageServerConfigProvider {
+	result := make(map[types.LanguageServer]types.LanguageServerConfigProvider)
+	// Build a server -> server config mapping
+	for serverName, serverConfig := range c.LanguageServers {
+		result[serverName] = &serverConfig
 	}
 	return result
+}
+
+// GetServerNameFromLanguage returns the server name for a given language
+func (c LSPServerConfig) GetServerNameFromLanguage(language types.Language) types.LanguageServer {
+	for serverName, supportedLanguages := range c.LanguageServerMap {
+		if slices.Contains(supportedLanguages, language) {
+			return serverName
+		}
+	}
+	return "" // Handle not found case
 }
 
 // DetectPrimaryProjectLanguage returns the most likely primary language for a project

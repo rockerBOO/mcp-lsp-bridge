@@ -199,8 +199,11 @@ func TestLSPConnectToolExecution(t *testing.T) {
 			name:     "successful connection",
 			language: "go",
 			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-					"go": {Command: "gopls"},
+				LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+					"gopls": {Command: "gopls"},
+				},
+				LanguageServerMap: map[types.LanguageServer][]types.Language{
+					"gopls": {"go"},
 				},
 			},
 			mockClient:  &lsp.LanguageClient{},
@@ -210,8 +213,11 @@ func TestLSPConnectToolExecution(t *testing.T) {
 			name:     "language not configured",
 			language: "rust",
 			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-					"go": {Command: "gopls"},
+				LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+					"gopls": {Command: "gopls"},
+				},
+				LanguageServerMap: map[types.LanguageServer][]types.Language{
+					"gopls": {"go"},
 				},
 			},
 			expectError: true,
@@ -230,7 +236,17 @@ func TestLSPConnectToolExecution(t *testing.T) {
 
 			// Only set up GetClientForLanguageInterface expectation if we'll call it
 			if tc.mockConfig != nil {
-				if _, exists := tc.mockConfig.LanguageServers[types.Language(tc.language)]; exists {
+				// Check if language is supported by any server
+				languageSupported := false
+				for _, languages := range tc.mockConfig.LanguageServerMap {
+					for _, lang := range languages {
+						if lang == tc.language {
+							languageSupported = true
+							break
+						}
+					}
+				}
+				if languageSupported {
 
 					if tc.expectError && tc.mockClient == nil {
 						// This test case expects an error when getting the client

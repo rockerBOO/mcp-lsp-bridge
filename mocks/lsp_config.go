@@ -30,12 +30,17 @@ func (m *MockLSPServerConfig) GetGlobalConfig() types.GlobalConfig {
 	return args.Get(0).(types.GlobalConfig)
 }
 
-func (m *MockLSPServerConfig) GetLanguageServers() map[types.Language]types.LanguageServerConfigProvider {
+func (m *MockLSPServerConfig) GetLanguageServers() map[types.LanguageServer]types.LanguageServerConfigProvider {
 	args := m.Called()
-	return args.Get(0).(map[types.Language]types.LanguageServerConfigProvider)
+	return args.Get(0).(map[types.LanguageServer]types.LanguageServerConfigProvider)
 }
 
 func (m *MockLSPServerConfig) FindExtLanguage(ext string) (*types.Language, error) {
 	args := m.Called(ext)
 	return args.Get(0).(*types.Language), args.Error(1)
+}
+
+func (m *MockLSPServerConfig) GetServerNameFromLanguage(language types.Language) types.LanguageServer {
+	args := m.Called(language)
+	return args.Get(0).(types.LanguageServer)
 }

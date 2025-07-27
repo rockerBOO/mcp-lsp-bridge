@@ -161,9 +161,9 @@ func main() {
 
 		// Create minimal default LSP config so bridge can initialize
 		config = &lsp.LSPServerConfig{
-			LanguageServers:      make(map[types.Language]lsp.LanguageServerConfig),
+			LanguageServers:      make(map[types.LanguageServer]lsp.LanguageServerConfig),
+			LanguageServerMap:    make(map[types.LanguageServer][]types.Language),
 			ExtensionLanguageMap: make(map[string]types.Language),
-			LanguageExtensionMap: make(map[types.Language][]string),
 			Global: struct {
 				LogPath            string `json:"log_file_path"`
 				LogLevel           string `json:"log_level"`

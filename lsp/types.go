@@ -49,10 +49,10 @@ func (c *LanguageServerConfig) GetInitializationOptions() map[string]interface{}
 
 // LSPServerConfig represents the complete LSP server configuration
 type LSPServerConfig struct {
-	Global               GlobalConfig                            `json:"global"`
-	LanguageServers      map[types.Language]LanguageServerConfig `json:"language_servers"`
-	ExtensionLanguageMap map[string]types.Language               `json:"extension_language_map,omitempty"`
-	LanguageExtensionMap map[types.Language][]string             `json:"language_extension_map,omitempty"`
+	Global               GlobalConfig                                  `json:"global"`
+	LanguageServers      map[types.LanguageServer]LanguageServerConfig `json:"language_servers"`
+	LanguageServerMap    map[types.LanguageServer][]types.Language     `json:"language_server_map,omitempty"`
+	ExtensionLanguageMap map[string]types.Language                     `json:"extension_language_map,omitempty"`
 }
 
 // LanguageClient wraps a Language Server Protocol client connection

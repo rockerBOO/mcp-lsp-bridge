@@ -34,7 +34,7 @@ func LSPConnectTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHan
 				logger.Error("lsp_connect: Failed to get LSP client",
 					fmt.Sprintf("Language: %s, Error: %v", language, err),
 				)
-				return mcp.NewToolResultError("Failed to get LSP client for " + language), nil
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to get LSP client for %s: %v", language, err)), nil
 			}
 
 			return mcp.NewToolResultText("Connected to LSP for " + language), nil

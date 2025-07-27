@@ -23,7 +23,7 @@ import (
 // NewMCPLSPBridge creates a new bridge instance with provided configuration and client factory
 func NewMCPLSPBridge(config types.LSPServerConfigProvider, allowedDirectories []string) *MCPLSPBridge {
 	bridge := &MCPLSPBridge{
-		clients:            make(map[types.Language]types.LanguageClientInterface),
+		clients:            make(map[types.LanguageServer]types.LanguageClientInterface),
 		config:             config,
 		allowedDirectories: allowedDirectories,
 	}
@@ -251,8 +251,14 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 
 // GetClientForLanguage retrieves or creates a language server client for a specific language
 func (b *MCPLSPBridge) GetClientForLanguage(language string) (types.LanguageClientInterface, error) {
+	// Look up the server name for the given language
+	server := b.config.GetServerNameFromLanguage(types.Language(language))
+	if server == "" {
+		return nil, fmt.Errorf("no server found for language %s", language)
+	}
+
 	// Check if client already exists
-	if existingClient, exists := b.clients[types.Language(language)]; exists {
+	if existingClient, exists := b.clients[server]; exists {
 		// Check if client context is still valid (not cancelled)
 		if existingClient.Context().Err() == nil {
 			// Reset status to connected if it was in error state but context is still valid
@@ -269,7 +275,7 @@ func (b *MCPLSPBridge) GetClientForLanguage(language string) (types.LanguageClie
 			return nil, err
 		}
 
-		delete(b.clients, types.Language(language))
+		delete(b.clients, server)
 	}
 
 	// Find the server configuration
@@ -285,21 +291,21 @@ func (b *MCPLSPBridge) GetClientForLanguage(language string) (types.LanguageClie
 	}
 
 	// Store the new client
-	b.clients[types.Language(language)] = client
+	b.clients[server] = client
 
 	return client, nil
 }
 
 // CloseAllClients closes all active language server clients
 func (b *MCPLSPBridge) CloseAllClients() {
-	for _, client := range b.clients {
+	for serverName, client := range b.clients {
 		err := client.Close()
 		if err != nil {
-			logger.Error(fmt.Errorf("failed to close client: %w", err))
+			logger.Error(fmt.Errorf("failed to close client for %s: %w", serverName, err))
 		}
 	}
 
-	b.clients = make(map[types.Language]types.LanguageClientInterface)
+	b.clients = make(map[types.LanguageServer]types.LanguageClientInterface)
 }
 
 // InferLanguage infers the programming language from a file path

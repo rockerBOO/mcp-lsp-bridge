@@ -161,7 +161,7 @@ func formatCallHierarchyResults(items []protocol.CallHierarchyItem, successfulLa
 	var result strings.Builder
 
 	// Header with summary
-	fmt.Fprintf(&result, "=== CALL HIERARCHY ===\n")
+	fmt.Fprintf(&result, "CALL HIERARCHY:\n")
 	fmt.Fprintf(&result, "Position: %s:%d:%d\n", uri, line, character)
 	fmt.Fprintf(&result, "Language: %s\n", successfulLanguage)
 	fmt.Fprintf(&result, "Items found: %d\n", len(items))
@@ -172,7 +172,7 @@ func formatCallHierarchyResults(items []protocol.CallHierarchyItem, successfulLa
 
 	// Show errors if any
 	if len(errors) > 0 {
-		fmt.Fprintf(&result, "=== ERRORS ===\n")
+		fmt.Fprintf(&result, "ERRORS:\n")
 		for i, err := range errors {
 			fmt.Fprintf(&result, "%d. %v\n", i+1, err)
 		}
@@ -181,7 +181,7 @@ func formatCallHierarchyResults(items []protocol.CallHierarchyItem, successfulLa
 
 	// Show call hierarchy items
 	if len(items) > 0 {
-		fmt.Fprintf(&result, "=== CALL HIERARCHY ITEMS ===\n")
+		fmt.Fprintf(&result, "CALL HIERARCHY ITEMS:\n")
 		for i, item := range items {
 			fmt.Fprintf(&result, "%d. %s\n", i+1, item.Name)
 			fmt.Fprintf(&result, "   Kind: %s\n", symbolKindToString(item.Kind))
@@ -205,7 +205,7 @@ func formatCallHierarchyResults(items []protocol.CallHierarchyItem, successfulLa
 	// Display call details based on direction
 	switch direction {
 	case "incoming":
-		fmt.Fprintf(&result, "=== INCOMING CALLS (%d) ===\n", len(incomingCalls))
+		fmt.Fprintf(&result, "INCOMING CALLS (%d):\n", len(incomingCalls))
 		for _, call := range incomingCalls {
 			fmt.Fprintf(&result, "Caller: %s\n", call.From.Name)
 			fmt.Fprintf(&result, "   From: %s\n", call.From.Uri)
@@ -221,7 +221,7 @@ func formatCallHierarchyResults(items []protocol.CallHierarchyItem, successfulLa
 			}
 		}
 	case "outgoing":
-		fmt.Fprintf(&result, "=== OUTGOING CALLS (%d) ===\n", len(outgoingCalls))
+		fmt.Fprintf(&result, "OUTGOING CALLS (%d):\n", len(outgoingCalls))
 		for _, call := range outgoingCalls {
 			fmt.Fprintf(&result, "Callee: %s\n", call.To.Name)
 			fmt.Fprintf(&result, "   To: %s\n", call.To.Uri)
@@ -237,7 +237,7 @@ func formatCallHierarchyResults(items []protocol.CallHierarchyItem, successfulLa
 			}
 		}
 	case "both":
-		fmt.Fprintf(&result, "=== INCOMING CALLS (%d) ===\n", len(incomingCalls))
+		fmt.Fprintf(&result, "INCOMING CALLS (%d):\n", len(incomingCalls))
 		for _, call := range incomingCalls {
 			fmt.Fprintf(&result, "Caller: %s\n", call.From.Name)
 			fmt.Fprintf(&result, "   From: %s\n", call.From.Uri)
@@ -252,7 +252,7 @@ func formatCallHierarchyResults(items []protocol.CallHierarchyItem, successfulLa
 					callRange.End.Line+1, callRange.End.Character+1)
 			}
 		}
-		fmt.Fprintf(&result, "\n=== OUTGOING CALLS (%d) ===\n", len(outgoingCalls))
+		fmt.Fprintf(&result, "\nOUTGOING CALLS (%d):\n", len(outgoingCalls))
 		for _, call := range outgoingCalls {
 			fmt.Fprintf(&result, "Callee: %s\n", call.To.Name)
 			fmt.Fprintf(&result, "   To: %s\n", call.To.Uri)

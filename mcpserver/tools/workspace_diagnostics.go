@@ -24,7 +24,14 @@ func RegisterWorkspaceDiagnosticsTool(mcpServer ToolServer, bridge interfaces.Br
 
 func WorkspaceDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("workspace_diagnostics",
-			mcp.WithDescription("Get comprehensive diagnostics for entire workspace"),
+			mcp.WithDescription(`Analyze entire workspace for errors, warnings, and code issues across all languages.
+
+USAGE:
+- Full scan: workspace_uri="file://project/root"
+- Check health: Review error categories and language-specific issues
+
+PARAMETERS: workspace_uri (required)
+OUTPUT: Categorized diagnostics by language with error explanations and suggestions`),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("workspace_uri", mcp.Description("URI to the workspace/project root")),
 			mcp.WithString("identifier", mcp.Description("Optional identifier for diagnostic session")), // TODO: Add optional when supported
@@ -186,7 +193,7 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 	var result strings.Builder
 
 	// Header with summary
-	fmt.Fprintf(&result, "=== WORKSPACE DIAGNOSTICS ===\n")
+	fmt.Fprintf(&result, "WORKSPACE DIAGNOSTICS:\n")
 	fmt.Fprintf(&result, "Languages analyzed: %d\n", len(languageResults))
 	fmt.Fprintf(&result, "Total diagnostics: %d\n", len(allDiagnostics))
 	if len(errors) > 0 {
@@ -196,7 +203,7 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 
 	// Show errors if any with better categorization
 	if len(errors) > 0 {
-		fmt.Fprintf(&result, "=== ERRORS ===\n")
+		fmt.Fprintf(&result, "ERRORS:\n")
 
 		// Group errors by category for better presentation
 		unsupportedMethods := []DiagnosticError{}
@@ -216,17 +223,17 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 
 		// Show unsupported methods with explanation
 		if len(unsupportedMethods) > 0 {
-			fmt.Fprintf(&result, "🚫 Unsupported Methods:\n")
+			fmt.Fprintf(&result, "UNSUPPORTED METHODS:\n")
 			for i, err := range unsupportedMethods {
 				fmt.Fprintf(&result, "%d. %s\n", i+1, err.Explanation)
 			}
-			fmt.Fprintf(&result, "\n💡 Note: These language servers need to be updated to support LSP 3.17+ workspace diagnostics.\n")
+			fmt.Fprintf(&result, "\nNote: These language servers need to be updated to support LSP 3.17+ workspace diagnostics.\n")
 			fmt.Fprintf(&result, "   Consider using individual file diagnostics or updating to newer language server versions.\n\n")
 		}
 
 		// Show connection errors
 		if len(connectionErrors) > 0 {
-			fmt.Fprintf(&result, "🔌 Connection Errors:\n")
+			fmt.Fprintf(&result, "CONNECTION ERRORS:\n")
 			for i, err := range connectionErrors {
 				fmt.Fprintf(&result, "%d. %s\n", i+1, err.Explanation)
 			}
@@ -235,7 +242,7 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 
 		// Show other errors
 		if len(otherErrors) > 0 {
-			fmt.Fprintf(&result, "❌ Other Errors:\n")
+			fmt.Fprintf(&result, "OTHER ERRORS:\n")
 			for i, err := range otherErrors {
 				fmt.Fprintf(&result, "%d. %s\n", i+1, err.Explanation)
 			}
@@ -255,25 +262,25 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 
 	// Show severity summary
 	if len(allDiagnostics) > 0 {
-		fmt.Fprintf(&result, "=== SUMMARY BY SEVERITY ===\n")
+		fmt.Fprintf(&result, "SUMMARY BY SEVERITY:\n")
 		if count, exists := severityCounts[protocol.DiagnosticSeverityError]; exists {
-			fmt.Fprintf(&result, "🔴 Errors: %d\n", count)
+			fmt.Fprintf(&result, "Errors: %d\n", count)
 		}
 		if count, exists := severityCounts[protocol.DiagnosticSeverityWarning]; exists {
-			fmt.Fprintf(&result, "🟡 Warnings: %d\n", count)
+			fmt.Fprintf(&result, "Warnings: %d\n", count)
 		}
 		if count, exists := severityCounts[protocol.DiagnosticSeverityInformation]; exists {
-			fmt.Fprintf(&result, "🔵 Information: %d\n", count)
+			fmt.Fprintf(&result, "Information: %d\n", count)
 		}
 		if count, exists := severityCounts[protocol.DiagnosticSeverityHint]; exists {
-			fmt.Fprintf(&result, "💡 Hints: %d\n", count)
+			fmt.Fprintf(&result, "Hints: %d\n", count)
 		}
 		fmt.Fprintf(&result, "\n")
 	}
 
 	// Show results by language
 	if len(languageResults) > 0 {
-		fmt.Fprintf(&result, "=== RESULTS BY LANGUAGE ===\n")
+		fmt.Fprintf(&result, "RESULTS BY LANGUAGE:\n")
 		for i, langResult := range languageResults {
 			fmt.Fprintf(&result, "%d. %s: %d diagnostics\n", i+1, langResult.Language, len(langResult.Diagnostics))
 
@@ -282,7 +289,7 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 			for j := 0; j < sampleCount; j++ {
 				diag := langResult.Diagnostics[j]
 				severity := "Unknown"
-				icon := "❓"
+				icon := "[UNKNOWN]"
 				if diag.Severity != nil {
 					severity = getDiagnosticSeverityString(diag.Severity)
 					icon = getSeverityIcon(severity)
@@ -296,7 +303,7 @@ func formatWorkspaceDiagnosticsByLanguage(languageResults []LanguageDiagnosticRe
 			fmt.Fprintf(&result, "\n")
 		}
 	} else {
-		fmt.Fprintf(&result, "✅ No diagnostics found across all languages\n")
+		fmt.Fprintf(&result, "No diagnostics found across all languages\n")
 	}
 
 	return result.String()

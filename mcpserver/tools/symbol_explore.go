@@ -42,23 +42,14 @@ type SymbolSessionData struct {
 
 func SymbolExploreTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("symbol_explore",
-			mcp.WithDescription(`Explore code symbols with intelligent search and context-aware information gathering.
+			mcp.WithDescription(`Intelligent symbol search with contextual filtering and detailed code information.
 
-USAGE EXAMPLES:
-• Find symbol: query="getUserData"
-• Filter by file: query="getUserData", file_context="auth"
-• Get details: query="connectDB", detail_level="full"
+USAGE:
+- Find symbols: query="getUserData"
+- Filter by context: query="validateUser", file_context="auth"
+- Detailed view: query="connectDB", detail_level="full"
 
-PARAMETERS:
-• query: Symbol name to search for (required)
-• file_context: Fuzzy file filter (optional, e.g., "auth", "utils", "models")
-• detail_level: Information depth - "auto", "basic", "full" (default: "auto")
-• workspace_scope: Search scope - "project", "current_dir" (default: "project")
-
-BEHAVIOR:
-• Single match: Returns full details immediately
-• Multiple matches: Returns summary with disambiguation options
-• Uses session state for progressive exploration`),
+PARAMETERS: query (required), file_context (optional), detail_level (auto/basic/full)`),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("query", mcp.Description("Symbol name to search for"), mcp.Required()),
 			mcp.WithString("file_context", mcp.Description("Fuzzy file filter (filename, directory, or path component)")),
@@ -370,7 +361,8 @@ func generateDetailedMultipleSymbols(bridge interfaces.BridgeInterface, symbols 
 	info.WriteString(" (detailed view):\n\n")
 
 	for i, symbol := range symbols {
-		info.WriteString(fmt.Sprintf("=== %d. %s (%s) ===\n", i+1, symbol.Name, symbolKindToString(symbol.Kind)))
+		info.WriteString(fmt.Sprintf("%d. %s (%s)\n", i+1, symbol.Name, symbolKindToString(symbol.Kind)))
+		info.WriteString(strings.Repeat("-", 50) + "\n")
 
 		uri := string(symbol.Location.Uri)
 		line := symbol.Location.Range.Start.Line
@@ -517,7 +509,7 @@ func generateTableOfContentsResponse(bridge interfaces.BridgeInterface, symbols 
 		}
 
 		for i := detailStart; i < detailEnd; i++ {
-			result.WriteString(fmt.Sprintf("\n=== %d. %s (%s) ===\n",
+			result.WriteString(fmt.Sprintf("\n%d. %s (%s):\n",
 				i+1, symbols[i].Name, symbolKindToString(symbols[i].Kind)))
 
 			// Get detailed info for this symbol

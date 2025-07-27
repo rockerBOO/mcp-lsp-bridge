@@ -24,19 +24,43 @@ func createTestConfig() *lsp.LSPServerConfig {
 	if err != nil {
 		// Fallback to a minimal config if file doesn't exist
 		return &lsp.LSPServerConfig{
-			LanguageServers: map[types.Language]lsp.LanguageServerConfig{
-				"go": {
+			LanguageServers: map[types.LanguageServer]lsp.LanguageServerConfig{
+				"gopls": {
 					Command:   "gopls",
 					Args:      []string{},
 					Languages: []string{"go"},
 					Filetypes: []string{".go"},
 				},
+				"pyright-langserver": {
+					Command:   "pyright-langserver",
+					Args:      []string{"--stdio"},
+					Languages: []string{"python"},
+					Filetypes: []string{".py"},
+				},
+				"typescript-language-server": {
+					Command:   "typescript-language-server",
+					Args:      []string{"--stdio"},
+					Languages: []string{"typescript"},
+					Filetypes: []string{".ts"},
+				},
+				"rust-analyzer": {
+					Command:   "rust-analyzer",
+					Args:      []string{},
+					Languages: []string{"rust"},
+					Filetypes: []string{".rs"},
+				},
+			},
+			LanguageServerMap: map[types.LanguageServer][]types.Language{
+				"gopls":                      {"go"},
+				"pyright-langserver":         {"python"},
+				"typescript-language-server": {"typescript"},
+				"rust-analyzer":              {"rust"},
 			},
 			ExtensionLanguageMap: map[string]types.Language{
 				".go": "go",
-			},
-			LanguageExtensionMap: map[types.Language][]string{
-				"go": {".go"},
+				".py": "python",
+				".ts": "typescript",
+				".rs": "rust",
 			},
 		}
 	}
@@ -132,18 +156,18 @@ func TestTryLoadConfig(t *testing.T) {
 				// Create a valid config file
 				configContent := `{
 					"language_servers": {
-						"go": {
+						"gopls": {
 							"command": "gopls",
 							"args": [],
 							"languages": ["go"],
 							"filetypes": [".go"]
 						}
 					},
+					"language_server_map": {
+						"gopls": ["go"]
+					},
 					"extension_language_map": {
 						".go": "go"
-					},
-					"language_extension_map": {
-						"go": [".go"]
 					}
 				}`
 
@@ -170,12 +194,15 @@ func TestTryLoadConfig(t *testing.T) {
 				// Create fallback config in current directory
 				configContent := `{
 					"language_servers": {
-						"python": {
+						"pyright-langserver": {
 							"command": "pyright-langserver",
 							"args": ["--stdio"],
 							"languages": ["python"],
 							"filetypes": [".py"]
 						}
+					},
+					"language_server_map": {
+						"pyright-langserver": ["python"]
 					},
 					"extension_language_map": {
 						".py": "python"
@@ -208,12 +235,15 @@ func TestTryLoadConfig(t *testing.T) {
 				// Create fallback config in config directory
 				configContent := `{
 					"language_servers": {
-						"typescript": {
+						"typescript-language-server": {
 							"command": "typescript-language-server",
 							"args": ["--stdio"],
 							"languages": ["typescript"],
 							"filetypes": [".ts", ".tsx"]
 						}
+					},
+					"language_server_map": {
+						"typescript-language-server": ["typescript"]
 					},
 					"extension_language_map": {
 						".ts": "typescript",
@@ -245,12 +275,15 @@ func TestTryLoadConfig(t *testing.T) {
 				// Create example config in current directory
 				configContent := `{
 					"language_servers": {
-						"rust": {
+						"rust-analyzer": {
 							"command": "rust-analyzer",
 							"args": [],
 							"languages": ["rust"],
 							"filetypes": [".rs"]
 						}
+					},
+					"language_server_map": {
+						"rust-analyzer": ["rust"]
 					},
 					"extension_language_map": {
 						".rs": "rust"
@@ -309,12 +342,15 @@ func TestTryLoadConfig(t *testing.T) {
 				// Create config with primary path name
 				configContent := `{
 					"language_servers": {
-						"javascript": {
+						"typescript-language-server": {
 							"command": "typescript-language-server",
 							"args": ["--stdio"],
 							"languages": ["javascript"],
 							"filetypes": [".js", ".jsx"]
 						}
+					},
+					"language_server_map": {
+						"typescript-language-server": ["javascript"]
 					},
 					"extension_language_map": {
 						".js": "javascript",

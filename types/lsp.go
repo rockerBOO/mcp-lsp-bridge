@@ -125,6 +125,7 @@ type LSPProcessInterface interface {
 }
 
 type Language string
+type LanguageServer string
 
 type GlobalConfig struct {
 	LogPath            string `json:"log_file_path"`
@@ -137,7 +138,8 @@ type GlobalConfig struct {
 type LSPServerConfigProvider interface {
 	FindServerConfig(language string) (LanguageServerConfigProvider, error)
 	GetGlobalConfig() GlobalConfig
-	GetLanguageServers() map[Language]LanguageServerConfigProvider
+	GetLanguageServers() map[LanguageServer]LanguageServerConfigProvider
+	GetServerNameFromLanguage(language Language) LanguageServer
 
 	LanguageDetector
 }

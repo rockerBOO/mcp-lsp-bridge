@@ -36,16 +36,21 @@ func createTempProjectWithFiles(t *testing.T, files map[string]string) string {
 func TestDetectProjectLanguages(t *testing.T) {
 	// Create a test configuration
 	config := &LSPServerConfig{
-		LanguageServers: map[types.Language]LanguageServerConfig{
-			"go": {
+		LanguageServers: map[types.LanguageServer]LanguageServerConfig{
+			"gopls": {
 				Filetypes: []string{".go"},
 			},
-			"python": {
+			"pyright-langserver": {
 				Filetypes: []string{".py"},
 			},
-			"typescript": {
+			"typescript-language-server": {
 				Filetypes: []string{".ts", ".js"},
 			},
+		},
+		LanguageServerMap: map[types.LanguageServer][]types.Language{
+			"gopls":                      {"go"},
+			"pyright-langserver":         {"python"},
+			"typescript-language-server": {"typescript"},
 		},
 		ExtensionLanguageMap: map[string]types.Language{
 			".go": "go",
@@ -136,16 +141,21 @@ func TestDetectProjectLanguages(t *testing.T) {
 func TestDetectPrimaryProjectLanguage(t *testing.T) {
 	// Create a test configuration
 	config := &LSPServerConfig{
-		LanguageServers: map[types.Language]LanguageServerConfig{
-			"go": {
+		LanguageServers: map[types.LanguageServer]LanguageServerConfig{
+			"gopls": {
 				Filetypes: []string{".go"},
 			},
-			"python": {
+			"pyright-langserver": {
 				Filetypes: []string{".py"},
 			},
-			"typescript": {
+			"typescript-language-server": {
 				Filetypes: []string{".ts", ".js"},
 			},
+		},
+		LanguageServerMap: map[types.LanguageServer][]types.Language{
+			"gopls":                      {"go"},
+			"pyright-langserver":         {"python"},
+			"typescript-language-server": {"typescript"},
 		},
 		ExtensionLanguageMap: map[string]types.Language{
 			".go": "go",

@@ -18,7 +18,14 @@ func RegisterRenameTool(mcpServer ToolServer, bridge interfaces.BridgeInterface)
 
 func RenameTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("rename",
-			mcp.WithDescription("ACTIONABLE: Rename a symbol across the entire codebase with LSP precision and cross-file support. PREVIEW MODE (apply='false', default): Shows all files and exact locations that would be modified, with line numbers and replacement text. APPLY MODE (apply='true'): Actually performs the rename across all affected files in the codebase. Requires precise coordinates from definitions or hover for accurate targeting. Supports functions, variables, types, and other symbols. Always preview first to verify scope."),
+			mcp.WithDescription(`Rename symbols across entire codebase with cross-file precision. Always preview first.
+
+USAGE:
+- Preview: uri="file://path", line=10, character=5, new_name="newFunc", apply="false"
+- Apply: Same parameters with apply="true"
+
+PARAMETERS: uri (required), line/character (required), new_name (required), apply (default: false)
+OUTPUT: All affected files with exact change locations`),
 			mcp.WithDestructiveHintAnnotation(true),
 			mcp.WithString("uri", mcp.Description("URI to the file containing the symbol (file:// scheme required, e.g., 'file:///path/to/file.go')")),
 			mcp.WithNumber("line", mcp.Description("Line number (0-based) where the symbol is located - use coordinates from project_analysis definitions for precision")),
@@ -84,14 +91,14 @@ func RenameTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandler
 
 				// Return success message with applied changes
 				content := formatWorkspaceEdit(result)
-				content += "\n✅ RENAME APPLIED ✅\nAll rename changes have been applied across the codebase."
+				content += "\nRENAME APPLIED\nAll rename changes have been applied across the codebase."
 
 				return mcp.NewToolResultText(content), nil
 			} else {
 				// Just preview the changes
 				content := formatWorkspaceEdit(result)
 				if content != "=== RENAME PREVIEW ===\nWorkspace edit: <nil>" {
-					content += "\n💡 To apply these changes, use: rename with apply='true'"
+					content += "\nTo apply these changes, use: rename with apply='true'"
 				}
 
 				return mcp.NewToolResultText(content), nil

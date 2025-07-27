@@ -110,7 +110,7 @@ func TestFormatWorkspaceDiagnostics(t *testing.T) {
 			},
 			expected: []string{
 				"Language Server 1 Results:",
-				"✅ No issues found in workspace",
+				"No issues found in workspace",
 			},
 		},
 		{
@@ -121,7 +121,7 @@ func TestFormatWorkspaceDiagnostics(t *testing.T) {
 				},
 			},
 			expected: []string{
-				"✅ No issues found in workspace",
+				"No issues found in workspace",
 			},
 		},
 	}
@@ -171,11 +171,11 @@ func TestDiagnosticSeverityFunctions(t *testing.T) {
 			severity string
 			expected string
 		}{
-			{"Error", "🔴"},
-			{"Warning", "🟡"},
-			{"Information", "🔵"},
-			{"Hint", "💡"},
-			{"Unknown", "❓"},
+			{"Error", "[ERROR]"},
+			{"Warning", "[WARN]"},
+			{"Information", "[INFO]"},
+			{"Hint", "[HINT]"},
+			{"Unknown", "[UNKNOWN]"},
 		}
 
 		for _, tt := range tests {

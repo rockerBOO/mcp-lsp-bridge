@@ -16,9 +16,9 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 	// tools.RegisterAnalyzeCodeTool(mcpServer, bridge)
 	tools.RegisterProjectAnalysisTool(mcpServer, bridge)
 
-	// Disabling lesser used tools
-	// tools.RegisterInferLanguageTool(mcpServer, bridge)
-	// tools.RegisterProjectLanguageDetectionTool(mcpServer, bridge)
+	// Language detection tools
+	tools.RegisterInferLanguageTool(mcpServer, bridge)
+	tools.RegisterProjectLanguageDetectionTool(mcpServer, bridge)
 
 	// LSP connection management
 	// Disabling lesser used tools

@@ -85,10 +85,8 @@
       "command": "clangd",
       "args": ["--background-index", "--clang-tidy"],
       "initialization_options": {
-        "clangdFileStatus": true,
-        "usePlaceholders": true,
-        "completeUnimported": true,
-        "semanticHighlighting": true
+        "fallbackFlags": ["-std=c++17"],
+        "compilationDatabasePath": ""
       }
     },
     "omnisharp": {
@@ -111,16 +109,16 @@
       "initialization_options": {
         "Lua": {
           "runtime": {
-            "version": "LuaJIT"
+            "version": "Lua 5.4"
           },
           "diagnostics": {
             "globals": ["vim"]
           },
           "workspace": {
-            "library": {
-              "/usr/share/lua/5.1": true,
-              "/usr/share/lua/5.3": true
-            }
+            "library": [
+              "/usr/share/lua/5.4",
+              "/usr/local/share/lua/5.4"
+            ]
           }
         }
       }
@@ -273,29 +271,29 @@
       }
     }
   },
-  "language_extension_map": {
-    "go": [".go"],
-    "python": [".py", ".pyw"],
-    "typescript": [".ts", ".tsx", ".js", ".jsx", ".mjs"],
-    "rust": [".rs"],
-    "java": [".java"],
-    "cpp": [".cpp", ".cc", ".cxx", ".c++", ".c", ".h", ".hpp", ".hxx"],
-    "csharp": [".cs", ".csx"],
-    "lua": [".lua"],
-    "ruby": [".rb", ".rake", ".gemspec"],
-    "php": [".php", ".phtml"],
-    "swift": [".swift"],
-    "kotlin": [".kt", ".kts"],
-    "scala": [".scala", ".sc", ".sbt"],
-    "haskell": [".hs", ".lhs"],
-    "elm": [".elm"],
-    "ocaml": [".ml", ".mli", ".ocaml"],
-    "zig": [".zig"],
-    "dockerfile": [".dockerfile", "Dockerfile"],
-    "yaml": [".yaml", ".yml"],
-    "json": [".json", ".jsonc"],
-    "html": [".html", ".htm"],
-    "css": [".css", ".scss", ".sass", ".less"]
+  "language_server_map": {
+    "gopls": ["go"],
+    "pyright-langserver": ["python"],
+    "typescript-language-server": ["typescript", "javascript"],
+    "rust-analyzer": ["rust"],
+    "jdtls": ["java"],
+    "clangd": ["cpp", "c"],
+    "omnisharp": ["csharp"],
+    "lua-language-server": ["lua"],
+    "solargraph": ["ruby"],
+    "phpactor": ["php"],
+    "sourcekit-lsp": ["swift"],
+    "kotlin-language-server": ["kotlin"],
+    "metals": ["scala"],
+    "haskell-language-server-wrapper": ["haskell"],
+    "elm-language-server": ["elm"],
+    "ocamllsp": ["ocaml"],
+    "zls": ["zig"],
+    "docker-langserver": ["dockerfile"],
+    "yaml-language-server": ["yaml"],
+    "vscode-json-language-server": ["json"],
+    "vscode-html-language-server": ["html"],
+    "vscode-css-language-server": ["css"]
   },
   "extension_language_map": {
     ".go": "go",
@@ -303,18 +301,18 @@
     ".pyw": "python",
     ".ts": "typescript",
     ".tsx": "typescript",
-    ".js": "typescript",
-    ".jsx": "typescript",
-    ".mjs": "typescript",
-    ".cjs": "typescript",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".mjs": "javascript",
+    ".cjs": "javascript",
     ".rs": "rust",
     ".java": "java",
     ".cpp": "cpp",
     ".cc": "cpp",
     ".cxx": "cpp",
     ".c++": "cpp",
-    ".c": "cpp",
-    ".h": "cpp",
+    ".c": "c",
+    ".h": "c",
     ".hpp": "cpp",
     ".hxx": "cpp",
     ".cs": "csharp",
