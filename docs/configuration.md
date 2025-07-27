@@ -27,16 +27,16 @@ A valid `lsp_config.json` file is required for the bridge to function. The bridg
 
 ```bash
 # Use default platform-appropriate directories
-./mcp-lsp-bridge
+mcp-lsp-bridge
 
 # Use custom configuration file
-./mcp-lsp-bridge --config /path/to/my-config.json
+mcp-lsp-bridge --config /path/to/my-config.json
 
 # Set custom log file and level
-./mcp-lsp-bridge --log-path /var/log/mcp-bridge.log --log-level debug
+mcp-lsp-bridge --log-path /var/log/mcp-bridge.log --log-level debug
 
 # Combine options
-./mcp-lsp-bridge -c /etc/mcp/config.json -l /tmp/debug.log
+mcp-lsp-bridge -c /etc/mcp/config.json -l /tmp/debug.log
 ```
 
 ## Default Directory Locations
