@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
@@ -810,4 +812,273 @@ func getRangeContent(
 	}
 
 	return strings.Join(result, "\n"), nil
+}
+
+// ResolvedFileContext represents the result of file context resolution
+type ResolvedFileContext struct {
+	ResolvedPath string   // Found file path (empty if not found)
+	Suggestions  []string // Alternative directories/files to try
+	CacheInfo    string   // Cache age info for user
+	ErrorMessage string   // Helpful error with guidance
+}
+
+// DirectoryCache provides lightweight directory caching with TTL
+type DirectoryCache struct {
+	entries    map[string][]string  // directory -> file list
+	timestamps map[string]time.Time // directory -> cache time
+	ttl        time.Duration        // 5 minutes default
+	mu         sync.RWMutex         // thread safety
+}
+
+// Global directory cache instance
+var globalDirCache = &DirectoryCache{
+	entries:    make(map[string][]string),
+	timestamps: make(map[string]time.Time),
+	ttl:        5 * time.Minute,
+}
+
+// GetFiles returns cached files for a directory, or scans if not cached/stale
+func (dc *DirectoryCache) GetFiles(dir string) ([]string, bool, time.Duration) {
+	dc.mu.RLock()
+	files, exists := dc.entries[dir]
+	timestamp, hasTimestamp := dc.timestamps[dir]
+	dc.mu.RUnlock()
+
+	if !exists || !hasTimestamp {
+		return dc.scanDirectory(dir)
+	}
+
+	age := time.Since(timestamp)
+	if age > dc.ttl {
+		return dc.scanDirectory(dir)
+	}
+
+	return files, true, age
+}
+
+// scanDirectory scans a directory and caches the results
+func (dc *DirectoryCache) scanDirectory(dir string) ([]string, bool, time.Duration) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, false, 0
+	}
+
+	var files []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			files = append(files, entry.Name())
+		}
+	}
+
+	dc.mu.Lock()
+	dc.entries[dir] = files
+	dc.timestamps[dir] = time.Now()
+	dc.mu.Unlock()
+
+	return files, false, 0 // Fresh scan, not cached
+}
+
+// ResolveFileContext attempts to resolve a file context to an actual file path
+func ResolveFileContext(bridge interfaces.BridgeInterface, fileContext string, workspaceDir string) (*ResolvedFileContext, error) {
+	result := &ResolvedFileContext{}
+
+	// 1. Try exact path
+	if exactPath := tryExactPath(workspaceDir, fileContext); exactPath != "" {
+		result.ResolvedPath = exactPath
+		return result, nil
+	}
+
+	// 2. Try common directory patterns
+	if patternPath := tryCommonPatterns(workspaceDir, fileContext); patternPath != "" {
+		result.ResolvedPath = patternPath
+		return result, nil
+	}
+
+	// 3. Try with extension inference
+	if extPath := tryWithExtensions(workspaceDir, fileContext); extPath != "" {
+		result.ResolvedPath = extPath
+		return result, nil
+	}
+
+	// 4. Generate helpful suggestions
+	suggestions, cacheInfo := generateSuggestions(workspaceDir, fileContext)
+	result.Suggestions = suggestions
+	result.CacheInfo = cacheInfo
+	result.ErrorMessage = formatHelpfulError(fileContext, suggestions, cacheInfo)
+
+	return result, nil
+}
+
+// tryExactPath tests if the file context is an exact path that exists
+func tryExactPath(workspaceDir, fileContext string) string {
+	// Try absolute path first
+	if filepath.IsAbs(fileContext) {
+		if fileExists(fileContext) {
+			return fileContext
+		}
+		return ""
+	}
+
+	// Try relative to workspace
+	fullPath := filepath.Join(workspaceDir, fileContext)
+	if fileExists(fullPath) {
+		return fullPath
+	}
+
+	return ""
+}
+
+// tryCommonPatterns tests common directory patterns for the file
+func tryCommonPatterns(workspaceDir, fileContext string) string {
+	// Get common patterns based on file extension
+	ext := filepath.Ext(fileContext)
+	patterns := getCommonPatternsForExtension(ext)
+
+	for _, pattern := range patterns {
+		testPath := filepath.Join(workspaceDir, pattern, fileContext)
+		if fileExists(testPath) {
+			return testPath
+		}
+	}
+
+	return ""
+}
+
+// tryWithExtensions tries adding common extensions if none provided
+func tryWithExtensions(workspaceDir, fileContext string) string {
+	// Skip if already has extension
+	if filepath.Ext(fileContext) != "" {
+		return ""
+	}
+
+	// Try common extensions
+	extensions := []string{".js", ".ts", ".tsx", ".jsx", ".go", ".py", ".java", ".cpp", ".c", ".h"}
+
+	for _, ext := range extensions {
+		testName := fileContext + ext
+
+		// Try exact path with extension
+		if exactPath := tryExactPath(workspaceDir, testName); exactPath != "" {
+			return exactPath
+		}
+
+		// Try common patterns with extension
+		if patternPath := tryCommonPatterns(workspaceDir, testName); patternPath != "" {
+			return patternPath
+		}
+	}
+
+	return ""
+}
+
+// generateSuggestions generates helpful suggestions when file not found
+func generateSuggestions(workspaceDir, fileContext string) ([]string, string) {
+	var suggestions []string
+	var cacheInfo strings.Builder
+
+	// Get file extension for targeted suggestions
+	ext := filepath.Ext(fileContext)
+	if ext == "" {
+		// Guess extensions to look for
+		ext = ".js" // Default guess
+	}
+
+	// Check common directories for files with similar extension
+	patterns := getCommonPatternsForExtension(ext)
+
+	for _, pattern := range patterns {
+		dirPath := filepath.Join(workspaceDir, pattern)
+		files, found, age := globalDirCache.GetFiles(dirPath)
+
+		if found && len(files) > 0 {
+			// Count matching files
+			matchingFiles := 0
+			for _, file := range files {
+				if filepath.Ext(file) == ext {
+					matchingFiles++
+				}
+			}
+
+			if matchingFiles > 0 {
+				ageInfo := "fresh"
+				if age > 0 {
+					ageInfo = fmt.Sprintf("%.0f min old", age.Minutes())
+				}
+
+				suggestion := fmt.Sprintf("%s/ (%d %s files, cache: %s)", pattern, matchingFiles, ext, ageInfo)
+				suggestions = append(suggestions, suggestion)
+
+				if cacheInfo.Len() > 0 {
+					cacheInfo.WriteString(", ")
+				}
+				cacheInfo.WriteString(ageInfo)
+			}
+		}
+	}
+
+	return suggestions, cacheInfo.String()
+}
+
+// formatHelpfulError creates a user-friendly error message with guidance
+func formatHelpfulError(fileContext string, suggestions []string, cacheInfo string) string {
+	var result strings.Builder
+
+	result.WriteString(fmt.Sprintf("File '%s' not found.", fileContext))
+
+	if len(suggestions) > 0 {
+		result.WriteString(" Found files in these directories:\n")
+		for _, suggestion := range suggestions {
+			result.WriteString(fmt.Sprintf("- %s\n", suggestion))
+		}
+
+		result.WriteString("\nSuggestions:\n")
+		result.WriteString(fmt.Sprintf("1. Try specific path: file_context='%s/%s'\n", suggestions[0][:strings.Index(suggestions[0], "/")], fileContext))
+		result.WriteString(fmt.Sprintf("2. Search with ripgrep: Use Grep tool with pattern='%s' and glob='*.%s'\n",
+			strings.TrimSuffix(fileContext, filepath.Ext(fileContext)),
+			strings.TrimPrefix(filepath.Ext(fileContext), ".")))
+		result.WriteString(fmt.Sprintf("3. Directory analysis: Use project_analysis with file_analysis on '%s/'\n", suggestions[0][:strings.Index(suggestions[0], "/")]))
+		result.WriteString(fmt.Sprintf("4. Find files by name: Use 'fd %s' or 'find . -name %s'\n", fileContext, fileContext))
+	} else {
+		result.WriteString(" No similar files found in common directories.\n")
+		result.WriteString("\nSuggestions:\n")
+		result.WriteString("1. Check file path and spelling\n")
+		result.WriteString("2. Use Grep tool to search for content\n")
+		result.WriteString("3. Use project_analysis to explore directory structure\n")
+		result.WriteString("4. Use workspace_symbols to find all symbols\n")
+	}
+
+	if cacheInfo != "" {
+		result.WriteString("\nCache info: " + cacheInfo)
+	}
+
+	return result.String()
+}
+
+// getCommonPatternsForExtension returns common directory patterns for file extensions
+func getCommonPatternsForExtension(ext string) []string {
+	patterns := map[string][]string{
+		".js":   {"src", "assets/js", "components", "lib", "public/js", "js"},
+		".jsx":  {"src", "components", "lib", "src/components"},
+		".ts":   {"src", "components", "lib", "types", "src/types"},
+		".tsx":  {"src", "components", "lib", "src/components"},
+		".go":   {"", "cmd", "internal", "pkg"},
+		".py":   {"src", "lib", "scripts", ""},
+		".java": {"src/main/java", "src", "java"},
+		".cpp":  {"src", "lib", "include"},
+		".c":    {"src", "lib", "include"},
+		".h":    {"include", "src", "lib"},
+	}
+
+	if patterns[ext] != nil {
+		return patterns[ext]
+	}
+
+	// Default patterns for unknown extensions
+	return []string{"src", "lib", ""}
+}
+
+// fileExists checks if a file exists
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

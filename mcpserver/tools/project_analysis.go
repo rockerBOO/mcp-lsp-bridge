@@ -130,8 +130,6 @@ PARAMETERS: analysis_type (required), query (required), limit (default: 20)`),
 				return handleReferences(bridge, clients, query, offset, limit, activeLanguage, &response)
 			case "definitions":
 				return handleDefinitions(bridge, lspClient, query, activeLanguage, &response)
-			case "text_search":
-				return handleTextSearch(bridge, query, offset, limit, activeLanguage, &response)
 			case "workspace_analysis":
 				return handleWorkspaceAnalysis(bridge, clients, query, options, &response)
 			case "symbol_relationships":
@@ -548,56 +546,6 @@ func handleDefinitions(bridge interfaces.BridgeInterface, lspClient types.Langua
 	return mcp.NewToolResultText(response.String()), nil
 }
 
-// handleTextSearch handles the 'text_search' analysis type
-func handleTextSearch(bridge interfaces.BridgeInterface, query string, offset, limit int, activeLanguage types.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
-	response.WriteString("TEXT SEARCH:\n")
-
-	searchResults, err := bridge.SearchTextInWorkspace(string(activeLanguage), query)
-	if err != nil {
-		fmt.Fprintf(response, "Text search failed: %v\n", err)
-		return mcp.NewToolResultText(response.String()), nil
-	}
-
-	if len(searchResults) == 0 {
-		fmt.Fprintf(response, "No results found for query '%s'.\n", query)
-		return mcp.NewToolResultText(response.String()), nil
-	}
-
-	// Apply pagination to text search results
-	totalCount := len(searchResults)
-
-	// Handle offset
-	if offset >= totalCount {
-		fmt.Fprintf(response, "Offset %d exceeds total results (%d). No results to display.\n", offset, totalCount)
-		return mcp.NewToolResultText(response.String()), nil
-	}
-
-	// Apply offset and limit
-	end := min(offset+limit, totalCount)
-
-	paginatedResults := searchResults[offset:end]
-	resultCount := len(paginatedResults)
-
-	// Format pagination info
-	if offset > 0 || end < totalCount {
-		fmt.Fprintf(response, "Showing results %d-%d of %d total:\n", offset+1, offset+resultCount, totalCount)
-	} else {
-		fmt.Fprintf(response, "Found %d results:\n", totalCount)
-	}
-
-	for i, result := range paginatedResults {
-		fmt.Fprintf(response, "%d. %v\n", offset+i+1, result)
-	}
-
-	// Show pagination info
-	if end < totalCount {
-		remaining := totalCount - end
-		fmt.Fprintf(response, "\n... and %d more results available (use offset=%d to see next page)\n", remaining, end)
-	}
-
-	return mcp.NewToolResultText(response.String()), nil
-}
-
 // ComplexityMetrics represents file complexity metrics
 type ComplexityMetrics struct {
 	TotalLines      int
@@ -612,17 +560,42 @@ type ComplexityMetrics struct {
 func handleFileAnalysis(bridge interfaces.BridgeInterface, clients map[types.Language]types.LanguageClientInterface, query string, options map[string]interface{}, response *strings.Builder) (*mcp.CallToolResult, error) {
 	response.WriteString("FILE ANALYSIS:\n")
 
-	// For file analysis, the query should be a file URI
-	fileUri := query
-	if !strings.HasPrefix(query, "file://") {
-		// If query is not a URI, treat it as a file path and normalize it
-		fileUri = utils.NormalizeURI(query)
+	// Try intelligent file context resolution first
+	var fileUri string
+	if strings.HasPrefix(query, "file://") {
+		// Already a URI, use as-is
+		fileUri = query
+	} else {
+		// Get workspace directory from bridge
+		dirs := bridge.AllowedDirectories()
+		if len(dirs) == 0 {
+			return mcp.NewToolResultError("no workspace directories configured"), nil
+		}
+		workspaceDir := dirs[0] // Use first allowed directory as workspace
+
+		// Try to resolve the file context to an actual file path
+		resolved, err := ResolveFileContext(bridge, query, workspaceDir)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("file context resolution failed: %v", err)), nil
+		}
+
+		// If we found a specific file, use it
+		if resolved.ResolvedPath != "" {
+			fileUri = "file://" + resolved.ResolvedPath
+		} else if resolved.ErrorMessage != "" {
+			// File not found - provide helpful error with suggestions
+			return mcp.NewToolResultError(resolved.ErrorMessage), nil
+		} else {
+			// Fallback to original behavior
+			fileUri = utils.NormalizeURI(query)
+		}
 	}
 
 	fmt.Fprintf(response, "Analyzing file: %s\n\n", fileUri)
 
-	// Create analysis engine with clients
-	analyzer := analysis.NewProjectAnalyzer(clients)
+	// Create analysis engine with clients and language detector
+	analyzer := analysis.NewProjectAnalyzer(clients,
+		analysis.WithLanguageDetector(bridge.InferLanguage))
 
 	// Create analysis request
 	request := analysis.AnalysisRequest{
@@ -729,8 +702,9 @@ func handlePatternAnalysis(bridge interfaces.BridgeInterface, clients map[types.
 
 	fmt.Fprintf(response, "Pattern Type: %s\n\n", patternType)
 
-	// Create analysis engine with clients
-	analyzer := analysis.NewProjectAnalyzer(clients)
+	// Create analysis engine with clients and language detector
+	analyzer := analysis.NewProjectAnalyzer(clients,
+		analysis.WithLanguageDetector(bridge.InferLanguage))
 
 	// Add pattern_type to options if not present
 	if options == nil {
@@ -824,8 +798,9 @@ func handleWorkspaceAnalysis(bridge interfaces.BridgeInterface, clients map[type
 
 	fmt.Fprintf(response, "Analyzing workspace for: %s\n\n", query)
 
-	// Create analysis engine with clients
-	analyzer := analysis.NewProjectAnalyzer(clients)
+	// Create analysis engine with clients and language detector
+	analyzer := analysis.NewProjectAnalyzer(clients,
+		analysis.WithLanguageDetector(bridge.InferLanguage))
 
 	// Create analysis request
 	request := analysis.AnalysisRequest{
@@ -922,8 +897,9 @@ func handleSymbolRelationships(bridge interfaces.BridgeInterface, clients map[ty
 
 	fmt.Fprintf(response, "Analyzing symbol: %s\n\n", query)
 
-	// Create analysis engine with clients
-	analyzer := analysis.NewProjectAnalyzer(clients)
+	// Create analysis engine with clients and language detector
+	analyzer := analysis.NewProjectAnalyzer(clients,
+		analysis.WithLanguageDetector(bridge.InferLanguage))
 
 	// Create analysis request
 	request := analysis.AnalysisRequest{

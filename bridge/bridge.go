@@ -453,6 +453,52 @@ func (b *MCPLSPBridge) SearchTextInWorkspace(language, query string) ([]protocol
 	return symbols, nil
 }
 
+// SearchTextInAllLanguages performs a text search across all connected language clients
+func (b *MCPLSPBridge) SearchTextInAllLanguages(query string) ([]protocol.WorkspaceSymbol, error) {
+	var allSymbols []protocol.WorkspaceSymbol
+	var errs []error
+
+	// Get all currently connected clients
+	b.mu.RLock()
+	clientMap := make(map[types.LanguageServer]types.LanguageClientInterface)
+	for server, client := range b.clients {
+		// Check if client context is still valid
+		if client.Context().Err() == nil {
+			clientMap[server] = client
+		}
+	}
+	b.mu.RUnlock()
+
+	if len(clientMap) == 0 {
+		return nil, errors.New("no connected language clients available for search")
+	}
+
+	// Search across all connected clients
+	for server, client := range clientMap {
+		symbols, err := client.WorkspaceSymbols(query)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("search failed for %s: %w", server, err))
+			continue
+		}
+		allSymbols = append(allSymbols, symbols...)
+	}
+
+	// If all searches failed, return the combined error
+	if len(allSymbols) == 0 && len(errs) > 0 {
+		var errMsg strings.Builder
+		errMsg.WriteString("all language client searches failed: ")
+		for i, err := range errs {
+			if i > 0 {
+				errMsg.WriteString("; ")
+			}
+			errMsg.WriteString(err.Error())
+		}
+		return nil, fmt.Errorf("%s", errMsg.String())
+	}
+
+	return allSymbols, nil
+}
+
 // GetMultiLanguageClients gets language clients for multiple languages with fallback
 func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[types.Language]types.LanguageClientInterface, error) {
 	clients := make(map[types.Language]types.LanguageClientInterface)

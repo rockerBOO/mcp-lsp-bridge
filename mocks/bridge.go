@@ -94,6 +94,11 @@ func (m *MockBridge) SearchTextInWorkspace(language, query string) ([]protocol.W
 	return args.Get(0).([]protocol.WorkspaceSymbol), args.Error(1)
 }
 
+func (m *MockBridge) SearchTextInAllLanguages(query string) ([]protocol.WorkspaceSymbol, error) {
+	args := m.Called(query)
+	return args.Get(0).([]protocol.WorkspaceSymbol), args.Error(1)
+}
+
 func (m *MockBridge) GetMultiLanguageClients(languages []string) (map[types.Language]types.LanguageClientInterface, error) {
 	args := m.Called(languages)
 	return args.Get(0).(map[types.Language]types.LanguageClientInterface), args.Error(1)

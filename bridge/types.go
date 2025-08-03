@@ -1,6 +1,8 @@
 package bridge
 
 import (
+	"sync"
+
 	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/mark3labs/mcp-go/server"
@@ -12,4 +14,5 @@ type MCPLSPBridge struct {
 	clients            map[types.LanguageServer]types.LanguageClientInterface
 	config             types.LSPServerConfigProvider
 	allowedDirectories []string
+	mu                 sync.RWMutex
 }

@@ -101,7 +101,12 @@ PARAMETERS: query (required), file_context (optional), detail_level (auto/basic/
 			// Filter by file context if provided
 			filteredSymbols := symbols
 			if fileContext != "" {
-				filteredSymbols = filterSymbolsByFileContext(symbols, fileContext)
+				var err error
+				filteredSymbols, err = filterSymbolsByFileContext(bridge, symbols, fileContext)
+				if err != nil {
+					logger.Warn("File context filtering failed", err)
+					return mcp.NewToolResultError(fmt.Sprintf("File context error: %v", err)), nil
+				}
 			}
 
 			// Store results in session data
@@ -204,18 +209,58 @@ func convertWorkspaceSymbolToMatch(symbol protocol.WorkspaceSymbol) SymbolMatch 
 	}
 }
 
-// filterSymbolsByFileContext applies fuzzy file filtering with scoring
-// Filters symbols based on file context using a scoring system:
-// - Exact filename match: 100 points
-// - Directory name match: 50 points
-// - Path component match: 25 points
-// - File extension match: 10 points
-// Only symbols with score > 0 are included in results
-func filterSymbolsByFileContext(symbols []SymbolMatch, fileContext string) []SymbolMatch {
+// filterSymbolsByFileContext applies intelligent file context resolution
+// First attempts to resolve the file context to an actual file path, then filters symbols.
+// If resolution fails, falls back to the original fuzzy matching with helpful error guidance.
+func filterSymbolsByFileContext(bridge interfaces.BridgeInterface, symbols []SymbolMatch, fileContext string) ([]SymbolMatch, error) {
 	if fileContext == "" {
-		return symbols
+		return symbols, nil
 	}
 
+	// Get workspace directory from bridge
+	dirs := bridge.AllowedDirectories()
+	if len(dirs) == 0 {
+		return nil, errors.New("no workspace directories configured")
+	}
+	workspaceDir := dirs[0] // Use first allowed directory as workspace
+
+	// Try to resolve the file context to an actual file path
+	resolved, err := ResolveFileContext(bridge, fileContext, workspaceDir)
+	if err != nil {
+		return nil, fmt.Errorf("file context resolution failed: %w", err)
+	}
+
+	// If we found a specific file, filter symbols to only that file
+	if resolved.ResolvedPath != "" {
+		return filterSymbolsByExactFile(symbols, resolved.ResolvedPath), nil
+	}
+
+	// File not found - provide helpful error with suggestions
+	if resolved.ErrorMessage != "" {
+		return nil, fmt.Errorf("%s", resolved.ErrorMessage)
+	}
+
+	// Fallback to original fuzzy matching if resolution provides no guidance
+	return filterSymbolsByFuzzyMatch(symbols, fileContext), nil
+}
+
+// filterSymbolsByExactFile filters symbols to only those in the specified file path
+func filterSymbolsByExactFile(symbols []SymbolMatch, filePath string) []SymbolMatch {
+	filtered := make([]SymbolMatch, 0)
+	targetURI := "file://" + filePath
+
+	for _, symbol := range symbols {
+		if string(symbol.Location.Uri) == targetURI {
+			filtered = append(filtered, symbol)
+		}
+	}
+
+	return filtered
+}
+
+// filterSymbolsByFuzzyMatch applies the original fuzzy file filtering with scoring
+// This is kept as a fallback when intelligent resolution doesn't provide guidance
+func filterSymbolsByFuzzyMatch(symbols []SymbolMatch, fileContext string) []SymbolMatch {
 	filtered := make([]SymbolMatch, 0)
 	fileContext = strings.ToLower(fileContext)
 

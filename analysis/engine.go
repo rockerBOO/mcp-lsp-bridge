@@ -1,6 +1,7 @@
 package analysis
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"path/filepath"
@@ -12,12 +13,16 @@ import (
 	"rockerboo/mcp-lsp-bridge/types"
 )
 
+// LanguageDetector defines a function that can detect language from file path
+type LanguageDetector func(filePath string) (*types.Language, error)
+
 // ProjectAnalyzer provides capabilities for comprehensive project analysis
 type ProjectAnalyzer struct {
-	clients map[types.Language]types.LanguageClientInterface
-	cache   AnalysisCache
-	config  *PerformanceConfig
-	errors  *AnalysisErrorHandler
+	clients          map[types.Language]types.LanguageClientInterface
+	cache            AnalysisCache
+	config           *PerformanceConfig
+	errors           *AnalysisErrorHandler
+	languageDetector LanguageDetector
 }
 
 // NewProjectAnalyzer creates a new ProjectAnalyzer with given language clients
@@ -26,10 +31,11 @@ func NewProjectAnalyzer(
 	options ...func(*ProjectAnalyzer),
 ) *ProjectAnalyzer {
 	analyzer := &ProjectAnalyzer{
-		clients: clients,
-		cache:   NewAnalysisCache(1000, 1*time.Hour),
-		config:  DefaultPerformanceConfig(),
-		errors:  NewErrorHandler(10, true, 0.2),
+		clients:          clients,
+		cache:            NewAnalysisCache(1000, 1*time.Hour),
+		config:           DefaultPerformanceConfig(),
+		errors:           NewErrorHandler(10, true, 0.2),
+		languageDetector: createDefaultLanguageDetector(),
 	}
 
 	// Apply optional configuration
@@ -58,6 +64,21 @@ func WithPerformanceConfig(config *PerformanceConfig) func(*ProjectAnalyzer) {
 func WithErrorHandler(handler *AnalysisErrorHandler) func(*ProjectAnalyzer) {
 	return func(pa *ProjectAnalyzer) {
 		pa.errors = handler
+	}
+}
+
+// WithLanguageDetector allows customizing language detection
+func WithLanguageDetector(detector LanguageDetector) func(*ProjectAnalyzer) {
+	return func(pa *ProjectAnalyzer) {
+		pa.languageDetector = detector
+	}
+}
+
+// createDefaultLanguageDetector creates a no-op language detector that returns an error
+// This encourages users to provide their own detector with proper configuration
+func createDefaultLanguageDetector() LanguageDetector {
+	return func(filePath string) (*types.Language, error) {
+		return nil, errors.New("no language detector configured - use WithLanguageDetector option")
 	}
 }
 
@@ -1113,24 +1134,26 @@ func (a *ProjectAnalyzer) convertDefinitionsToLocations(definitions []protocol.O
 
 // analyzeFile performs comprehensive analysis on a specific file
 func (a *ProjectAnalyzer) analyzeFile(request AnalysisRequest, metadata *AnalysisMetadata) (*AnalysisResult, error) {
-	// Determine the language of the file
-	var fileLanguage types.Language
-	var documentSymbols []protocol.DocumentSymbol
-	var fileClient types.LanguageClientInterface
-
-	for lang, client := range a.clients {
-		// Get document symbols to understand file structure
-		symbols, err := client.DocumentSymbols(request.Target)
-		if err == nil && len(symbols) > 0 {
-			fileLanguage = lang
-			documentSymbols = symbols
-			fileClient = client
-			break
-		}
+	// First, determine the language using the configured detector
+	languagePtr, err := a.languageDetector(request.Target)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine language for file %s: %w", request.Target, err)
 	}
 
-	if fileLanguage == "" {
-		return nil, fmt.Errorf("could not determine language for file: %s", request.Target)
+	fileLanguage := *languagePtr
+
+	// Get the appropriate client for this language
+	fileClient, exists := a.clients[fileLanguage]
+	if !exists {
+		return nil, fmt.Errorf("no client available for language: %s", fileLanguage)
+	}
+
+	// Get document symbols from the correct client
+	// Note: Empty symbols is OK for analysis - we'll handle it gracefully
+	documentSymbols, err := fileClient.DocumentSymbols(request.Target)
+	if err != nil {
+		// Log the error but continue with empty symbols for basic analysis
+		documentSymbols = []protocol.DocumentSymbol{}
 	}
 
 	// Parallel analysis tasks

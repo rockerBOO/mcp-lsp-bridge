@@ -48,6 +48,7 @@ type DiagnosticsProvider interface {
 
 type SymbolNavigator interface {
 	SearchTextInWorkspace(language, query string) ([]protocol.WorkspaceSymbol, error)
+	SearchTextInAllLanguages(query string) ([]protocol.WorkspaceSymbol, error)
 	GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol, error)
 
 	FindSymbolReferences(language, uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error)

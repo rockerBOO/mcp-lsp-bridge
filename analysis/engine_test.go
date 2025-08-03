@@ -1,6 +1,8 @@
 package analysis
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -280,7 +282,21 @@ func TestErrorHandling(t *testing.T) {
 // TestAnalyzeFileAnalysis tests file analysis functionality
 func TestAnalyzeFileAnalysis(t *testing.T) {
 	clients := createMockClients()
-	analyzer := NewProjectAnalyzer(clients)
+
+	// Create a test language detector
+	testDetector := func(filePath string) (*types.Language, error) {
+		if strings.HasSuffix(filePath, ".go") {
+			lang := types.Language("go")
+			return &lang, nil
+		}
+		if strings.HasSuffix(filePath, ".js") {
+			lang := types.Language("javascript")
+			return &lang, nil
+		}
+		return nil, fmt.Errorf("unknown file type: %s", filePath)
+	}
+
+	analyzer := NewProjectAnalyzer(clients, WithLanguageDetector(testDetector))
 
 	result, err := analyzer.Analyze(AnalysisRequest{
 		Type:   FileAnalysis,
